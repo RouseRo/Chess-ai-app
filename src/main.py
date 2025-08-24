@@ -9,20 +9,22 @@ def main():
     ai_player1 = AIPlayer(model_name="openai/gpt-4o") # White
     ai_player2 = AIPlayer(model_name="deepseek/deepseek-chat-v3.1") # Black
 
-    game = Game()
-    board = chess.Board()
+    game = Game(ai_player1, ai_player2, white_strategy="Play the Ruy Lopez.", black_strategy="Play the Sicilian Defense.")
 
     print("--- Starting AI vs AI Chess Game ---")
-    print(f"Player 1 (White): {ai_player1.model_name}")
-    print(f"Player 2 (Black): {ai_player2.model_name}")
+    print(f"Player 1 (White): {ai_player1.model_name} (Strategy: Ruy Lopez)")
+    print(f"Player 2 (Black): {ai_player2.model_name} (Strategy: Sicilian Defense)")
     print("------------------------------------")
 
     # Game loop
-    while True:
+    while not game.is_game_over():
         game.display_board()
 
         # Determine whose turn it is
-        if game.get_board_state().turn == chess.WHITE:
+        turn = game.get_board_state().turn
+        strategy = game.strategies[turn]
+
+        if turn == chess.WHITE:
             current_player = ai_player1
             player_name = "Player 1 (White)"
         else:
@@ -30,9 +32,11 @@ def main():
             player_name = "Player 2 (Black)"
 
         print(f"\n{player_name}'s turn ({current_player.model_name})...")
+        if strategy and game.get_board_state().fullmove_number <= 3:
+            print(f"Strategy: {strategy}")
         
         # AI computes and makes a move
-        move = current_player.compute_move(game.get_board_state())
+        move = current_player.compute_move(game.get_board_state(), strategy_message=strategy)
         
         if move:
             game.make_move(move)
