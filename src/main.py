@@ -1,4 +1,4 @@
-import chess
+import chess # pyright: ignore[reportMissingImports]
 from game import Game
 from ai_player import AIPlayer
 
