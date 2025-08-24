@@ -1,0 +1,61 @@
+import os
+import chess
+from openai import OpenAI
+import random
+
+class AIPlayer:
+    def __init__(self, model_name):
+        self.model_name = model_name
+        # Initialize the OpenAI API client to use OpenRouter
+        self.client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=os.getenv("OPENAI_API_KEY"),
+        )
+
+    def compute_move(self, board: chess.Board):
+        """
+        Computes the next move using the specified AI model.
+        """
+        legal_moves_uci = [move.uci() for move in board.legal_moves]
+        
+        prompt = f"""You are a chess engine. The current board state in FEN is:
+{board.fen()}
+
+The legal moves are: {', '.join(legal_moves_uci)}.
+Your task is to select the best possible move from the list of legal moves.
+Respond with only the chosen move in UCI notation (e.g., 'e2e4')."""
+
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                completion = self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=[
+                        {"role": "system", "content": 
+                         "You are a helpful chess assistant that provides moves in UCI format."},
+                        {"role": "user", "content": prompt},
+                    ],
+                    temperature=0.5,
+                    max_tokens=10,
+                )
+                
+                model_response = completion.choices[0].message.content.strip()
+
+                # Check if the returned move is legal
+                if model_response in legal_moves_uci:
+                    print(f"Model {self.model_name} chose: {model_response}")
+                    return model_response
+                else:
+                    print(f"Warning: Model returned an illegal move '{model_response}'. Attempt {attempt + 1}/{max_retries}")
+
+            except Exception as e:
+                print(f"An error occurred calling the API: {e}")
+        
+        # Fallback strategy if the model fails to provide a valid move
+        print("AI failed to provide a valid move. Choosing a random legal move.")
+        return random.choice(legal_moves_uci)
+
+
+    def switch_model(self, new_model_name):
+        self.model_name = new_model_name
+        # Optionally reinitialize the API client if needed
