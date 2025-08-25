@@ -1,4 +1,5 @@
 import os
+from dotenv import load_dotenv
 import chess
 from openai import OpenAI
 import random
@@ -6,6 +7,9 @@ import random
 class AIPlayer:
     def __init__(self, model_name):
         self.model_name = model_name
+
+        load_dotenv() # Load environment variables from .env file
+        
         # Initialize the OpenAI API client to use OpenRouter
         self.client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
