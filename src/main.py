@@ -17,6 +17,7 @@ def main():
     print("------------------------------------")
 
     # Game loop
+    auto_moves_remaining = 0
     while not game.is_game_over():
         game.display_board()
 
@@ -47,9 +48,22 @@ def main():
         
         # Wait for user input before the next turn, unless the game is over
         if not game.is_game_over():
-            # Display the board after the move
-            game.display_board()
-            input("Press Enter to continue...")
+            if auto_moves_remaining > 0:
+                # If it's Black's turn, decrement after the full move is complete
+                if game.get_board_state().turn == chess.WHITE:
+                    auto_moves_remaining -= 1
+            else:
+                # Display the board after the move
+                game.display_board()
+                user_input = input("Press Enter to continue, or enter a number of moves to auto-play: ")
+                try:
+                    num_moves = int(user_input)
+                    # We subtract 1 because the current move has just completed a turn
+                    auto_moves_remaining = max(0, num_moves - 1)
+                except ValueError:
+                    # User just pressed Enter
+                    auto_moves_remaining = 0
+
 
     # Display the final board and result
     print("\n--- Game Over ---")
