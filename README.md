@@ -9,6 +9,7 @@ This project is a simple command-line chess application where two AI players, po
 *   Customizable opening strategies for both White and Black.
 *   Interactive and automatic move progression.
 *   Displays the board in the console after each move.
+*   Logs every game to a file for later review.
 
 ## Setup
 
@@ -44,22 +45,41 @@ To start a game, simply run the `main.py` script:
 python src/main.py
 ```
 
-The game will start, and you will see the board printed in the terminal. You can press Enter to step through the game move by move, or enter a number to have the game auto-play that many full moves.
+The game will start by presenting a menu to select opening strategies. After making a selection, the game will begin. You can press Enter to step through the game move by move, or enter a number to have the game auto-play that many full moves.
 
 ## Setting Opening Strategies
 
-You can specify an opening strategy for both the White and Black players directly within the `src/main.py` file. These strategies are passed as text prompts to the AI to influence their opening moves for the first three turns.
+When you run the application, a menu will be displayed allowing you to choose the opening strategies for both White and Black.
 
-To change the strategies, locate the following line in `src/main.py`:
+```
+--- Choose Opening Strategies ---
 
-```python
-# filepath: src/main.py
-game = Game(ai_player1, ai_player2, white_strategy="Play the Ruy Lopez.", black_strategy="Play the Sicilian Defense.")
+White Openings:
+  1: Ruy Lopez.
+  2: Italian Game.
+  3: Queen's Gambit.
+  4: London System.
+  5: King's Gambit.
+
+Black Defenses:
+  a: Sicilian Defense.
+  b: French Defense.
+  c: Caro-Kann Defense.
+
+Enter your choice (e.g., '1a', '3c'):
 ```
 
-You can modify the `white_strategy` and `black_strategy` string values to guide the AI players. For example, to have White play the Queen's Gambit, you would change the line to:
+To select the strategies, enter a two-character string consisting of a number for White's opening and a letter for Black's defense. For example, to have White play the **Ruy Lopez** and Black play the **Sicilian Defense**, you would enter `1a`.
 
-```python
-# filepath: src/main.py
-game = Game(ai_player1, ai_player2, white_strategy="Play the Queen's Gambit.", black_strategy="Play the Sicilian Defense.")
-```
+The chosen strategies will be passed as instructions to the AI players to guide their opening moves for the first three turns.
+
+## Game Logging
+
+Each game session is automatically logged to a file named `chess_game.log` in the project's root directory. The log file is overwritten for each new game.
+
+For every move, the log records:
+- The move number and the player who moved.
+- The move in UCI (Universal Chess Interface) notation.
+- The board state after the move in FEN (Forsyth–Edwards Notation).
+
+This allows for detailed post-game analysis.

@@ -1,4 +1,5 @@
 import chess
+import logging
 
 # ANSI color codes for highlighting
 BLUE = '\033[94m'
@@ -47,16 +48,26 @@ class Game:
 
     def make_move(self, uci_move):
         """
-        Makes a move on the board using UCI notation.
+        Attempts to make a move on the board using UCI notation.
+        Returns True if the move is legal, False otherwise.
         """
         try:
             move = chess.Move.from_uci(uci_move)
             if move in self.board.legal_moves:
+                # Log before the move to capture who is making the move
+                player_color = "White" if self.board.turn == chess.WHITE else "Black"
+                move_num = self.board.fullmove_number
+                
                 self.board.push(move)
-            else:
-                print(f"Warning: Attempted illegal move {uci_move}")
+                
+                # Log the result of the move
+                log_message = f"Move {move_num} ({player_color}): {uci_move}, FEN: {self.board.fen()}"
+                logging.info(log_message)
+                return True
         except ValueError:
-            print(f"Error: Invalid move format: {uci_move}")
+            # This can happen if the AI provides a malformed UCI string
+            return False
+        return False
 
     def is_game_over(self):
         """Checks if the game is over (checkmate, stalemate, etc.)."""

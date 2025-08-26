@@ -1,4 +1,5 @@
 import chess # pyright: ignore[reportMissingImports]
+import logging
 from game import Game
 from ai_player import AIPlayer
 
@@ -21,6 +22,13 @@ def display_menu_and_get_choice(white_openings, black_defenses):
             print("Invalid input. Please enter a valid number for White and a valid letter for Black (e.g., '1a').")
 
 def main():
+    # Set up logging
+    logging.basicConfig(filename='chess_game.log', level=logging.INFO, 
+                        format='%(asctime)s - %(message)s', filemode='w')
+
+    # Silence the HTTP logger from the openai library to keep the log clean
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
     # Dictionaries for opening strategies
     white_openings = {
         '1': "Play the Ruy Lopez.",
@@ -51,6 +59,8 @@ def main():
 
     game = Game(ai_player1, ai_player2, white_strategy=white_strategy, black_strategy=black_strategy)
 
+    start_message = f"New Game Started. White: {ai_player1.model_name} (Strategy: {white_strategy}) | Black: {ai_player2.model_name} (Strategy: {black_strategy})"
+    logging.info(start_message)
     print("\n--- Starting AI vs AI Chess Game ---")
     print(f"Player 1 (White): {ai_player1.model_name} (Strategy: {white_strategy})")
     print(f"Player 2 (Black): {ai_player2.model_name} (Strategy: {black_strategy})")
@@ -72,7 +82,8 @@ def main():
             current_player = ai_player2
             player_name = "Player 2 (Black)"
 
-        print(f"\n{player_name}'s turn ({current_player.model_name})...")
+        move_number = game.get_board_state().fullmove_number
+        print(f"\nMove {move_number}: {player_name}'s turn ({current_player.model_name})...")
         if strategy and game.get_board_state().fullmove_number <= 3:
             print(f"Strategy: {strategy}")
         
@@ -109,9 +120,12 @@ def main():
 
 
     # Display the final board and result
+    result = game.get_game_result()
+    logging.info(f"Game Over. Result: {result}")
     print("\n--- Game Over ---")
     game.display_board()
-    print(f"Result: {game.get_game_result()}")
+    print(f"Result: {result}")
+    print("Game history has been saved to chess_game.log")
 
 if __name__ == "__main__":
     main()
