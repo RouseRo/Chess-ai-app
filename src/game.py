@@ -1,5 +1,9 @@
 import chess
 
+# ANSI color codes for highlighting
+BLUE = '\033[94m'
+ENDC = '\033[0m'
+
 class Game:
     def __init__(self, white_player, black_player, white_strategy=None, black_strategy=None):
         """Initializes the chessboard and players."""
@@ -16,9 +20,30 @@ class Game:
             print("Invalid color specified for strategy.")
 
     def display_board(self):
-        """Prints a simple text representation of the board."""
-        print("\n" + str(self.board))
-        print("-----------------")
+        """Prints a text representation of the board, highlighting the last move."""
+        last_move = None
+        if self.board.move_stack:
+            last_move = self.board.move_stack[-1]
+
+        print()
+        print("  a b c d e f g h")
+        print(" -----------------")
+        for rank in range(7, -1, -1):
+            line = f"{rank + 1}|"
+            for file in range(8):
+                square = chess.square(file, rank)
+                piece = self.board.piece_at(square)
+                
+                symbol = "." if piece is None else piece.symbol()
+                
+                # Highlight the piece on the 'to' square of the last move
+                if last_move and square == last_move.to_square:
+                    line += f"{BLUE}{symbol}{ENDC} "
+                else:
+                    line += f"{symbol} "
+            print(line + f"|{rank + 1}")
+        print(" -----------------")
+        print("  a b c d e f g h")
 
     def make_move(self, uci_move):
         """
