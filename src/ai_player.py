@@ -26,12 +26,13 @@ class AIPlayer:
         if strategy_message:
             strategy_prompt = f"Your designated strategy is: {strategy_message}."
 
-        prompt = f"""You are a chess engine. {strategy_prompt}
+        prompt = f"""You are a world-class chess grandmaster. {strategy_prompt}
+Analyze the position deeply, considering long-term consequences, threats, and opportunities.
 The current board state in FEN is:
 {board.fen()}
 
 The legal moves are: {', '.join(legal_moves_uci)}.
-Your task is to select the best possible move from the list of legal moves that follows your strategy if provided.
+Your task is to select the absolute best possible move from the list of legal moves.
 Respond with only the chosen move in UCI notation (e.g., 'e2e4')."""
 
         max_retries = 3
