@@ -1,54 +1,65 @@
-# Chess AI App
+# Chess AI Application
 
-This project is a simple chess application that utilizes the OpenRouter.ai API through the OpenAI SDK to play chess with two different AI models. The application displays a chessboard after each move and requires user input to proceed to the next move.
+This project is a simple command-line chess application where two AI players, powered by large language models via the OpenRouter API, play against each other.
 
-## Project Structure
+## Features
 
-```
-chess-ai-app
-├── src
-│   ├── main.py        # Entry point of the application
-│   ├── game.py        # Manages the chessboard state and game logic
-│   └── ai_player.py   # Interacts with the OpenRouter.ai API for AI moves
-├── requirements.txt    # Lists project dependencies
-└── README.md           # Documentation for the project
-```
+*   AI vs. AI chess gameplay.
+*   Utilizes different language models for each player.
+*   Customizable opening strategies for both White and Black.
+*   Interactive and automatic move progression.
+*   Displays the board in the console after each move.
 
-## Setup Instructions
+## Setup
 
-1. Clone the repository:
-   ```
-   git clone <repository-url>
-   cd chess-ai-app
-   ```
+1.  **Clone the repository:**
+    ```bash
+    git clone <repository-url>
+    cd Chess-ai-app
+    ```
 
-2. Install the required dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
+2.  **Create a virtual environment:**
+    ```bash
+    python -m venv .venv
+    source .venv/bin/activate  # On Windows, use `.venv\Scripts\activate`
+    ```
 
-3. Set up your OpenAI API key as an environment variable:
-   ```
-   export OPENAI_API_KEY='your-api-key'
-   ```
+3.  **Install dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-## Usage
+4.  **Set up your API key:**
+    *   Create a file named `.env` in the root directory of the project.
+    *   Add your OpenRouter API key to the `.env` file:
+        ```
+        OPENAI_API_KEY="your-openrouter-api-key"
+        ```
 
-To start the chess game, run the following command:
-```
+## How to Run
+
+To start a game, simply run the `main.py` script:
+
+```bash
 python src/main.py
 ```
 
-Follow the on-screen instructions to play against the AI. After each move, press the ENTER character to compute the player's next move.
+The game will start, and you will see the board printed in the terminal. You can press Enter to step through the game move by move, or enter a number to have the game auto-play that many full moves.
 
-## Overview
+## Setting Opening Strategies
 
-The application consists of three main components:
+You can specify an opening strategy for both the White and Black players directly within the `src/main.py` file. These strategies are passed as text prompts to the AI to influence their opening moves for the first three turns.
 
-- **Game Class**: Manages the chessboard state, validates moves, and updates the board after each move. It also handles the display of the chessboard to the user.
+To change the strategies, locate the following line in `src/main.py`:
 
-- **AIPlayer Class**: Interacts with the OpenRouter.ai API to compute the next move based on the current board state using two different AI models.
+```python
+# filepath: src/main.py
+game = Game(ai_player1, ai_player2, white_strategy="Play the Ruy Lopez.", black_strategy="Play the Sicilian Defense.")
+```
 
-- **Main Application**: Initializes the game, manages the game loop, and handles user input to trigger the next move.
+You can modify the `white_strategy` and `black_strategy` string values to guide the AI players. For example, to have White play the Queen's Gambit, you would change the line to:
 
-Enjoy playing chess with AI!
+```python
+# filepath: src/main.py
+game = Game(ai_player1, ai_player2, white_strategy="Play the Queen's Gambit.", black_strategy="Play the Sicilian Defense.")
+```
