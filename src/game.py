@@ -36,8 +36,8 @@ class Game:
                 
                 symbol = "." if piece is None else piece.symbol()
                 
-                # Highlight the piece on the 'to' square of the last move
-                if last_move and square == last_move.to_square:
+                # Highlight the 'to' and 'from' squares of the last move
+                if last_move and (square == last_move.to_square or square == last_move.from_square):
                     line += f"{BLUE}{symbol}{ENDC} "
                 else:
                     line += f"{symbol} "
