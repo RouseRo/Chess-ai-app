@@ -55,7 +55,10 @@ def main():
             else:
                 # Display the board after the move
                 game.display_board()
-                user_input = input("Press Enter to continue, or enter a number of moves to auto-play: ")
+                user_input = input("Press Enter to continue, 'q' to quit, or a number of moves to auto-play: ")
+                if user_input.lower() == 'q':
+                    print("Exiting game.")
+                    break
                 try:
                     num_moves = int(user_input)
                     # We subtract 1 because the current move has just completed a turn
