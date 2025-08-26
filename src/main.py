@@ -2,18 +2,58 @@ import chess # pyright: ignore[reportMissingImports]
 from game import Game
 from ai_player import AIPlayer
 
+def display_menu_and_get_choice(white_openings, black_defenses):
+    """Displays strategy options and gets the user's choice."""
+    print("--- Choose Opening Strategies ---")
+    print("\nWhite Openings:")
+    for key, value in white_openings.items():
+        print(f"  {key}: {value.replace('Play the ', '')}")
+
+    print("\nBlack Defenses:")
+    for key, value in black_defenses.items():
+        print(f"  {key}: {value.replace('Play the ', '')}")
+
+    while True:
+        choice = input("\nEnter your choice (e.g., '1a', '3c'): ").strip().lower()
+        if len(choice) == 2 and choice[0] in white_openings and choice[1] in black_defenses:
+            return choice[0], choice[1]
+        else:
+            print("Invalid input. Please enter a valid number for White and a valid letter for Black (e.g., '1a').")
+
 def main():
+    # Dictionaries for opening strategies
+    white_openings = {
+        '1': "Play the Ruy Lopez.",
+        '2': "Play the Italian Game.",
+        '3': "Play the Queen's Gambit.",
+        '4': "Play the London System.",
+        '5': "Play the King's Gambit."
+    }
+
+    black_defenses = {
+        'a': "Play the Sicilian Defense.",
+        'b': "Play the French Defense.",
+        'c': "Play the Caro-Kann Defense."
+    }
+
+    # Get user's choice for strategies
+    white_key, black_key = display_menu_and_get_choice(white_openings, black_defenses)
+
     # Initialize the game and AI players with actual OpenRouter models.
     # You can choose any models from https://openrouter.ai/models
     # Using two different models to play against each other.
     ai_player1 = AIPlayer(model_name="openai/gpt-4o") # White
     ai_player2 = AIPlayer(model_name="deepseek/deepseek-chat-v3.1") # Black
 
-    game = Game(ai_player1, ai_player2, white_strategy="Play the Ruy Lopez.", black_strategy="Play the Sicilian Defense.")
+    # Set strategies from the dictionaries based on user input
+    white_strategy = white_openings[white_key]
+    black_strategy = black_defenses[black_key]
 
-    print("--- Starting AI vs AI Chess Game ---")
-    print(f"Player 1 (White): {ai_player1.model_name} (Strategy: Ruy Lopez)")
-    print(f"Player 2 (Black): {ai_player2.model_name} (Strategy: Sicilian Defense)")
+    game = Game(ai_player1, ai_player2, white_strategy=white_strategy, black_strategy=black_strategy)
+
+    print("\n--- Starting AI vs AI Chess Game ---")
+    print(f"Player 1 (White): {ai_player1.model_name} (Strategy: {white_strategy})")
+    print(f"Player 2 (Black): {ai_player2.model_name} (Strategy: {black_strategy})")
     print("------------------------------------")
 
     # Game loop
