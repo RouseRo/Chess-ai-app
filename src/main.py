@@ -113,7 +113,7 @@ def main():
     # Check for saved games at startup
     saved_games = glob.glob('chess_game_*.log')
     if saved_games:
-        load_choice = input("Saved games found. Load a game? (y/n): ").strip().lower()
+        load_choice = input("Welcome back! I found some saved games. Would you like to load one? (y/n): ").strip().lower()
         if load_choice == 'y':
             print("\n--- Saved Games ---")
             for i, filename in enumerate(saved_games):
