@@ -188,13 +188,15 @@ def main():
     while not game.is_game_over():
         game.display_board()
 
+        is_manual_move = False # Flag to skip AI move if user enters one
+
         # Wait for user input before proceeding with the move
         if auto_moves_remaining > 0:
             # If it's Black's turn, decrement after the full move is complete
             if game.get_board_state().turn == chess.WHITE:
                 auto_moves_remaining -= 1
         else:
-            user_input = input("Press Enter to continue, 'q' to quit, 'm' for menu, or a number of moves to auto-play: ")
+            user_input = input("Press Enter for AI move, 'q' to quit, 'm' for menu, a number for auto-play, or enter a move (e.g. e2e4): ")
             if user_input.lower() == 'q':
                 save_choice = input("Save game before quitting? (y/n): ").strip().lower()
                 if save_choice == 'y':
@@ -253,8 +255,18 @@ def main():
                 # We subtract 1 because the current move is about to be played
                 auto_moves_remaining = max(0, num_moves - 1)
             except ValueError:
-                # User just pressed Enter
-                auto_moves_remaining = 0
+                # Not a number, so it's either Enter or a move string
+                if user_input == '':
+                    # User pressed Enter, let AI play
+                    pass
+                else:
+                    # Assume it's a manual move
+                    move_uci = user_input.strip().lower()
+                    if game.make_move(move_uci):
+                        is_manual_move = True # Signal that AI should not move
+                    else:
+                        print("Invalid or illegal move. Please try again.")
+                        continue # Re-prompt user
 
         # Determine whose turn it is
         turn = game.get_board_state().turn
@@ -267,25 +279,23 @@ def main():
             current_player = game.players[chess.BLACK]
             player_name = "Player 2 (Black)"
 
-        move_number = game.get_board_state().fullmove_number
-        print(f"\n{BLUE}Move {move_number}:{ENDC} {player_name}'s turn ({current_player.model_name})...")
-        if strategy and game.get_board_state().fullmove_number <= 3:
-            print(f"Strategy: {strategy}")
+        # Only compute AI move if a manual move was not made
+        if not is_manual_move:
+            move_number = game.get_board_state().fullmove_number
+            print(f"\n{BLUE}Move {move_number}:{ENDC} {player_name}'s turn ({current_player.model_name})...")
+            if strategy and game.get_board_state().fullmove_number <= 3:
+                print(f"Strategy: {strategy}")
+            
+            # AI computes and makes a move
+            move = current_player.compute_move(game.get_board_state(), strategy_message=strategy)
+            
+            if move:
+                game.make_move(move)
+            else:
+                # This might happen if the AI fails to return a valid move
+                print("AI failed to provide a move. Ending game.")
+                break
         
-        # AI computes and makes a move
-        move = current_player.compute_move(game.get_board_state(), strategy_message=strategy)
-        
-        if move:
-            game.make_move(move)
-        else:
-            # This might happen if the AI fails to return a valid move
-            print("AI failed to provide a move. Ending game.")
-            break
-        
-        # Wait for user input before the next turn, unless the game is over
-        # This block has been moved to the top of the loop
-
-
     # Display the final board and result
     result = game.get_game_result()
     logging.info(f"Game Over. Result: {result}")
