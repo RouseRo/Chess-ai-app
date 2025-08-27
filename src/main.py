@@ -188,6 +188,74 @@ def main():
     while not game.is_game_over():
         game.display_board()
 
+        # Wait for user input before proceeding with the move
+        if auto_moves_remaining > 0:
+            # If it's Black's turn, decrement after the full move is complete
+            if game.get_board_state().turn == chess.WHITE:
+                auto_moves_remaining -= 1
+        else:
+            user_input = input("Press Enter to continue, 'q' to quit, 'm' for menu, or a number of moves to auto-play: ")
+            if user_input.lower() == 'q':
+                save_choice = input("Save game before quitting? (y/n): ").strip().lower()
+                if save_choice == 'y':
+                    # Close the logger to release the file handle
+                    logging.shutdown()
+                    try:
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        new_filename = f"chess_game_{timestamp}.log"
+                        os.rename('chess_game.log', new_filename)
+                        print(f"Game saved as {new_filename}")
+                    except FileNotFoundError:
+                        print("Log file not found, could not save.")
+                print("Exiting game.")
+                break
+            elif user_input.lower() == 'm':
+                menu_choice = display_game_menu_and_get_choice()
+                if menu_choice == 'l':
+                    saved_games = glob.glob('chess_game_*.log')
+                    if not saved_games:
+                        print("No saved games found.")
+                        continue
+                    
+                    print("\n--- Saved Games ---")
+                    for i, filename in enumerate(saved_games):
+                        print(f"  {i + 1}: {filename}")
+                    
+                    try:
+                        file_choice = int(input("Enter the number of the game to load: "))
+                        if 1 <= file_choice <= len(saved_games):
+                            chosen_file = saved_games[file_choice - 1]
+                            # We will load the board state from the chosen file.
+                            # The current AI models and strategies will be replaced.
+                            loaded_game = load_game_from_log(chosen_file)
+                            if loaded_game:
+                                game = loaded_game
+                                # Copy the loaded game to be the active game log and set to append
+                                logging.shutdown()
+                                shutil.copy(chosen_file, 'chess_game.log')
+                                logging.basicConfig(filename='chess_game.log', level=logging.INFO, 
+                                                    format='%(asctime)s - %(message)s', filemode='a')
+                                logging.getLogger("httpx").setLevel(logging.WARNING)
+
+                                print(f"Successfully loaded game from {chosen_file}.")
+                                auto_moves_remaining = 0 # Reset auto-play
+                            else:
+                                print("Could not load game from log file.")
+                        else:
+                            print("Invalid number.")
+                    except ValueError:
+                        print("Invalid input.")
+
+                # If 'c' or after loading, just continue the loop to redisplay the board
+                continue
+            try:
+                num_moves = int(user_input)
+                # We subtract 1 because the current move is about to be played
+                auto_moves_remaining = max(0, num_moves - 1)
+            except ValueError:
+                # User just pressed Enter
+                auto_moves_remaining = 0
+
         # Determine whose turn it is
         turn = game.get_board_state().turn
         strategy = game.strategies[turn]
@@ -215,75 +283,7 @@ def main():
             break
         
         # Wait for user input before the next turn, unless the game is over
-        if not game.is_game_over():
-            if auto_moves_remaining > 0:
-                # If it's Black's turn, decrement after the full move is complete
-                if game.get_board_state().turn == chess.WHITE:
-                    auto_moves_remaining -= 1
-            else:
-                # Display the board after the move
-                game.display_board()
-                user_input = input("Press Enter to continue, 'q' to quit, 'm' for menu, or a number of moves to auto-play: ")
-                if user_input.lower() == 'q':
-                    save_choice = input("Save game before quitting? (y/n): ").strip().lower()
-                    if save_choice == 'y':
-                        # Close the logger to release the file handle
-                        logging.shutdown()
-                        try:
-                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                            new_filename = f"chess_game_{timestamp}.log"
-                            os.rename('chess_game.log', new_filename)
-                            print(f"Game saved as {new_filename}")
-                        except FileNotFoundError:
-                            print("Log file not found, could not save.")
-                    print("Exiting game.")
-                    break
-                elif user_input.lower() == 'm':
-                    menu_choice = display_game_menu_and_get_choice()
-                    if menu_choice == 'l':
-                        saved_games = glob.glob('chess_game_*.log')
-                        if not saved_games:
-                            print("No saved games found.")
-                            continue
-                        
-                        print("\n--- Saved Games ---")
-                        for i, filename in enumerate(saved_games):
-                            print(f"  {i + 1}: {filename}")
-                        
-                        try:
-                            file_choice = int(input("Enter the number of the game to load: "))
-                            if 1 <= file_choice <= len(saved_games):
-                                chosen_file = saved_games[file_choice - 1]
-                                # We will load the board state from the chosen file.
-                                # The current AI models and strategies will be replaced.
-                                loaded_game = load_game_from_log(chosen_file)
-                                if loaded_game:
-                                    game = loaded_game
-                                    # Copy the loaded game to be the active game log and set to append
-                                    logging.shutdown()
-                                    shutil.copy(chosen_file, 'chess_game.log')
-                                    logging.basicConfig(filename='chess_game.log', level=logging.INFO, 
-                                                        format='%(asctime)s - %(message)s', filemode='a')
-                                    logging.getLogger("httpx").setLevel(logging.WARNING)
-
-                                    print(f"Successfully loaded game from {chosen_file}.")
-                                    auto_moves_remaining = 0 # Reset auto-play
-                                else:
-                                    print("Could not load game from log file.")
-                            else:
-                                print("Invalid number.")
-                        except ValueError:
-                            print("Invalid input.")
-
-                    # If 'c', just continue the loop and prompt again
-                    continue
-                try:
-                    num_moves = int(user_input)
-                    # We subtract 1 because the current move has just completed a turn
-                    auto_moves_remaining = max(0, num_moves - 1)
-                except ValueError:
-                    # User just pressed Enter
-                    auto_moves_remaining = 0
+        # This block has been moved to the top of the loop
 
 
     # Display the final board and result
