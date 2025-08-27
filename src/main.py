@@ -21,6 +21,23 @@ def display_menu_and_get_choice(white_openings, black_defenses):
         else:
             print("Invalid input. Please enter a valid number for White and a valid letter for Black (e.g., '1a').")
 
+def display_model_menu_and_get_choice(ai_models):
+    """Displays AI model options and gets the user's choice."""
+    print("\n--- Choose AI Models ---")
+    for key, value in ai_models.items():
+        print(f"  {key}: {value}")
+
+    while True:
+        choice = input("\nEnter your choice for White and Black models (e.g., 'm1m5'): ").strip().lower()
+        if len(choice) == 4 and choice.startswith('m') and choice[2] == 'm':
+            white_model_key = choice[:2]
+            black_model_key = choice[2:]
+            if white_model_key in ai_models and black_model_key in ai_models:
+                return white_model_key, black_model_key
+        
+        print("Invalid input. Please enter a valid choice for both models (e.g., 'm1m5').")
+
+
 def main():
     # Set up logging
     logging.basicConfig(filename='chess_game.log', level=logging.INFO, 
@@ -44,14 +61,28 @@ def main():
         'c': "Play the Caro-Kann Defense."
     }
 
+    # Dictionary for AI models
+    ai_models = {
+        'm1': "openai/gpt-4o",
+        'm2': "deepseek/deepseek-chat-v3.1",
+        'm3': "google/gemini-1.5-pro",
+        'm4': "anthropic/claude-3-opus",
+        'm5': "meta-llama/llama-3-70b-instruct"
+    }
+
     # Get user's choice for strategies
     white_key, black_key = display_menu_and_get_choice(white_openings, black_defenses)
+
+    # Get user's choice for AI models
+    white_model_key, black_model_key = display_model_menu_and_get_choice(ai_models)
 
     # Initialize the game and AI players with actual OpenRouter models.
     # You can choose any models from https://openrouter.ai/models
     # Using two different models to play against each other.
-    ai_player1 = AIPlayer(model_name="openai/gpt-4o") # White
-    ai_player2 = AIPlayer(model_name="deepseek/deepseek-chat-v3.1") # Black
+    white_model_name = ai_models[white_model_key]
+    black_model_name = ai_models[black_model_key]
+    ai_player1 = AIPlayer(model_name=white_model_name) # White
+    ai_player2 = AIPlayer(model_name=black_model_name) # Black
 
     # Set strategies from the dictionaries based on user input
     white_strategy = white_openings[white_key]
