@@ -9,39 +9,46 @@ import json
 from game import Game, BLUE, ENDC
 from ai_player import AIPlayer
 
-def display_menu_and_get_choice(white_openings, black_defenses):
-    """Displays strategy options and gets the user's choice."""
-    print("--- Choose Opening Strategies ---")
-    print("\nWhite Openings:")
-    for key, value in white_openings.items():
-        print(f"  {key}: {value.replace('Play the ', '')}")
+def display_setup_menu_and_get_choices(white_openings, black_defenses, ai_models):
+    """Displays all setup menus in columns and gets the user's combined choice."""
+    
+    white_list = [f"  {k}: {v.replace('Play the ', '')}" for k, v in white_openings.items()]
+    black_list = [f"  {k}: {v.replace('Play the ', '')}" for k, v in black_defenses.items()]
+    model_list = [f"  {k}: {v}" for k, v in ai_models.items()]
 
-    print("\nBlack Defenses:")
-    for key, value in black_defenses.items():
-        print(f"  {key}: {value.replace('Play the ', '')}")
+    # Determine column widths for alignment
+    white_width = max(len(s) for s in white_list) + 4
+    black_width = max(len(s) for s in black_list) + 4
 
-    while True:
-        choice = input("\nEnter your choice (e.g., '1a', '3c'): ").strip().lower()
-        if len(choice) == 2 and choice[0] in white_openings and choice[1] in black_defenses:
-            return choice[0], choice[1]
-        else:
-            print("Invalid input. Please enter a valid number for White and a valid letter for Black (e.g., '1a').")
-
-def display_model_menu_and_get_choice(ai_models):
-    """Displays AI model options and gets the user's choice."""
-    print("\n--- Choose AI Models ---")
-    for key, value in ai_models.items():
-        print(f"  {key}: {value}")
+    # Print headers
+    print(f"\n{'--- White Openings ---':<{white_width}}{'--- Black Defenses ---':<{black_width}}{'--- AI Models ---'}")
+    
+    # Print rows
+    num_rows = max(len(white_list), len(black_list), len(model_list))
+    for i in range(num_rows):
+        white_col = white_list[i] if i < len(white_list) else ""
+        black_col = black_list[i] if i < len(black_list) else ""
+        model_col = model_list[i] if i < len(model_list) else ""
+        print(f"{white_col:<{white_width}}{black_col:<{black_width}}{model_col}")
 
     while True:
-        choice = input("\nEnter your choice for White and Black models (e.g., 'm1m5'): ").strip().lower()
-        if len(choice) == 4 and choice.startswith('m') and choice[2] == 'm':
-            white_model_key = choice[:2]
-            black_model_key = choice[2:]
-            if white_model_key in ai_models and black_model_key in ai_models:
-                return white_model_key, black_model_key
+        choice = input("\nEnter choices for openings and models (e.g., '1a m1m2'): ").strip().lower()
+        parts = choice.split()
         
-        print("Invalid input. Please enter a valid choice for both models (e.g., 'm1m5').")
+        if len(parts) == 2:
+            opening_choice, model_choice = parts[0], parts[1]
+            if len(opening_choice) == 2 and len(model_choice) == 4:
+                white_opening_key, black_defense_key = opening_choice[0], opening_choice[1]
+                white_model_key, black_model_key = model_choice[:2], model_choice[2:]
+
+                if (white_opening_key in white_openings and
+                    black_defense_key in black_defenses and
+                    white_model_key in ai_models and
+                    black_model_key in ai_models):
+                    return white_opening_key, black_defense_key, white_model_key, black_model_key
+        
+        print("Invalid input. Please enter a valid string like '1a m1m2'.")
+
 
 def display_game_menu_and_get_choice():
     """Displays the in-game menu and gets the user's choice."""
@@ -73,24 +80,18 @@ def parse_log_header(log_file):
     return None
 
 def setup_new_game(white_openings, black_defenses, ai_models):
-    """Set up a new game with user-defined or default settings."""
-    # Get user's choice for strategies
-    white_key, black_key = display_menu_and_get_choice(white_openings, black_defenses)
+    """Handles the user interaction for setting up a new game."""
+    # Get user's choices for strategies and models
+    white_opening_key, black_defense_key, white_model_key, black_model_key = \
+        display_setup_menu_and_get_choices(white_openings, black_defenses, ai_models)
 
-    # Get user's choice for AI models
-    white_model_key, black_model_key = display_model_menu_and_get_choice(ai_models)
-
-    # Initialize the game and AI players with actual OpenRouter models.
-    # You can choose any models from https://openrouter.ai/models
-    # Using two different models to play against each other.
     white_model_name = ai_models[white_model_key]
     black_model_name = ai_models[black_model_key]
     ai_player1 = AIPlayer(model_name=white_model_name) # White
     ai_player2 = AIPlayer(model_name=black_model_name) # Black
 
-    # Set strategies from the dictionaries based on user input
-    white_strategy = white_openings[white_key]
-    black_strategy = black_defenses[black_key]
+    white_strategy = white_openings[white_opening_key]
+    black_strategy = black_defenses[black_defense_key]
 
     return Game(ai_player1, ai_player2, white_strategy=white_strategy, black_strategy=black_strategy)
 
