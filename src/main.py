@@ -51,6 +51,23 @@ def display_setup_menu_and_get_choices(white_openings, black_defenses, ai_models
         print("Invalid input. Please enter a valid string like '1a m1m2'.")
 
 
+def display_model_menu_and_get_choice(ai_models):
+    """Displays AI model options and gets the user's choice."""
+    print("\n--- Choose AI Models for Practice ---")
+    for key, value in ai_models.items():
+        print(f"  {key}: {value}")
+
+    while True:
+        choice = input("\nEnter your choice for White and Black models (e.g., 'm1m2'): ").strip().lower()
+        if len(choice) == 4 and choice.startswith('m') and choice[2] == 'm':
+            white_model_key = choice[:2]
+            black_model_key = choice[2:]
+            if white_model_key in ai_models and black_model_key in ai_models:
+                return white_model_key, black_model_key
+        
+        print("Invalid input. Please enter a valid choice for both models (e.g., 'm1m2').")
+
+
 def display_main_menu():
     """Displays the main menu and gets the user's choice."""
     print("\n--- Main Menu ---")
@@ -355,18 +372,28 @@ def main():
                 
                 pos_choice = int(input("Enter the number of the position to load: "))
                 if 1 <= pos_choice <= len(positions):
-                    # For practice, we set up a default game and then load the position
+                    # Get user's choice for AI models
+                    white_model_key, black_model_key = display_model_menu_and_get_choice(ai_models)
+                    
+                    # Set up logging for the practice session
                     logging.basicConfig(filename='chess_game.log', level=logging.INFO, 
                                         format='%(asctime)s - %(message)s', filemode='w')
                     logging.getLogger("httpx").setLevel(logging.WARNING)
 
-                    ai_player1 = AIPlayer(model_name=ai_models['m1'])
-                    ai_player2 = AIPlayer(model_name=ai_models['m2'])
-                    game = Game(ai_player1, ai_player2)
+                    # Create AI players
+                    white_model_name = ai_models[white_model_key]
+                    black_model_name = ai_models[black_model_key]
+                    ai_player1 = AIPlayer(model_name=white_model_name)
+                    ai_player2 = AIPlayer(model_name=black_model_name)
+
+                    # Set the checkmate strategy for both players
+                    checkmate_strategy = "Play for a direct checkmate."
+                    game = Game(ai_player1, ai_player2, white_strategy=checkmate_strategy, black_strategy=checkmate_strategy)
 
                     chosen_pos = positions[pos_choice - 1]
                     if game.set_board_from_fen(chosen_pos['fen']):
                         print(f"Loaded position: {chosen_pos['name']}")
+                        print(f"Strategy for both players: {checkmate_strategy}")
                         play_game(game)
                     else:
                         print("Failed to load position.")
