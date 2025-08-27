@@ -109,43 +109,23 @@ class Game:
         """Checks if the game is over."""
         return self.board.is_game_over(claim_draw=True)
 
-    def get_board_state(self):
-        """Returns the current board object."""
-        return self.board
-
     def get_game_result(self):
-        """Returns the result of the game."""
-        return self.board.result()
+        """Returns the result of the game as a string."""
+        if self.board.is_checkmate():
+            return "Checkmate!"
+        elif self.board.is_stalemate():
+            return "Stalemate!"
+        elif self.board.is_insufficient_material():
+            return "Draw due to insufficient material."
+        elif self.board.is_seventyfive_moves():
+            return "Draw due to 75-move rule."
+        elif self.board.is_fivefold_repetition():
+            return "Draw due to fivefold repetition."
+        else:
+            return "Game in progress."
 
-    def play(self):
-        """
-        Starts and manages the chess game loop.
-        """
-        while not self.is_game_over():
-            self.display_board()
-            
-            turn = self.board.turn
-            current_player = self.players[turn]
-            player_name = f"Player ({'White' if turn == chess.WHITE else 'Black'})"
-            
-            print(f"\n{player_name}'s turn ({current_player.model_name})...")
-
-            # Pass strategy to AI player, e.g., for the first 3 moves
-            strategy = None
-            if self.board.fullmove_number <= 3:
-                strategy = self.strategies[turn]
-
-            move = current_player.compute_move(self.get_board_state(), strategy_message=strategy)
-            
-            if move:
-                self.make_move(move)
-            else:
-                print("AI failed to provide a move. Ending game.")
-                break
-            
-            if not self.is_game_over():
-                input("Press Enter to continue...")
-
-        print("\n--- Game Over ---")
-        self.display_board()
-        print(f"Result: {self.get_game_result()}")
+    def swap_player_model(self, color, new_player):
+        """Swaps the AI player for the given color."""
+        self.players[color] = new_player
+        self.strategies[color] = "Play for a direct checkmate." # Reset strategy
+        logging.info(f"Player model for {'White' if color == chess.WHITE else 'Black'} swapped to {new_player.model_name}")

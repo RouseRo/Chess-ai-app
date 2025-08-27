@@ -88,13 +88,14 @@ def display_game_menu_and_get_choice():
     print("\n--- Game Menu ---")
     print("  l: Load a saved game")
     print("  p: Load a practice position")
+    print("  s: Swap AI Model")
     print("  c: Cancel and continue game")
     while True:
         choice = input("Enter your choice: ").strip().lower()
-        if choice in ['l', 'p', 'c']:
+        if choice in ['l', 'p', 's', 'c']:
             return choice
         else:
-            print("Invalid choice. Please enter 'l', 'p', or 'c'.")
+            print("Invalid choice. Please enter 'l', 'p', 's', or 'c'.")
 
 
 def parse_log_header(log_file):
@@ -142,7 +143,7 @@ def load_game_from_log(log_file):
             return game
     return None
 
-def play_game(game):
+def play_game(game, ai_models):
     """Contains the main game loop for playing a chess game."""
     # Game loop
     auto_moves_remaining = 0
@@ -154,10 +155,10 @@ def play_game(game):
         # Wait for user input before proceeding with the move
         if auto_moves_remaining > 0:
             # If it's Black's turn, decrement after the full move is complete
-            if game.get_board_state().turn == chess.WHITE:
+            if game.board.turn == chess.WHITE:
                 auto_moves_remaining -= 1
         else:
-            turn_color = "White" if game.get_board_state().turn == chess.WHITE else "Black"
+            turn_color = "White" if game.board.turn == chess.WHITE else "Black"
             user_input = input(f"Press Enter for AI move, 'q' to quit, 'm' for menu, a number for auto-play, or enter a move for {turn_color} (e.g. e2e4): ")
             if user_input.lower() == 'q':
                 save_choice = input("Save game before quitting? (y/n): ").strip().lower()
@@ -230,6 +231,26 @@ def play_game(game):
                             print("Invalid number.")
                     except (FileNotFoundError, json.JSONDecodeError, ValueError):
                         print("Could not load practice positions file or invalid input.")
+                elif menu_choice == 's':
+                    player_choice = input("Change model for (w)hite or (b)lack? ").strip().lower()
+                    if player_choice in ['w', 'b']:
+                        color_to_swap = chess.WHITE if player_choice == 'w' else chess.BLACK
+                        
+                        print("\n--- Available AI Models ---")
+                        for key, value in ai_models.items():
+                            print(f"  {key}: {value}")
+                        
+                        model_key = input("Enter the key of the new model (e.g., m1): ").strip().lower()
+                        if model_key in ai_models:
+                            new_model_name = ai_models[model_key]
+                            new_player = AIPlayer(model_name=new_model_name)
+                            game.swap_player_model(color_to_swap, new_player)
+                            print(f"Successfully swapped {'White' if color_to_swap == chess.WHITE else 'Black'}'s model to {new_model_name}.")
+                        else:
+                            print("Invalid model key.")
+                    else:
+                        print("Invalid selection. Please choose 'w' or 'b'.")
+
 
                 # If 'c' or after loading, just continue the loop to redisplay the board
                 continue
@@ -252,7 +273,7 @@ def play_game(game):
                         continue # Re-prompt user
 
         # Determine whose turn it is
-        turn = game.get_board_state().turn
+        turn = game.board.turn
         strategy = game.strategies[turn]
 
         if turn == chess.WHITE:
@@ -264,13 +285,13 @@ def play_game(game):
 
         # Only compute AI move if a manual move was not made
         if not is_manual_move:
-            move_number = game.get_board_state().fullmove_number
+            move_number = game.board.fullmove_number
             print(f"\n{BLUE}Move {move_number}:{ENDC} {player_name}'s turn ({current_player.model_name})...")
-            if strategy and game.get_board_state().fullmove_number <= 3:
+            if strategy and game.board.fullmove_number <= 3:
                 print(f"Strategy: {strategy}")
             
             # AI computes and makes a move
-            move = current_player.compute_move(game.get_board_state(), strategy_message=strategy)
+            move = current_player.compute_move(game.board, strategy_message=strategy)
             
             if move:
                 game.make_move(move, author="AI")
@@ -329,7 +350,7 @@ def main():
             print(f"Player 1 (White): {game.players[chess.WHITE].model_name} (Strategy: {game.strategies[chess.WHITE]})")
             print(f"Player 2 (Black): {game.players[chess.BLACK].model_name} (Strategy: {game.strategies[chess.BLACK]})")
             print("------------------------------------")
-            play_game(game)
+            play_game(game, ai_models)
 
         elif choice == '2': # Load a Saved Game
             saved_games = glob.glob('chess_game_*.log')
@@ -353,7 +374,7 @@ def main():
                     
                     game = load_game_from_log('chess_game.log')
                     if game:
-                        play_game(game)
+                        play_game(game, ai_models)
                     else:
                         print("Failed to load game.")
                 else:
@@ -394,7 +415,7 @@ def main():
                     if game.set_board_from_fen(chosen_pos['fen']):
                         print(f"Loaded position: {chosen_pos['name']}")
                         print(f"Strategy for both players: {checkmate_strategy}")
-                        play_game(game)
+                        play_game(game, ai_models)
                     else:
                         print("Failed to load position.")
                 else:
