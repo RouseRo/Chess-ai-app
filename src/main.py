@@ -1,5 +1,10 @@
 import chess
 import logging
+import os
+import re
+from datetime import datetime
+import glob
+import shutil
 from game import Game, BLUE, ENDC
 from ai_player import AIPlayer
 
@@ -37,11 +42,102 @@ def display_model_menu_and_get_choice(ai_models):
         
         print("Invalid input. Please enter a valid choice for both models (e.g., 'm1m5').")
 
+def display_game_menu_and_get_choice():
+    """Displays the in-game menu and gets the user's choice."""
+    print("\n--- Game Menu ---")
+    print("  l: Load last position from log")
+    print("  c: Cancel and continue game")
+    while True:
+        choice = input("Enter your choice: ").strip().lower()
+        if choice in ['l', 'c']:
+            return choice
+        else:
+            print("Invalid choice. Please enter 'l' or 'c'.")
+
+
+def parse_log_header(log_file):
+    """Parses the first line of the log to get game settings."""
+    try:
+        with open(log_file, 'r') as f:
+            first_line = f.readline()
+            # Example: ... - New Game Started. White: openai/gpt-4o (Strategy: Play the Ruy Lopez.) | Black: deepseek/deepseek-chat-v3.1 (Strategy: Play the Sicilian Defense.)
+            pattern = r"White: (.*?) \(Strategy: (.*?)\) \| Black: (.*?) \(Strategy: (.*?)\)"
+            match = re.search(pattern, first_line)
+            if match:
+                white_model, white_strategy, black_model, black_strategy = match.groups()
+                return white_model.strip(), white_strategy.strip(), black_model.strip(), black_strategy.strip()
+    except (FileNotFoundError, IndexError):
+        return None
+    return None
+
+def setup_new_game(white_openings, black_defenses, ai_models):
+    """Set up a new game with user-defined or default settings."""
+    # Get user's choice for strategies
+    white_key, black_key = display_menu_and_get_choice(white_openings, black_defenses)
+
+    # Get user's choice for AI models
+    white_model_key, black_model_key = display_model_menu_and_get_choice(ai_models)
+
+    # Initialize the game and AI players with actual OpenRouter models.
+    # You can choose any models from https://openrouter.ai/models
+    # Using two different models to play against each other.
+    white_model_name = ai_models[white_model_key]
+    black_model_name = ai_models[black_model_key]
+    ai_player1 = AIPlayer(model_name=white_model_name) # White
+    ai_player2 = AIPlayer(model_name=black_model_name) # Black
+
+    # Set strategies from the dictionaries based on user input
+    white_strategy = white_openings[white_key]
+    black_strategy = black_defenses[black_key]
+
+    return Game(ai_player1, ai_player2, white_strategy=white_strategy, black_strategy=black_strategy)
+
+def load_game_from_log(log_file):
+    """Loads game settings and board state from a log file."""
+    settings = parse_log_header(log_file)
+    if settings:
+        white_model_name, white_strategy, black_model_name, black_strategy = settings
+        ai_player1 = AIPlayer(model_name=white_model_name)
+        ai_player2 = AIPlayer(model_name=black_model_name)
+        game = Game(ai_player1, ai_player2, white_strategy=white_strategy, black_strategy=black_strategy)
+        
+        if game.load_last_position_from_log(log_file):
+            print("\n--- Continuing Previous Game ---")
+            return game
+    return None
 
 def main():
+    game = None
+    file_mode = 'w' # Default to overwrite log
+
+    # Check for saved games at startup
+    saved_games = glob.glob('chess_game_*.log')
+    if saved_games:
+        load_choice = input("Saved games found. Load a game? (y/n): ").strip().lower()
+        if load_choice == 'y':
+            print("\n--- Saved Games ---")
+            for i, filename in enumerate(saved_games):
+                print(f"  {i + 1}: {filename}")
+            
+            try:
+                file_choice = int(input("Enter the number of the game to load: "))
+                if 1 <= file_choice <= len(saved_games):
+                    chosen_file = saved_games[file_choice - 1]
+                    # Copy the chosen saved game to the active log file
+                    shutil.copy(chosen_file, 'chess_game.log')
+                    file_mode = 'a' # Set logger to append
+                    game = load_game_from_log('chess_game.log')
+                    if not game:
+                        print("Failed to load game. Starting a new game instead.")
+                        file_mode = 'w' # Revert to overwrite for new game
+                else:
+                    print("Invalid number. Starting a new game.")
+            except ValueError:
+                print("Invalid input. Starting a new game.")
+
     # Set up logging
     logging.basicConfig(filename='chess_game.log', level=logging.INFO, 
-                        format='%(asctime)s - %(message)s', filemode='w')
+                        format='%(asctime)s - %(message)s', filemode=file_mode)
 
     # Silence the HTTP logger from the openai library to keep the log clean
     logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -70,31 +166,21 @@ def main():
         'm5': "meta-llama/llama-3-70b-instruct"
     }
 
-    # Get user's choice for strategies
-    white_key, black_key = display_menu_and_get_choice(white_openings, black_defenses)
+    # Set up a new game if one wasn't loaded
+    if not game:
+        game = setup_new_game(white_openings, black_defenses, ai_models)
+        # Log the start of the new game
+        start_message = f"New Game Started. White: {game.players[chess.WHITE].model_name} (Strategy: {game.strategies[chess.WHITE]}) | Black: {game.players[chess.BLACK].model_name} (Strategy: {game.strategies[chess.BLACK]})"
+        logging.info(start_message)
 
-    # Get user's choice for AI models
-    white_model_key, black_model_key = display_model_menu_and_get_choice(ai_models)
+    white_player = game.players[chess.WHITE]
+    black_player = game.players[chess.BLACK]
+    white_strategy = game.strategies[chess.WHITE]
+    black_strategy = game.strategies[chess.BLACK]
 
-    # Initialize the game and AI players with actual OpenRouter models.
-    # You can choose any models from https://openrouter.ai/models
-    # Using two different models to play against each other.
-    white_model_name = ai_models[white_model_key]
-    black_model_name = ai_models[black_model_key]
-    ai_player1 = AIPlayer(model_name=white_model_name) # White
-    ai_player2 = AIPlayer(model_name=black_model_name) # Black
-
-    # Set strategies from the dictionaries based on user input
-    white_strategy = white_openings[white_key]
-    black_strategy = black_defenses[black_key]
-
-    game = Game(ai_player1, ai_player2, white_strategy=white_strategy, black_strategy=black_strategy)
-
-    start_message = f"New Game Started. White: {ai_player1.model_name} (Strategy: {white_strategy}) | Black: {ai_player2.model_name} (Strategy: {black_strategy})"
-    logging.info(start_message)
     print("\n--- Starting AI vs AI Chess Game ---")
-    print(f"Player 1 (White): {ai_player1.model_name} (Strategy: {white_strategy})")
-    print(f"Player 2 (Black): {ai_player2.model_name} (Strategy: {black_strategy})")
+    print(f"Player 1 (White): {white_player.model_name} (Strategy: {white_strategy})")
+    print(f"Player 2 (Black): {black_player.model_name} (Strategy: {black_strategy})")
     print("------------------------------------")
 
     # Game loop
@@ -107,10 +193,10 @@ def main():
         strategy = game.strategies[turn]
 
         if turn == chess.WHITE:
-            current_player = ai_player1
+            current_player = game.players[chess.WHITE]
             player_name = "Player 1 (White)"
         else:
-            current_player = ai_player2
+            current_player = game.players[chess.BLACK]
             player_name = "Player 2 (Black)"
 
         move_number = game.get_board_state().fullmove_number
@@ -137,10 +223,60 @@ def main():
             else:
                 # Display the board after the move
                 game.display_board()
-                user_input = input("Press Enter to continue, 'q' to quit, or a number of moves to auto-play: ")
+                user_input = input("Press Enter to continue, 'q' to quit, 'm' for menu, or a number of moves to auto-play: ")
                 if user_input.lower() == 'q':
+                    save_choice = input("Save game before quitting? (y/n): ").strip().lower()
+                    if save_choice == 'y':
+                        # Close the logger to release the file handle
+                        logging.shutdown()
+                        try:
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            new_filename = f"chess_game_{timestamp}.log"
+                            os.rename('chess_game.log', new_filename)
+                            print(f"Game saved as {new_filename}")
+                        except FileNotFoundError:
+                            print("Log file not found, could not save.")
                     print("Exiting game.")
                     break
+                elif user_input.lower() == 'm':
+                    menu_choice = display_game_menu_and_get_choice()
+                    if menu_choice == 'l':
+                        saved_games = glob.glob('chess_game_*.log')
+                        if not saved_games:
+                            print("No saved games found.")
+                            continue
+                        
+                        print("\n--- Saved Games ---")
+                        for i, filename in enumerate(saved_games):
+                            print(f"  {i + 1}: {filename}")
+                        
+                        try:
+                            file_choice = int(input("Enter the number of the game to load: "))
+                            if 1 <= file_choice <= len(saved_games):
+                                chosen_file = saved_games[file_choice - 1]
+                                # We will load the board state from the chosen file.
+                                # The current AI models and strategies will be replaced.
+                                loaded_game = load_game_from_log(chosen_file)
+                                if loaded_game:
+                                    game = loaded_game
+                                    # Copy the loaded game to be the active game log and set to append
+                                    logging.shutdown()
+                                    shutil.copy(chosen_file, 'chess_game.log')
+                                    logging.basicConfig(filename='chess_game.log', level=logging.INFO, 
+                                                        format='%(asctime)s - %(message)s', filemode='a')
+                                    logging.getLogger("httpx").setLevel(logging.WARNING)
+
+                                    print(f"Successfully loaded game from {chosen_file}.")
+                                    auto_moves_remaining = 0 # Reset auto-play
+                                else:
+                                    print("Could not load game from log file.")
+                            else:
+                                print("Invalid number.")
+                        except ValueError:
+                            print("Invalid input.")
+
+                    # If 'c', just continue the loop and prompt again
+                    continue
                 try:
                     num_moves = int(user_input)
                     # We subtract 1 because the current move has just completed a turn

@@ -1,5 +1,6 @@
 import chess
 import logging
+import re
 
 # ANSI color codes for highlighting
 BLUE = '\033[94m'
@@ -69,9 +70,31 @@ class Game:
             return False
         return False
 
+    def load_last_position_from_log(self, filename='chess_game.log'):
+        """
+        Finds the last FEN string in the specified log file and loads it into the board.
+        Returns True on success, False on failure.
+        """
+        last_fen = None
+        try:
+            with open(filename, 'r') as f:
+                for line in f:
+                    if "FEN:" in line:
+                        # Extract the FEN string from the line
+                        match = re.search(r'FEN: (.*)', line)
+                        if match:
+                            last_fen = match.group(1).strip()
+            
+            if last_fen:
+                self.board.set_fen(last_fen)
+                return True
+        except (FileNotFoundError, IndexError):
+            return False
+        return False
+
     def is_game_over(self):
-        """Checks if the game is over (checkmate, stalemate, etc.)."""
-        return self.board.is_game_over()
+        """Checks if the game is over."""
+        return self.board.is_game_over(claim_draw=True)
 
     def get_board_state(self):
         """Returns the current board object."""
