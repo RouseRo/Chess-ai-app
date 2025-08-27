@@ -53,7 +53,7 @@ def display_setup_menu_and_get_choices(white_openings, black_defenses, ai_models
 def display_game_menu_and_get_choice():
     """Displays the in-game menu and gets the user's choice."""
     print("\n--- Game Menu ---")
-    print("  l: Load last position from log")
+    print("  l: Load a saved game")
     print("  p: Load a practice position")
     print("  c: Cancel and continue game")
     while True:
@@ -116,7 +116,21 @@ def main():
     # Check for saved games at startup
     saved_games = glob.glob('chess_game_*.log')
     if saved_games:
-        load_choice = input("Welcome back! I found some saved games. Would you like to load one? (y/n): ").strip().lower()
+        
+        welcome_message = "WELCOME BACK, CHESS MASTER!"
+        found_message = f"I found {len(saved_games)} saved game(s) for you."
+        box_width = 55
+
+        print(f"\n{BLUE}")
+        print("*" * box_width)
+        print("*" + " " * (box_width - 2) + "*")
+        print("*" + welcome_message.center(box_width - 2) + "*")
+        print("*" + found_message.center(box_width - 2) + "*")
+        print("*" + " " * (box_width - 2) + "*")
+        print("*" * box_width)
+        print(f"{ENDC}")
+        
+        load_choice = input("Would you like to load one? (y/n): ").strip().lower()
         if load_choice == 'y':
             print("\n--- Saved Games ---")
             for i, filename in enumerate(saved_games):
@@ -328,6 +342,7 @@ def main():
     game.display_board()
     print(f"Result: {result}")
     print("Game history has been saved to chess_game.log")
+
 
 if __name__ == "__main__":
     main()
