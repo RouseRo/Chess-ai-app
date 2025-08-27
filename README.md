@@ -45,7 +45,7 @@ To start a game, simply run the `main.py` script:
 python src/main.py
 ```
 
-The game will start by presenting a menu to select opening strategies. After making a selection, the game will begin. You can press Enter to step through the game move by move, or enter a number to have the game auto-play that many full moves.
+The game will start by presenting menus to select opening strategies and AI models. After making your selections, the game will begin. You can press Enter to step through the game move by move, or enter a number to have the game auto-play that many full moves.
 
 ## Setting Opening Strategies
 
@@ -71,7 +71,21 @@ Enter your choice (e.g., '1a', '3c'):
 
 To select the strategies, enter a two-character string consisting of a number for White's opening and a letter for Black's defense. For example, to have White play the **Ruy Lopez** and Black play the **Sicilian Defense**, you would enter `1a`.
 
-The chosen strategies will be passed as instructions to the AI players to guide their opening moves for the first three turns.
+## Selecting AI Models
+
+After choosing the strategies, a second menu will appear, allowing you to select the AI models for each player.
+
+```
+--- Choose AI Models ---
+  m1: openai/gpt-4o
+  m2: deepseek/deepseek-chat-v3.1
+  m3: google/gemini-1.5-pro
+  ...
+
+Enter your choice for White and Black models (e.g., 'm1m5'):
+```
+
+To select the models, enter a four-character string combining the keys for the White and Black players. For example, to have White use `openai/gpt-4o` (`m1`) and Black use `meta-llama/llama-3-70b-instruct` (`m5`), you would enter `m1m5`.
 
 ## Game Logging
 
