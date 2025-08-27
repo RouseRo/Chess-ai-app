@@ -6,6 +6,7 @@ from datetime import datetime
 import glob
 import shutil
 import json
+import sys
 from game import Game, BLUE, ENDC
 from ai_player import AIPlayer
 
@@ -48,6 +49,21 @@ def display_setup_menu_and_get_choices(white_openings, black_defenses, ai_models
                     return white_opening_key, black_defense_key, white_model_key, black_model_key
         
         print("Invalid input. Please enter a valid string like '1a m1m2'.")
+
+
+def display_main_menu():
+    """Displays the main menu and gets the user's choice."""
+    print("\n--- Main Menu ---")
+    print("  1: Play a New AI vs AI Game")
+    print("  2: Load a Saved Game")
+    print("  3: Load a Practice Position")
+    print("  4: Quit")
+    while True:
+        choice = input("Enter your choice (1-4): ").strip()
+        if choice in ['1', '2', '3', '4']:
+            return choice
+        else:
+            print("Invalid choice. Please enter a number from 1 to 4.")
 
 
 def display_game_menu_and_get_choice():
@@ -109,97 +125,8 @@ def load_game_from_log(log_file):
             return game
     return None
 
-def main():
-    game = None
-    file_mode = 'w' # Default to overwrite log
-
-    # Check for saved games at startup
-    saved_games = glob.glob('chess_game_*.log')
-    if saved_games:
-        
-        welcome_message = "WELCOME BACK, CHESS MASTER!"
-        found_message = f"I found {len(saved_games)} saved game(s) for you."
-        box_width = 55
-
-        print(f"\n{BLUE}")
-        print("*" * box_width)
-        print("*" + " " * (box_width - 2) + "*")
-        print("*" + welcome_message.center(box_width - 2) + "*")
-        print("*" + found_message.center(box_width - 2) + "*")
-        print("*" + " " * (box_width - 2) + "*")
-        print("*" * box_width)
-        print(f"{ENDC}")
-        
-        load_choice = input("Would you like to load one? (y/n): ").strip().lower()
-        if load_choice == 'y':
-            print("\n--- Saved Games ---")
-            for i, filename in enumerate(saved_games):
-                print(f"  {i + 1}: {filename}")
-            
-            try:
-                file_choice = int(input("Enter the number of the game to load: "))
-                if 1 <= file_choice <= len(saved_games):
-                    chosen_file = saved_games[file_choice - 1]
-                    # Copy the chosen saved game to the active log file
-                    shutil.copy(chosen_file, 'chess_game.log')
-                    file_mode = 'a' # Set logger to append
-                    game = load_game_from_log('chess_game.log')
-                    if not game:
-                        print("Failed to load game. Starting a new game instead.")
-                        file_mode = 'w' # Revert to overwrite for new game
-                else:
-                    print("Invalid number. Starting a new game.")
-            except ValueError:
-                print("Invalid input. Starting a new game.")
-
-    # Set up logging
-    logging.basicConfig(filename='chess_game.log', level=logging.INFO, 
-                        format='%(asctime)s - %(message)s', filemode=file_mode)
-
-    # Silence the HTTP logger from the openai library to keep the log clean
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-
-    # Dictionaries for opening strategies
-    white_openings = {
-        '1': "Play the Ruy Lopez.",
-        '2': "Play the Italian Game.",
-        '3': "Play the Queen's Gambit.",
-        '4': "Play the London System.",
-        '5': "Play the King's Gambit."
-    }
-
-    black_defenses = {
-        'a': "Play the Sicilian Defense.",
-        'b': "Play the French Defense.",
-        'c': "Play the Caro-Kann Defense."
-    }
-
-    # Dictionary for AI models
-    ai_models = {
-        'm1': "openai/gpt-4o",
-        'm2': "deepseek/deepseek-chat-v3.1",
-        'm3': "google/gemini-1.5-pro",
-        'm4': "anthropic/claude-3-opus",
-        'm5': "meta-llama/llama-3-70b-instruct"
-    }
-
-    # Set up a new game if one wasn't loaded
-    if not game:
-        game = setup_new_game(white_openings, black_defenses, ai_models)
-        # Log the start of the new game
-        start_message = f"New Game Started. White: {game.players[chess.WHITE].model_name} (Strategy: {game.strategies[chess.WHITE]}) | Black: {game.players[chess.BLACK].model_name} (Strategy: {game.strategies[chess.BLACK]})"
-        logging.info(start_message)
-
-    white_player = game.players[chess.WHITE]
-    black_player = game.players[chess.BLACK]
-    white_strategy = game.strategies[chess.WHITE]
-    black_strategy = game.strategies[chess.BLACK]
-
-    print("\n--- Starting AI vs AI Chess Game ---")
-    print(f"Player 1 (White): {white_player.model_name} (Strategy: {white_strategy})")
-    print(f"Player 2 (Black): {black_player.model_name} (Strategy: {black_strategy})")
-    print("------------------------------------")
-
+def play_game(game):
+    """Contains the main game loop for playing a chess game."""
     # Game loop
     auto_moves_remaining = 0
     while not game.is_game_over():
@@ -342,6 +269,115 @@ def main():
     game.display_board()
     print(f"Result: {result}")
     print("Game history has been saved to chess_game.log")
+
+
+def main():
+    # Dictionaries for opening strategies
+    white_openings = {
+        '1': "Play the Ruy Lopez.",
+        '2': "Play the Italian Game.",
+        '3': "Play the Queen's Gambit.",
+        '4': "Play the London System.",
+        '5': "Play the King's Gambit."
+    }
+
+    black_defenses = {
+        'a': "Play the Sicilian Defense.",
+        'b': "Play the French Defense.",
+        'c': "Play the Caro-Kann Defense."
+    }
+
+    # Dictionary for AI models
+    ai_models = {
+        'm1': "openai/gpt-4o",
+        'm2': "deepseek/deepseek-chat-v3.1",
+        'm3': "google/gemini-1.5-pro",
+        'm4': "anthropic/claude-3-opus",
+        'm5': "meta-llama/llama-3-70b-instruct"
+    }
+
+    while True:
+        choice = display_main_menu()
+
+        if choice == '1': # Play a New AI vs AI Game
+            logging.basicConfig(filename='chess_game.log', level=logging.INFO, 
+                                format='%(asctime)s - %(message)s', filemode='w')
+            logging.getLogger("httpx").setLevel(logging.WARNING)
+            
+            game = setup_new_game(white_openings, black_defenses, ai_models)
+            start_message = f"New Game Started. White: {game.players[chess.WHITE].model_name} (Strategy: {game.strategies[chess.WHITE]}) | Black: {game.players[chess.BLACK].model_name} (Strategy: {game.strategies[chess.BLACK]})"
+            logging.info(start_message)
+            
+            print("\n--- Starting AI vs AI Chess Game ---")
+            print(f"Player 1 (White): {game.players[chess.WHITE].model_name} (Strategy: {game.strategies[chess.WHITE]})")
+            print(f"Player 2 (Black): {game.players[chess.BLACK].model_name} (Strategy: {game.strategies[chess.BLACK]})")
+            print("------------------------------------")
+            play_game(game)
+
+        elif choice == '2': # Load a Saved Game
+            saved_games = glob.glob('chess_game_*.log')
+            if not saved_games:
+                print("No saved games found.")
+                continue
+            
+            print("\n--- Saved Games ---")
+            for i, filename in enumerate(saved_games):
+                print(f"  {i + 1}: {filename}")
+            
+            try:
+                file_choice = int(input("Enter the number of the game to load: "))
+                if 1 <= file_choice <= len(saved_games):
+                    chosen_file = saved_games[file_choice - 1]
+                    shutil.copy(chosen_file, 'chess_game.log')
+                    
+                    logging.basicConfig(filename='chess_game.log', level=logging.INFO, 
+                                        format='%(asctime)s - %(message)s', filemode='a')
+                    logging.getLogger("httpx").setLevel(logging.WARNING)
+                    
+                    game = load_game_from_log('chess_game.log')
+                    if game:
+                        play_game(game)
+                    else:
+                        print("Failed to load game.")
+                else:
+                    print("Invalid number.")
+            except ValueError:
+                print("Invalid input.")
+
+        elif choice == '3': # Load a Practice Position
+            try:
+                with open('src/endgame_positions.json', 'r') as f:
+                    positions = json.load(f)
+                
+                print("\n--- Practice Checkmate Positions ---")
+                for i, pos in enumerate(positions):
+                    print(f"  {i + 1}: {pos['name']}")
+                
+                pos_choice = int(input("Enter the number of the position to load: "))
+                if 1 <= pos_choice <= len(positions):
+                    # For practice, we set up a default game and then load the position
+                    logging.basicConfig(filename='chess_game.log', level=logging.INFO, 
+                                        format='%(asctime)s - %(message)s', filemode='w')
+                    logging.getLogger("httpx").setLevel(logging.WARNING)
+
+                    ai_player1 = AIPlayer(model_name=ai_models['m1'])
+                    ai_player2 = AIPlayer(model_name=ai_models['m2'])
+                    game = Game(ai_player1, ai_player2)
+
+                    chosen_pos = positions[pos_choice - 1]
+                    if game.set_board_from_fen(chosen_pos['fen']):
+                        print(f"Loaded position: {chosen_pos['name']}")
+                        play_game(game)
+                    else:
+                        print("Failed to load position.")
+                else:
+                    print("Invalid number.")
+            except (FileNotFoundError, json.JSONDecodeError, ValueError):
+                print("Could not load practice positions file or invalid input.")
+
+        elif choice == '4': # Quit
+            print("Thank you for playing!")
+            sys.exit()
 
 
 if __name__ == "__main__":
