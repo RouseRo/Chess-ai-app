@@ -5,6 +5,7 @@ import re
 from datetime import datetime
 import glob
 import shutil
+import json
 from game import Game, BLUE, ENDC
 from ai_player import AIPlayer
 
@@ -46,13 +47,14 @@ def display_game_menu_and_get_choice():
     """Displays the in-game menu and gets the user's choice."""
     print("\n--- Game Menu ---")
     print("  l: Load last position from log")
+    print("  p: Load a practice position")
     print("  c: Cancel and continue game")
     while True:
         choice = input("Enter your choice: ").strip().lower()
-        if choice in ['l', 'c']:
+        if choice in ['l', 'p', 'c']:
             return choice
         else:
-            print("Invalid choice. Please enter 'l' or 'c'.")
+            print("Invalid choice. Please enter 'l', 'p', or 'c'.")
 
 
 def parse_log_header(log_file):
@@ -196,7 +198,8 @@ def main():
             if game.get_board_state().turn == chess.WHITE:
                 auto_moves_remaining -= 1
         else:
-            user_input = input("Press Enter for AI move, 'q' to quit, 'm' for menu, a number for auto-play, or enter a move (e.g. e2e4): ")
+            turn_color = "White" if game.get_board_state().turn == chess.WHITE else "Black"
+            user_input = input(f"Press Enter for AI move, 'q' to quit, 'm' for menu, a number for auto-play, or enter a move for {turn_color} (e.g. e2e4): ")
             if user_input.lower() == 'q':
                 save_choice = input("Save game before quitting? (y/n): ").strip().lower()
                 if save_choice == 'y':
@@ -247,6 +250,27 @@ def main():
                             print("Invalid number.")
                     except ValueError:
                         print("Invalid input.")
+                elif menu_choice == 'p':
+                    try:
+                        with open('src/endgame_positions.json', 'r') as f:
+                            positions = json.load(f)
+                        
+                        print("\n--- Practice Checkmate Positions ---")
+                        for i, pos in enumerate(positions):
+                            print(f"  {i + 1}: {pos['name']}")
+                        
+                        pos_choice = int(input("Enter the number of the position to load: "))
+                        if 1 <= pos_choice <= len(positions):
+                            chosen_pos = positions[pos_choice - 1]
+                            if game.set_board_from_fen(chosen_pos['fen']):
+                                print(f"Loaded position: {chosen_pos['name']}")
+                                auto_moves_remaining = 0 # Reset auto-play
+                            else:
+                                print("Failed to load position.")
+                        else:
+                            print("Invalid number.")
+                    except (FileNotFoundError, json.JSONDecodeError, ValueError):
+                        print("Could not load practice positions file or invalid input.")
 
                 # If 'c' or after loading, just continue the loop to redisplay the board
                 continue
@@ -262,7 +286,7 @@ def main():
                 else:
                     # Assume it's a manual move
                     move_uci = user_input.strip().lower()
-                    if game.make_move(move_uci):
+                    if game.make_move(move_uci, author="User"):
                         is_manual_move = True # Signal that AI should not move
                     else:
                         print("Invalid or illegal move. Please try again.")
@@ -290,7 +314,7 @@ def main():
             move = current_player.compute_move(game.get_board_state(), strategy_message=strategy)
             
             if move:
-                game.make_move(move)
+                game.make_move(move, author="AI")
             else:
                 # This might happen if the AI fails to return a valid move
                 print("AI failed to provide a move. Ending game.")
