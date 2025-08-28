@@ -47,9 +47,10 @@ class Game:
         print(" -----------------")
         print("  a b c d e f g h")
 
-    def make_move(self, uci_move):
+    def make_move(self, uci_move, author="AI"):
         """
         Attempts to make a move on the board using UCI notation.
+        Logs the move with its author ('AI' or 'User').
         Returns True if the move is legal, False otherwise.
         """
         try:
@@ -61,8 +62,8 @@ class Game:
                 
                 self.board.push(move)
                 
-                # Log the result of the move
-                log_message = f"Move {move_num} ({player_color}): {uci_move}, FEN: {self.board.fen()}"
+                # Log the result of the move, including the author
+                log_message = f"Move {move_num} ({player_color} - {author}): {uci_move}, FEN: {self.board.fen()}"
                 logging.info(log_message)
                 return True
         except ValueError:
@@ -92,47 +93,39 @@ class Game:
             return False
         return False
 
+    def set_board_from_fen(self, fen_string):
+        """Sets the board state from a FEN string."""
+        try:
+            self.board.set_fen(fen_string)
+            # Clear the move stack to reflect the new position
+            self.board.move_stack.clear()
+            logging.info(f"Board position loaded from FEN: {fen_string}")
+            return True
+        except ValueError:
+            print("Invalid FEN string provided.")
+            return False
+
     def is_game_over(self):
         """Checks if the game is over."""
         return self.board.is_game_over(claim_draw=True)
 
-    def get_board_state(self):
-        """Returns the current board object."""
-        return self.board
-
     def get_game_result(self):
-        """Returns the result of the game."""
-        return self.board.result()
+        """Returns the result of the game as a string."""
+        if self.board.is_checkmate():
+            return "Checkmate!"
+        elif self.board.is_stalemate():
+            return "Stalemate!"
+        elif self.board.is_insufficient_material():
+            return "Draw due to insufficient material."
+        elif self.board.is_seventyfive_moves():
+            return "Draw due to 75-move rule."
+        elif self.board.is_fivefold_repetition():
+            return "Draw due to fivefold repetition."
+        else:
+            return "Game in progress."
 
-    def play(self):
-        """
-        Starts and manages the chess game loop.
-        """
-        while not self.is_game_over():
-            self.display_board()
-            
-            turn = self.board.turn
-            current_player = self.players[turn]
-            player_name = f"Player ({'White' if turn == chess.WHITE else 'Black'})"
-            
-            print(f"\n{player_name}'s turn ({current_player.model_name})...")
-
-            # Pass strategy to AI player, e.g., for the first 3 moves
-            strategy = None
-            if self.board.fullmove_number <= 3:
-                strategy = self.strategies[turn]
-
-            move = current_player.compute_move(self.get_board_state(), strategy_message=strategy)
-            
-            if move:
-                self.make_move(move)
-            else:
-                print("AI failed to provide a move. Ending game.")
-                break
-            
-            if not self.is_game_over():
-                input("Press Enter to continue...")
-
-        print("\n--- Game Over ---")
-        self.display_board()
-        print(f"Result: {self.get_game_result()}")
+    def swap_player_model(self, color, new_player):
+        """Swaps the AI player for the given color."""
+        self.players[color] = new_player
+        self.strategies[color] = "Play for a direct checkmate." # Reset strategy
+        logging.info(f"Player model for {'White' if color == chess.WHITE else 'Black'} swapped to {new_player.model_name}")
