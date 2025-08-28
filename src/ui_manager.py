@@ -1,4 +1,5 @@
 import chess
+import json
 from game import BLUE, ENDC
 
 class UIManager:
