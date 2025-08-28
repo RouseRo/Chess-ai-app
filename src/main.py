@@ -10,6 +10,8 @@ import sys
 from game import Game, BLUE, ENDC
 from ai_player import AIPlayer
 
+# --- UI & Menu Functions ---
+
 def display_setup_menu_and_get_choices(white_openings, black_defenses, ai_models):
     """Displays all setup menus in columns and gets the user's combined choice."""
     
@@ -97,6 +99,7 @@ def display_game_menu_and_get_choice():
         else:
             print("Invalid choice. Please enter 'l', 'p', 's', or 'c'.")
 
+# --- Game Setup & Loading Functions ---
 
 def parse_log_header(log_file):
     """Parses the first line of the log to get game settings."""
@@ -112,6 +115,7 @@ def parse_log_header(log_file):
     except (FileNotFoundError, IndexError):
         return None
     return None
+
 
 def setup_new_game(white_openings, black_defenses, ai_models):
     """Handles the user interaction for setting up a new game."""
@@ -129,6 +133,7 @@ def setup_new_game(white_openings, black_defenses, ai_models):
 
     return Game(ai_player1, ai_player2, white_strategy=white_strategy, black_strategy=black_strategy)
 
+
 def load_game_from_log(log_file):
     """Loads game settings and board state from a log file."""
     settings = parse_log_header(log_file)
@@ -143,27 +148,116 @@ def load_game_from_log(log_file):
             return game
     return None
 
+# --- In-Game Menu Handlers ---
+
+def handle_load_game_in_menu(game, ai_models):
+    """Handles the 'load game' option from the in-game menu."""
+    saved_games = glob.glob('chess_game_*.log')
+    if not saved_games:
+        print("No saved games found.")
+        return game, False # Return original game, don't skip turn
+
+    print("\n--- Saved Games ---")
+    for i, filename in enumerate(saved_games):
+        print(f"  {i + 1}: {filename}")
+    
+    try:
+        file_choice = int(input("Enter the number of the game to load: "))
+        if 1 <= file_choice <= len(saved_games):
+            chosen_file = saved_games[file_choice - 1]
+            loaded_game = load_game_from_log(chosen_file)
+            if loaded_game:
+                logging.shutdown()
+                shutil.copy(chosen_file, 'chess_game.log')
+                logging.basicConfig(filename='chess_game.log', level=logging.INFO, format='%(asctime)s - %(message)s', filemode='a')
+                logging.getLogger("httpx").setLevel(logging.WARNING)
+                print(f"Successfully loaded game from {chosen_file}.")
+                return loaded_game, True # Return new game, skip turn
+            else:
+                print("Could not load game from log file.")
+        else:
+            print("Invalid number.")
+    except ValueError:
+        print("Invalid input.")
+    return game, False # On failure, return original game
+
+def handle_practice_load_in_menu(game):
+    """Handles the 'load practice position' option from the in-game menu."""
+    try:
+        with open('src/endgame_positions.json', 'r') as f:
+            positions = json.load(f)
+        
+        print("\n--- Practice Checkmate Positions ---")
+        for i, pos in enumerate(positions):
+            print(f"  {i + 1}: {pos['name']}")
+        
+        pos_choice = int(input("Enter the number of the position to load: "))
+        if 1 <= pos_choice <= len(positions):
+            chosen_pos = positions[pos_choice - 1]
+            if game.set_board_from_fen(chosen_pos['fen']):
+                print(f"Loaded position: {chosen_pos['name']}")
+                return True # Skip turn
+            else:
+                print("Failed to load position.")
+        else:
+            print("Invalid number.")
+    except (FileNotFoundError, json.JSONDecodeError, ValueError):
+        print("Could not load practice positions file or invalid input.")
+    return False # Don't skip turn
+
+def handle_swap_model_in_menu(game, ai_models):
+    """Handles the 'swap AI model' option from the in-game menu."""
+    player_choice = input("Change model for (w)hite or (b)lack? ").strip().lower()
+    if player_choice in ['w', 'b']:
+        color_to_swap = chess.WHITE if player_choice == 'w' else chess.BLACK
+        
+        print("\n--- Available AI Models ---")
+        for key, value in ai_models.items():
+            print(f"  {key}: {value}")
+        
+        model_key = input("Enter the key of the new model (e.g., m1): ").strip().lower()
+        if model_key in ai_models:
+            new_model_name = ai_models[model_key]
+            new_player = AIPlayer(model_name=new_model_name)
+            game.swap_player_model(color_to_swap, new_player)
+            print(f"Successfully swapped {'White' if color_to_swap == chess.WHITE else 'Black'}'s model to {new_model_name}.")
+        else:
+            print("Invalid model key.")
+    else:
+        print("Invalid selection. Please choose 'w' or 'b'.")
+
+def handle_in_game_menu(game, ai_models):
+    """Displays and handles the in-game menu options."""
+    menu_choice = display_game_menu_and_get_choice()
+    if menu_choice == 'l':
+        return handle_load_game_in_menu(game, ai_models)
+    elif menu_choice == 'p':
+        skip_turn = handle_practice_load_in_menu(game)
+        return game, skip_turn
+    elif menu_choice == 's':
+        handle_swap_model_in_menu(game, ai_models)
+    # For 's' and 'c', we don't skip the turn and return the original game
+    return game, False
+
+# --- Core Game Loop ---
+
 def play_game(game, ai_models):
     """Contains the main game loop for playing a chess game."""
-    # Game loop
     auto_moves_remaining = 0
     while not game.is_game_over():
         game.display_board()
+        is_manual_move = False
 
-        is_manual_move = False # Flag to skip AI move if user enters one
-
-        # Wait for user input before proceeding with the move
         if auto_moves_remaining > 0:
-            # If it's Black's turn, decrement after the full move is complete
             if game.board.turn == chess.WHITE:
                 auto_moves_remaining -= 1
         else:
             turn_color = "White" if game.board.turn == chess.WHITE else "Black"
             user_input = input(f"Press Enter for AI move, 'q' to quit, 'm' for menu, a number for auto-play, or enter a move for {turn_color} (e.g. e2e4): ")
+            
             if user_input.lower() == 'q':
                 save_choice = input("Save game before quitting? (y/n): ").strip().lower()
                 if save_choice == 'y':
-                    # Close the logger to release the file handle
                     logging.shutdown()
                     try:
                         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -173,134 +267,47 @@ def play_game(game, ai_models):
                     except FileNotFoundError:
                         print("Log file not found, could not save.")
                 print("Exiting game.")
-                break
+                break # Exit game loop
+            
             elif user_input.lower() == 'm':
-                menu_choice = display_game_menu_and_get_choice()
-                if menu_choice == 'l':
-                    saved_games = glob.glob('chess_game_*.log')
-                    if not saved_games:
-                        print("No saved games found.")
-                        continue
-                    
-                    print("\n--- Saved Games ---")
-                    for i, filename in enumerate(saved_games):
-                        print(f"  {i + 1}: {filename}")
-                    
-                    try:
-                        file_choice = int(input("Enter the number of the game to load: "))
-                        if 1 <= file_choice <= len(saved_games):
-                            chosen_file = saved_games[file_choice - 1]
-                            # We will load the board state from the chosen file.
-                            # The current AI models and strategies will be replaced.
-                            loaded_game = load_game_from_log(chosen_file)
-                            if loaded_game:
-                                game = loaded_game
-                                # Copy the loaded game to be the active game log and set to append
-                                logging.shutdown()
-                                shutil.copy(chosen_file, 'chess_game.log')
-                                logging.basicConfig(filename='chess_game.log', level=logging.INFO, 
-                                                    format='%(asctime)s - %(message)s', filemode='a')
-                                logging.getLogger("httpx").setLevel(logging.WARNING)
-
-                                print(f"Successfully loaded game from {chosen_file}.")
-                                auto_moves_remaining = 0 # Reset auto-play
-                            else:
-                                print("Could not load game from log file.")
-                        else:
-                            print("Invalid number.")
-                    except ValueError:
-                        print("Invalid input.")
-                elif menu_choice == 'p':
-                    try:
-                        with open('src/endgame_positions.json', 'r') as f:
-                            positions = json.load(f)
-                        
-                        print("\n--- Practice Checkmate Positions ---")
-                        for i, pos in enumerate(positions):
-                            print(f"  {i + 1}: {pos['name']}")
-                        
-                        pos_choice = int(input("Enter the number of the position to load: "))
-                        if 1 <= pos_choice <= len(positions):
-                            chosen_pos = positions[pos_choice - 1]
-                            if game.set_board_from_fen(chosen_pos['fen']):
-                                print(f"Loaded position: {chosen_pos['name']}")
-                                auto_moves_remaining = 0 # Reset auto-play
-                            else:
-                                print("Failed to load position.")
-                        else:
-                            print("Invalid number.")
-                    except (FileNotFoundError, json.JSONDecodeError, ValueError):
-                        print("Could not load practice positions file or invalid input.")
-                elif menu_choice == 's':
-                    player_choice = input("Change model for (w)hite or (b)lack? ").strip().lower()
-                    if player_choice in ['w', 'b']:
-                        color_to_swap = chess.WHITE if player_choice == 'w' else chess.BLACK
-                        
-                        print("\n--- Available AI Models ---")
-                        for key, value in ai_models.items():
-                            print(f"  {key}: {value}")
-                        
-                        model_key = input("Enter the key of the new model (e.g., m1): ").strip().lower()
-                        if model_key in ai_models:
-                            new_model_name = ai_models[model_key]
-                            new_player = AIPlayer(model_name=new_model_name)
-                            game.swap_player_model(color_to_swap, new_player)
-                            print(f"Successfully swapped {'White' if color_to_swap == chess.WHITE else 'Black'}'s model to {new_model_name}.")
-                        else:
-                            print("Invalid model key.")
+                game, skip_turn = handle_in_game_menu(game, ai_models)
+                if skip_turn:
+                    continue # Restart loop to show new board
+            
+            else:
+                try:
+                    num_moves = int(user_input)
+                    auto_moves_remaining = max(0, num_moves - 1)
+                except ValueError:
+                    if user_input == '':
+                        pass # Let AI play
                     else:
-                        print("Invalid selection. Please choose 'w' or 'b'.")
+                        move_uci = user_input.strip().lower()
+                        if game.make_move(move_uci, author="User"):
+                            is_manual_move = True
+                        else:
+                            print("Invalid or illegal move. Please try again.")
+                            continue
 
-
-                # If 'c' or after loading, just continue the loop to redisplay the board
-                continue
-            try:
-                num_moves = int(user_input)
-                # We subtract 1 because the current move is about to be played
-                auto_moves_remaining = max(0, num_moves - 1)
-            except ValueError:
-                # Not a number, so it's either Enter or a move string
-                if user_input == '':
-                    # User pressed Enter, let AI play
-                    pass
-                else:
-                    # Assume it's a manual move
-                    move_uci = user_input.strip().lower()
-                    if game.make_move(move_uci, author="User"):
-                        is_manual_move = True # Signal that AI should not move
-                    else:
-                        print("Invalid or illegal move. Please try again.")
-                        continue # Re-prompt user
-
-        # Determine whose turn it is
-        turn = game.board.turn
-        strategy = game.strategies[turn]
-
-        if turn == chess.WHITE:
-            current_player = game.players[chess.WHITE]
-            player_name = "Player 1 (White)"
-        else:
-            current_player = game.players[chess.BLACK]
-            player_name = "Player 2 (Black)"
-
-        # Only compute AI move if a manual move was not made
         if not is_manual_move:
+            turn = game.board.turn
+            strategy = game.strategies[turn]
+            current_player = game.players[turn]
+            player_name = "Player 1 (White)" if turn == chess.WHITE else "Player 2 (Black)"
+            
             move_number = game.board.fullmove_number
             print(f"\n{BLUE}Move {move_number}:{ENDC} {player_name}'s turn ({current_player.model_name})...")
             if strategy and game.board.fullmove_number <= 3:
                 print(f"Strategy: {strategy}")
             
-            # AI computes and makes a move
             move = current_player.compute_move(game.board, strategy_message=strategy)
-            
             if move:
                 game.make_move(move, author="AI")
             else:
-                # This might happen if the AI fails to return a valid move
                 print("AI failed to provide a move. Ending game.")
                 break
         
-    # Display the final board and result
+    # Post-game
     result = game.get_game_result()
     logging.info(f"Game Over. Result: {result}")
     print("\n--- Game Over ---")
@@ -308,38 +315,19 @@ def play_game(game, ai_models):
     print(f"Result: {result}")
     print("Game history has been saved to chess_game.log")
 
+# --- Main Application Entry Point ---
 
 def main():
-    # Dictionaries for opening strategies
-    white_openings = {
-        '1': "Play the Ruy Lopez.",
-        '2': "Play the Italian Game.",
-        '3': "Play the Queen's Gambit.",
-        '4': "Play the London System.",
-        '5': "Play the King's Gambit."
-    }
-
-    black_defenses = {
-        'a': "Play the Sicilian Defense.",
-        'b': "Play the French Defense.",
-        'c': "Play the Caro-Kann Defense."
-    }
-
-    # Dictionary for AI models
-    ai_models = {
-        'm1': "openai/gpt-4o",
-        'm2': "deepseek/deepseek-chat-v3.1",
-        'm3': "google/gemini-1.5-pro",
-        'm4': "anthropic/claude-3-opus",
-        'm5': "meta-llama/llama-3-70b-instruct"
-    }
+    """Main function to run the chess application."""
+    white_openings = {'1': "Play the Ruy Lopez.", '2': "Play the Italian Game.", '3': "Play the Queen's Gambit.", '4': "Play the London System.", '5': "Play the King's Gambit."}
+    black_defenses = {'a': "Play the Sicilian Defense.", 'b': "Play the French Defense.", 'c': "Play the Caro-Kann Defense."}
+    ai_models = {'m1': "openai/gpt-4o", 'm2': "deepseek/deepseek-chat-v3.1", 'm3': "google/gemini-1.5-pro", 'm4': "anthropic/claude-3-opus", 'm5': "meta-llama/llama-3-70b-instruct"}
 
     while True:
         choice = display_main_menu()
 
-        if choice == '1': # Play a New AI vs AI Game
-            logging.basicConfig(filename='chess_game.log', level=logging.INFO, 
-                                format='%(asctime)s - %(message)s', filemode='w')
+        if choice == '1': # New Game
+            logging.basicConfig(filename='chess_game.log', level=logging.INFO, format='%(asctime)s - %(message)s', filemode='w')
             logging.getLogger("httpx").setLevel(logging.WARNING)
             
             game = setup_new_game(white_openings, black_defenses, ai_models)
@@ -352,7 +340,7 @@ def main():
             print("------------------------------------")
             play_game(game, ai_models)
 
-        elif choice == '2': # Load a Saved Game
+        elif choice == '2': # Load Saved Game
             saved_games = glob.glob('chess_game_*.log')
             if not saved_games:
                 print("No saved games found.")
@@ -368,8 +356,7 @@ def main():
                     chosen_file = saved_games[file_choice - 1]
                     shutil.copy(chosen_file, 'chess_game.log')
                     
-                    logging.basicConfig(filename='chess_game.log', level=logging.INFO, 
-                                        format='%(asctime)s - %(message)s', filemode='a')
+                    logging.basicConfig(filename='chess_game.log', level=logging.INFO, format='%(asctime)s - %(message)s', filemode='a')
                     logging.getLogger("httpx").setLevel(logging.WARNING)
                     
                     game = load_game_from_log('chess_game.log')
@@ -382,7 +369,7 @@ def main():
             except ValueError:
                 print("Invalid input.")
 
-        elif choice == '3': # Load a Practice Position
+        elif choice == '3': # Load Practice Position
             try:
                 with open('src/endgame_positions.json', 'r') as f:
                     positions = json.load(f)
@@ -393,21 +380,16 @@ def main():
                 
                 pos_choice = int(input("Enter the number of the position to load: "))
                 if 1 <= pos_choice <= len(positions):
-                    # Get user's choice for AI models
                     white_model_key, black_model_key = display_model_menu_and_get_choice(ai_models)
                     
-                    # Set up logging for the practice session
-                    logging.basicConfig(filename='chess_game.log', level=logging.INFO, 
-                                        format='%(asctime)s - %(message)s', filemode='w')
+                    logging.basicConfig(filename='chess_game.log', level=logging.INFO, format='%(asctime)s - %(message)s', filemode='w')
                     logging.getLogger("httpx").setLevel(logging.WARNING)
 
-                    # Create AI players
                     white_model_name = ai_models[white_model_key]
                     black_model_name = ai_models[black_model_key]
                     ai_player1 = AIPlayer(model_name=white_model_name)
                     ai_player2 = AIPlayer(model_name=black_model_name)
 
-                    # Set the checkmate strategy for both players
                     checkmate_strategy = "Play for a direct checkmate."
                     game = Game(ai_player1, ai_player2, white_strategy=checkmate_strategy, black_strategy=checkmate_strategy)
 
