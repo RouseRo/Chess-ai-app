@@ -15,9 +15,23 @@ class ChessApp:
     def __init__(self):
         """Initializes the application, loading configurations."""
         self.ui = UIManager()
-        self.white_openings = {'1': "Play the Ruy Lopez.", '2': "Play the Italian Game.", '3': "Play the Queen's Gambit.", '4': "Play the London System.", '5': "Play the King's Gambit."}
-        self.black_defenses = {'a': "Play the Sicilian Defense.", 'b': "Play the French Defense.", 'c': "Play the Caro-Kann Defense."}
-        self.ai_models = {'m1': "openai/gpt-4o", 'm2': "deepseek/deepseek-chat-v3.1", 'm3': "google/gemini-1.5-pro", 'm4': "anthropic/claude-3-opus", 'm5': "meta-llama/llama-3-70b-instruct"}
+        self.white_openings = {}
+        self.black_defenses = {}
+        self.ai_models = {}
+        self._load_config()
+
+    def _load_config(self):
+        """Loads configuration from config.json."""
+        try:
+            with open('src/config.json', 'r') as f:
+                config = json.load(f)
+                self.white_openings = config.get("white_openings", {})
+                self.black_defenses = config.get("black_defenses", {})
+                self.ai_models = config.get("ai_models", {})
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            self.ui.display_message(f"Error loading config.json: {e}")
+            self.ui.display_message("Please ensure src/config.json exists and is correctly formatted.")
+            sys.exit(1)
 
     # --- Game Setup & Loading Methods ---
 
