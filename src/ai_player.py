@@ -1,4 +1,5 @@
 import os
+from dotenv import load_dotenv
 import chess
 from openai import OpenAI
 import random
@@ -6,23 +7,32 @@ import random
 class AIPlayer:
     def __init__(self, model_name):
         self.model_name = model_name
+
+        load_dotenv() # Load environment variables from .env file
+        
         # Initialize the OpenAI API client to use OpenRouter
         self.client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=os.getenv("OPENAI_API_KEY"),
         )
 
-    def compute_move(self, board: chess.Board):
+    def compute_move(self, board: chess.Board, strategy_message=None):
         """
         Computes the next move using the specified AI model.
         """
         legal_moves_uci = [move.uci() for move in board.legal_moves]
         
-        prompt = f"""You are a chess engine. The current board state in FEN is:
+        strategy_prompt = ""
+        if strategy_message:
+            strategy_prompt = f"Your designated strategy is: {strategy_message}."
+
+        prompt = f"""You are a world-class chess grandmaster. {strategy_prompt}
+Analyze the position deeply, considering long-term consequences, threats, and opportunities.
+The current board state in FEN is:
 {board.fen()}
 
 The legal moves are: {', '.join(legal_moves_uci)}.
-Your task is to select the best possible move from the list of legal moves.
+Your task is to select the absolute best possible move from the list of legal moves.
 Respond with only the chosen move in UCI notation (e.g., 'e2e4')."""
 
         max_retries = 3
