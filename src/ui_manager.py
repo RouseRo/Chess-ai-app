@@ -24,7 +24,9 @@ class UIManager:
         UIManager.display_message("  3: Load a Practice Position")
         UIManager.display_message("  4: Quit")
         while True:
-            choice = UIManager.get_user_input("Enter your choice (1-4): ")
+            choice = UIManager.get_user_input("Enter your choice (1-4 or q): ")
+            if choice.lower() == 'q':
+                return '4'
             if choice in ['1', '2', '3', '4']:
                 return choice
             else:
