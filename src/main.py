@@ -191,7 +191,7 @@ class ChessApp:
                 user_input = self.ui.get_user_input(prompt)
                 
                 if user_input.lower() == 'q':
-                    save_choice = self.ui.get_user_input("Save game before quitting? (y/n): ").lower()
+                    save_choice = self.ui.get_user_input("Save game before quitting? (y/N): ").lower()
                     if save_choice == 'y':
                         logging.shutdown()
                         try:
@@ -319,4 +319,4 @@ class ChessApp:
 
 if __name__ == "__main__":
     app = ChessApp()
-    app.run()                
+    app.run()
