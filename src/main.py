@@ -107,7 +107,7 @@ class ChessApp:
         saved_games = glob.glob('chess_game_*.log')
         if not saved_games:
             self.ui.display_message("No saved games found.")
-            return game, False
+            return game, 'continue'
 
         chosen_file = self.ui.display_saved_games_and_get_choice(saved_games)
         if chosen_file:
@@ -118,10 +118,10 @@ class ChessApp:
                 logging.basicConfig(filename='chess_game.log', level=logging.INFO, format='%(asctime)s - %(message)s', filemode='a')
                 logging.getLogger("httpx").setLevel(logging.WARNING)
                 self.ui.display_message(f"Successfully loaded game from {chosen_file}.")
-                return loaded_game, True
+                return loaded_game, 'skip_turn'
             else:
                 self.ui.display_message("Could not load game from log file.")
-        return game, False
+        return game, 'continue'
 
     def handle_practice_load_in_menu(self, game):
         """Handles the 'load practice position' option from the in-game menu."""
@@ -133,12 +133,12 @@ class ChessApp:
             if chosen_pos:
                 if game.set_board_from_fen(chosen_pos['fen']):
                     self.ui.display_message(f"Loaded position: {chosen_pos['name']}")
-                    return True
+                    return 'skip_turn'
                 else:
                     self.ui.display_message("Failed to load position.")
         except (FileNotFoundError, json.JSONDecodeError):
             self.ui.display_message("Could not load practice positions file.")
-        return False
+        return 'continue'
 
     def handle_swap_model_in_menu(self, game):
         """Handles the 'swap AI model' option from the in-game menu."""
@@ -167,11 +167,15 @@ class ChessApp:
         if menu_choice == 'l':
             return self.handle_load_game_in_menu(game)
         elif menu_choice == 'p':
-            skip_turn = self.handle_practice_load_in_menu(game)
-            return game, skip_turn
+            action = self.handle_practice_load_in_menu(game)
+            return game, action
         elif menu_choice == 's':
             self.handle_swap_model_in_menu(game)
-        return game, False
+            return game, 'continue'
+        elif menu_choice == 'q':
+            return game, 'exit_to_main'
+        # 'c' is the default
+        return game, 'continue'
 
     # --- Core Game Loop ---
 
@@ -205,9 +209,12 @@ class ChessApp:
                     break
                 
                 elif user_input.lower() == 'm':
-                    game, skip_turn = self.handle_in_game_menu(game)
-                    if skip_turn:
+                    game, action = self.handle_in_game_menu(game)
+                    if action == 'skip_turn':
                         continue
+                    elif action == 'exit_to_main':
+                        self.ui.display_message("\nReturning to Main Menu...")
+                        return # Exit play_game
                 
                 else:
                     try:

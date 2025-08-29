@@ -39,13 +39,14 @@ class UIManager:
         UIManager.display_message("  l: Load a saved game")
         UIManager.display_message("  p: Load a practice position")
         UIManager.display_message("  s: Swap AI Model")
+        UIManager.display_message("  q: Return to Main Menu")
         UIManager.display_message("  c: Cancel and continue game")
         while True:
             choice = UIManager.get_user_input("Enter your choice: ").lower()
-            if choice in ['l', 'p', 's', 'c']:
+            if choice in ['l', 'p', 's', 'c', 'q']:
                 return choice
             else:
-                UIManager.display_message("Invalid choice. Please enter 'l', 'p', 's', or 'c'.")
+                UIManager.display_message("Invalid choice. Please enter 'l', 'p', 's', 'c', or 'q'.")
 
     @staticmethod
     def display_setup_menu_and_get_choices(white_openings, black_defenses, ai_models):
