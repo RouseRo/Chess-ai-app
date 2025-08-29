@@ -124,16 +124,25 @@ class UIManager:
         UIManager.display_message("\n--- Practice Checkmate Positions ---")
         for i, pos in enumerate(positions):
             UIManager.display_message(f"  {i + 1}: {pos['name']}")
+        UIManager.display_message("  ?: Ask a question about chess")
         
-        try:
-            choice = int(UIManager.get_user_input("Enter the number of the position to load: "))
-            if 1 <= choice <= len(positions):
-                return positions[choice - 1]
-            else:
-                UIManager.display_message("Invalid number.")
-        except (FileNotFoundError, json.JSONDecodeError, ValueError):
-            UIManager.display_message("Could not load practice positions file or invalid input.")
-        return None
+        while True:
+            choice = UIManager.get_user_input("Enter the number of the position to load, or '?' to ask a question: ")
+            if choice == '?':
+                return '?'
+            try:
+                choice_num = int(choice)
+                if 1 <= choice_num <= len(positions):
+                    return positions[choice_num - 1]
+                else:
+                    UIManager.display_message("Invalid number.")
+            except ValueError:
+                UIManager.display_message("Invalid input. Please enter a number or '?'.")
+
+    @staticmethod
+    def get_chess_question():
+        """Prompts the user to enter their chess question."""
+        return UIManager.get_user_input("What is your question for the Grandmaster? ")
 
     @staticmethod
     def display_game_start_message(game):

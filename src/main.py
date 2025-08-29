@@ -18,6 +18,7 @@ class ChessApp:
         self.white_openings = {}
         self.black_defenses = {}
         self.ai_models = {}
+        self.chess_expert_model = ""
         self._load_config()
 
     def _load_config(self):
@@ -28,10 +29,30 @@ class ChessApp:
                 self.white_openings = config.get("white_openings", {})
                 self.black_defenses = config.get("black_defenses", {})
                 self.ai_models = config.get("ai_models", {})
-        except (FileNotFoundError, json.JSONDecodeError) as e:
+                self.chess_expert_model = config.get("chess_expert_model")
+                if not self.chess_expert_model:
+                    raise ValueError("chess_expert_model not found in config.")
+        except (FileNotFoundError, json.JSONDecodeError, ValueError) as e:
             self.ui.display_message(f"Error loading config.json: {e}")
             self.ui.display_message("Please ensure src/config.json exists and is correctly formatted.")
             sys.exit(1)
+
+    def _ask_expert(self):
+        """Handles the logic for asking the chess expert a question."""
+        question = self.ui.get_chess_question()
+        if not question:
+            return
+
+        self.ui.display_message("\nThinking deeply...")
+        expert_player = AIPlayer(model_name=self.chess_expert_model)
+        system_prompt = "You are a chess expert playing at the grandmaster level. Think deeply about the question."
+        
+        answer = expert_player.ask_question(question, system_prompt)
+        
+        self.ui.display_message("\n--- Grandmaster's Answer ---")
+        self.ui.display_message(answer)
+        self.ui.display_message("----------------------------")
+        self.ui.get_user_input("Press Enter to return to the practice menu.")
 
     # --- Game Setup & Loading Methods ---
 
@@ -256,27 +277,39 @@ class ChessApp:
                     with open('src/endgame_positions.json', 'r') as f:
                         positions = json.load(f)
                     
-                    chosen_pos = self.ui.display_practice_positions_and_get_choice(positions)
-                    if chosen_pos:
-                        white_model_key, black_model_key = self.ui.display_model_menu_and_get_choice(self.ai_models)
+                    while True: # Loop to allow asking questions or loading a position
+                        chosen_item = self.ui.display_practice_positions_and_get_choice(positions)
                         
-                        logging.basicConfig(filename='chess_game.log', level=logging.INFO, format='%(asctime)s - %(message)s', filemode='w')
-                        logging.getLogger("httpx").setLevel(logging.WARNING)
+                        if chosen_item == '?':
+                            self._ask_expert()
+                            continue # Go back to the practice menu
+                        
+                        if chosen_item:
+                            # This is a position dictionary, so proceed to load it
+                            white_model_key, black_model_key = self.ui.display_model_menu_and_get_choice(self.ai_models)
+                            
+                            logging.basicConfig(filename='chess_game.log', level=logging.INFO, format='%(asctime)s - %(message)s', filemode='w')
+                            logging.getLogger("httpx").setLevel(logging.WARNING)
 
-                        white_model_name = self.ai_models[white_model_key]
-                        black_model_name = self.ai_models[black_model_key]
-                        ai_player1 = AIPlayer(model_name=white_model_name)
-                        ai_player2 = AIPlayer(model_name=black_model_name)
+                            white_model_name = self.ai_models[white_model_key]
+                            black_model_name = self.ai_models[black_model_key]
+                            ai_player1 = AIPlayer(model_name=white_model_name)
+                            ai_player2 = AIPlayer(model_name=black_model_name)
 
-                        checkmate_strategy = "Play for a direct checkmate."
-                        game = Game(ai_player1, ai_player2, white_strategy=checkmate_strategy, black_strategy=checkmate_strategy)
+                            checkmate_strategy = "Play for a direct checkmate."
+                            game = Game(ai_player1, ai_player2, white_strategy=checkmate_strategy, black_strategy=checkmate_strategy)
 
-                        if game.set_board_from_fen(chosen_pos['fen']):
-                            self.ui.display_message(f"Loaded position: {chosen_pos['name']}")
-                            self.ui.display_message(f"Strategy for both players: {checkmate_strategy}")
-                            self.play_game(game)
+                            if game.set_board_from_fen(chosen_item['fen']):
+                                self.ui.display_message(f"Loaded position: {chosen_item['name']}")
+                                self.ui.display_message(f"Strategy for both players: {checkmate_strategy}")
+                                self.play_game(game)
+                            else:
+                                self.ui.display_message("Failed to load position.")
+                            break # Exit the while loop after a game is played
                         else:
-                            self.ui.display_message("Failed to load position.")
+                            # User entered invalid input for position, or wants to go back
+                            break # Exit to main menu
+
                 except (FileNotFoundError, json.JSONDecodeError):
                     self.ui.display_message("Could not load practice positions file or invalid input.")
 
@@ -284,7 +317,6 @@ class ChessApp:
                 self.ui.display_message("Thank you for playing!")
                 sys.exit()
 
-
 if __name__ == "__main__":
     app = ChessApp()
-    app.run()
+    app.run()                

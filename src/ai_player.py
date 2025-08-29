@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 import chess
 from openai import OpenAI
+import openai
 import random
 
 class AIPlayer:
@@ -69,3 +70,25 @@ Respond with only the chosen move in UCI notation (e.g., 'e2e4')."""
     def switch_model(self, new_model_name):
         self.model_name = new_model_name
         # Optionally reinitialize the API client if needed
+
+    def ask_question(self, question, system_prompt):
+        """Sends a general question to the AI model and returns the answer."""
+        try:
+            completion = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": question}
+                ],
+                temperature=0.5,
+            )
+            return completion.choices[0].message.content
+        except openai.APIConnectionError as e:
+            print(f"Failed to connect to API: {e}")
+            return "Error: Could not connect to the AI service."
+        except openai.APIError as e:
+            print(f"An API error occurred: {e}")
+            return f"Error: An API error occurred: {e}"
+
+# Load environment variables
+load_dotenv()

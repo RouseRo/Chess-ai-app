@@ -14,8 +14,9 @@
   "ai_models": {
     "m1": "openai/gpt-4o",
     "m2": "deepseek/deepseek-chat-v3.1",
-    "m3": "google/gemini-2.5-flash",
+    "m3": "google/gemini-2.5-pro",
     "m4": "anthropic/claude-3-opus",
     "m5": "meta-llama/llama-3-70b-instruct"
-  }
+  },
+  "chess_expert_model": "google/gemini-2.5-pro"
 }
