@@ -7,7 +7,7 @@ import glob
 import shutil
 import json
 import sys
-from game import Game
+from game import Game, RED, ENDC
 from ai_player import AIPlayer
 from ui_manager import UIManager
 
@@ -231,7 +231,7 @@ class ChessApp:
                             if game.make_move(move_uci, author="User"):
                                 is_manual_move = True
                             else:
-                                self.ui.display_message("Invalid or illegal move. Please try again.")
+                                self.ui.display_message(f"{RED}Invalid or illegal move. Please try again.{ENDC}")
                                 continue
 
             if not is_manual_move:
