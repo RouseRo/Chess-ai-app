@@ -43,9 +43,9 @@ class ChessApp:
         if not question:
             return
 
-        self.ui.display_message("\nThinking deeply...")
+        self.ui.display_message("\nConsulting the expert...")
         expert_player = AIPlayer(model_name=self.chess_expert_model)
-        system_prompt = "You are a chess expert playing at the grandmaster level. Think deeply about the question."
+        system_prompt = "You are a chess expert playing at the grandmaster level."
         
         answer = expert_player.ask_question(question, system_prompt)
         
@@ -171,6 +171,9 @@ class ChessApp:
             return game, action
         elif menu_choice == 's':
             self.handle_swap_model_in_menu(game)
+            return game, 'continue'
+        elif menu_choice == '?':
+            self._ask_expert()
             return game, 'continue'
         elif menu_choice == 'q':
             return game, 'exit_to_main'
@@ -319,6 +322,10 @@ class ChessApp:
 
                 except (FileNotFoundError, json.JSONDecodeError):
                     self.ui.display_message("Could not load practice positions file or invalid input.")
+
+            elif choice == '?':
+                self._ask_expert()
+                continue
 
             elif choice == '4': # Quit
                 self.ui.display_message("Thank you for playing!")

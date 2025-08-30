@@ -22,15 +22,14 @@ class UIManager:
         UIManager.display_message("  1: Play a New AI vs AI Game")
         UIManager.display_message("  2: Load a Saved Game")
         UIManager.display_message("  3: Load a Practice Position")
+        UIManager.display_message("  ?: Ask a Chess Expert")
         UIManager.display_message("  4: Quit")
         while True:
-            choice = UIManager.get_user_input("Enter your choice (1-4 or q): ")
-            if choice.lower() == 'q':
-                return '4'
-            if choice in ['1', '2', '3', '4']:
+            choice = UIManager.get_user_input("Enter your choice (1-4, ?): ")
+            if choice in ['1', '2', '3', '4', '?']:
                 return choice
             else:
-                UIManager.display_message("Invalid choice. Please enter a number from 1 to 4.")
+                UIManager.display_message("Invalid choice. Please enter a number from 1 to 4, or '?'.")
 
     @staticmethod
     def display_game_menu_and_get_choice():
@@ -39,14 +38,15 @@ class UIManager:
         UIManager.display_message("  l: Load a saved game")
         UIManager.display_message("  p: Load a practice position")
         UIManager.display_message("  s: Swap AI Model")
+        UIManager.display_message("  ?: Ask a Chess Expert")
         UIManager.display_message("  q: Return to Main Menu")
         UIManager.display_message("  c: Cancel and continue game")
         while True:
             choice = UIManager.get_user_input("Enter your choice: ").lower()
-            if choice in ['l', 'p', 's', 'c', 'q']:
+            if choice in ['l', 'p', 's', 'c', 'q', '?']:
                 return choice
             else:
-                UIManager.display_message("Invalid choice. Please enter 'l', 'p', 's', 'c', or 'q'.")
+                UIManager.display_message("Invalid choice. Please enter 'l', 'p', 's', 'c', 'q', or '?'.")
 
     @staticmethod
     def display_setup_menu_and_get_choices(white_openings, black_defenses, ai_models):
