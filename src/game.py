@@ -1,16 +1,17 @@
 import chess
 import logging
-import re
+from datetime import datetime
 
-# ANSI color codes for highlighting
+# ANSI escape codes for colors
 BLUE = '\033[94m'
+RED = '\033[91m'
 ENDC = '\033[0m'
 
 class Game:
-    def __init__(self, white_player, black_player, white_strategy=None, black_strategy=None):
+    def __init__(self, player1, player2, white_strategy=None, black_strategy=None):
         """Initializes the chessboard and players."""
         self.board = chess.Board()
-        self.players = {chess.WHITE: white_player, chess.BLACK: black_player}
+        self.players = {chess.WHITE: player1, chess.BLACK: player2}
         self.strategies = {chess.WHITE: white_strategy, chess.BLACK: black_strategy}
 
     def set_opening_strategy(self, color, strategy_message):

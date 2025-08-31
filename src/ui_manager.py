@@ -22,13 +22,14 @@ class UIManager:
         UIManager.display_message("  1: Play a New AI vs AI Game")
         UIManager.display_message("  2: Load a Saved Game")
         UIManager.display_message("  3: Load a Practice Position")
+        UIManager.display_message("  ?: Ask a Chess Expert")
         UIManager.display_message("  4: Quit")
         while True:
-            choice = UIManager.get_user_input("Enter your choice (1-4): ")
-            if choice in ['1', '2', '3', '4']:
+            choice = UIManager.get_user_input("Enter your choice (1-4, ?): ")
+            if choice in ['1', '2', '3', '4', '?']:
                 return choice
             else:
-                UIManager.display_message("Invalid choice. Please enter a number from 1 to 4.")
+                UIManager.display_message("Invalid choice. Please enter a number from 1 to 4, or '?'.")
 
     @staticmethod
     def display_game_menu_and_get_choice():
@@ -37,13 +38,15 @@ class UIManager:
         UIManager.display_message("  l: Load a saved game")
         UIManager.display_message("  p: Load a practice position")
         UIManager.display_message("  s: Swap AI Model")
+        UIManager.display_message("  ?: Ask a Chess Expert")
+        UIManager.display_message("  q: Return to Main Menu")
         UIManager.display_message("  c: Cancel and continue game")
         while True:
             choice = UIManager.get_user_input("Enter your choice: ").lower()
-            if choice in ['l', 'p', 's', 'c']:
+            if choice in ['l', 'p', 's', 'c', 'q', '?']:
                 return choice
             else:
-                UIManager.display_message("Invalid choice. Please enter 'l', 'p', 's', or 'c'.")
+                UIManager.display_message("Invalid choice. Please enter 'l', 'p', 's', 'c', 'q', or '?'.")
 
     @staticmethod
     def display_setup_menu_and_get_choices(white_openings, black_defenses, ai_models):
@@ -122,16 +125,25 @@ class UIManager:
         UIManager.display_message("\n--- Practice Checkmate Positions ---")
         for i, pos in enumerate(positions):
             UIManager.display_message(f"  {i + 1}: {pos['name']}")
+        UIManager.display_message("  ?: Ask a question about chess")
         
-        try:
-            choice = int(UIManager.get_user_input("Enter the number of the position to load: "))
-            if 1 <= choice <= len(positions):
-                return positions[choice - 1]
-            else:
-                UIManager.display_message("Invalid number.")
-        except (FileNotFoundError, json.JSONDecodeError, ValueError):
-            UIManager.display_message("Could not load practice positions file or invalid input.")
-        return None
+        while True:
+            choice = UIManager.get_user_input("Enter the number of the position to load, or '?' to ask a question: ")
+            if choice == '?':
+                return '?'
+            try:
+                choice_num = int(choice)
+                if 1 <= choice_num <= len(positions):
+                    return positions[choice_num - 1]
+                else:
+                    UIManager.display_message("Invalid number.")
+            except ValueError:
+                UIManager.display_message("Invalid input. Please enter a number or '?'.")
+
+    @staticmethod
+    def get_chess_question():
+        """Prompts the user to enter their chess question."""
+        return UIManager.get_user_input("What is your question for the Grandmaster? ")
 
     @staticmethod
     def display_game_start_message(game):

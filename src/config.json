@@ -1,5 +1,6 @@
 {
   "white_openings": {
+    "0": "No Classic Chess Opening",
     "1": "Play the Ruy Lopez.",
     "2": "Play the Italian Game.",
     "3": "Play the Queen's Gambit.",
@@ -9,13 +10,15 @@
   "black_defenses": {
     "a": "Play the Sicilian Defense.",
     "b": "Play the French Defense.",
-    "c": "Play the Caro-Kann Defense."
+    "c": "Play the Caro-Kann Defense.",
+    "z": "No Classic Chess Defense"
   },
   "ai_models": {
     "m1": "openai/gpt-4o",
     "m2": "deepseek/deepseek-chat-v3.1",
-    "m3": "google/gemini-2.5-flash",
+    "m3": "google/gemini-2.5-pro",
     "m4": "anthropic/claude-3-opus",
     "m5": "meta-llama/llama-3-70b-instruct"
-  }
+  },
+  "chess_expert_model": "google/gemini-2.5-pro"
 }
