@@ -28,5 +28,19 @@
     "name": "Smothered Mate Practice",
     "description": "A classic pattern where a knight delivers mate to a king trapped by its own pieces. White to move.",
     "fen": "6rk/6pp/4Q3/8/8/8/6PP/7K w - - 0 1"
+  },
+  {
+    "name": "Mate in 1 (Queen & King)",
+    "fen": "6k1/8/6K1/8/8/8/8/5Q2 w - - 0 1",
+    "mate_in": 1
+  },
+  {
+    "name": "Mate in 1 (Rook & King)",
+    "fen": "6k1/8/6K1/8/8/8/8/7R w - - 0 1",
+    "mate_in": 1
+  },
+  {
+    "name": "Mate in 2 (Two Rooks)",
+    "fen": "8/k7/8/8/8/8/R7/R5K1 w - - 0 1"
   }
 ]

@@ -8,21 +8,29 @@ import chess
 from src.ai_player import AIPlayer
 from src.game import Game
 
+# Helper to get the absolute path to a file in the src directory
+def get_src_path(filename):
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src', filename))
+
 def load_models():
     """Loads AI model names from the config file."""
-    with open('src/config.json', 'r') as f:
+    with open(get_src_path('config.json'), 'r') as f:
         config = json.load(f)
     return list(config["ai_models"].values())
 
 def load_puzzles():
     """Loads mate-in-1 puzzles from the positions file."""
-    with open('src/endgame_positions.json', 'r') as f:
+    with open(get_src_path('endgame_positions.json'), 'r') as f:
         positions = json.load(f)
     # Filter for puzzles that are explicitly marked as "mate in 1"
     return [p for p in positions if p.get("mate_in") == 1]
 
+def puzzle_id(puzzle):
+    """Creates a readable ID for each puzzle test case."""
+    return puzzle['name'].replace(" ", "-")
+
 @pytest.mark.parametrize("model_name", load_models())
-@pytest.mark.parametrize("puzzle", load_puzzles())
+@pytest.mark.parametrize("puzzle", load_puzzles(), ids=puzzle_id)
 def test_mate_in_1_puzzle(model_name, puzzle):
     """
     Tests if an AI model can solve a mate-in-1 puzzle.
