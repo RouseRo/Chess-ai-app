@@ -81,8 +81,8 @@ class ChessApp:
         ai_player1 = AIPlayer(model_name=white_model_name)
         ai_player2 = AIPlayer(model_name=black_model_name)
 
-        white_strategy = self.white_openings[white_opening_key]
-        black_strategy = self.black_defenses[black_defense_key]
+        white_strategy = self.white_openings[white_opening_key] if white_opening_key != '0' else None
+        black_strategy = self.black_defenses[black_defense_key] if black_defense_key != 'z' else None
 
         return Game(ai_player1, ai_player2, white_strategy=white_strategy, black_strategy=black_strategy)
 
