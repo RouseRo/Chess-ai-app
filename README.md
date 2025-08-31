@@ -5,13 +5,14 @@ This project is a feature-rich, command-line chess application where two AI play
 ## Features
 
 *   **Configurable AI:** Easily add or change AI models and opening strategies by editing a simple JSON configuration file.
+*   **Ask a Chess Expert:** Get answers to your chess-related questions from a dedicated grandmaster-level AI, accessible from any menu.
 *   **Multiple Game Modes:** Start a new AI vs. AI game, load a previously saved game, or set up a board from a classic practice position.
 *   **Interactive Gameplay:**
     *   Step through games move by move or auto-play a set number of turns.
     *   Take control at any time by manually entering a move for either player.
     *   Swap out the AI model for White or Black mid-game.
+    *   Return to the main menu from an active game.
 *   **Save & Load System:** Save an in-progress game at any time and load it later to continue.
-*   **Practice Mode:** Load classic endgame checkmate positions to practice your skills against an AI.
 *   **Game Logging:** Every move is logged to a file (`chess_game.log`), including the author (AI or User) and the board state in FEN notation.
 
 ## Project Structure
@@ -20,9 +21,9 @@ The project is organized with a separation of concerns to make it easy to mainta
 
 *   `src/main.py`: The main entry point of the application. Contains the `ChessApp` class which manages the overall application flow.
 *   `src/game.py`: Contains the `Game` class, which manages the state of a single chess game, including the board and players.
-*   `src/ai_player.py`: Contains the `AIPlayer` class, responsible for communicating with the OpenRouter API to get AI moves.
-*   `src/ui_manager.py`: Contains the `UIManager` class, which handles all console input and output, such as displaying menus and the board.
-*   `src/config.json`: A JSON file for configuring the available AI models and opening strategies.
+*   `src/ai_player.py`: Contains the `AIPlayer` class, responsible for communicating with the OpenRouter API to get AI moves and answer questions.
+*   `src/ui_manager.py`: Contains the `UIManager` class, which handles all console input and output.
+*   `src/config.json`: A JSON file for configuring AI models, strategies, and the chess expert model.
 *   `src/endgame_positions.json`: A JSON file containing classic endgame scenarios for practice mode.
 
 ## Setup
@@ -53,39 +54,47 @@ The project is organized with a separation of concerns to make it easy to mainta
 
 ## Configuration
 
-You can customize the available AI models and opening strategies by editing the `src/config.json` file.
+You can customize the application by editing the `src/config.json` file.
 
-For example, to add a new AI model, simply add a new entry to the `ai_models` object with a unique key (e.g., "m6"):
+*   **`ai_models`**: Add, remove, or change the AI models available for games.
+*   **`white_openings` / `black_defenses`**: Customize the opening strategies.
+*   **`chess_expert_model`**: Specify which model from your `ai_models` list should be used to answer questions.
 
+Example `config.json`:
 ```json
-"ai_models": {
-  "m1": "openai/gpt-4o",
-  "m2": "deepseek/deepseek-chat-v3.1",
-  "m3": "google/gemini-1.5-pro",
-  "m4": "anthropic/claude-3-opus",
-  "m5": "meta-llama/llama-3-70b-instruct",
-  "m6": "new-model/some-model-name"
+{
+  "white_openings": {
+    "1": "Play the Ruy Lopez."
+  },
+  "black_defenses": {
+    "a": "Play the Sicilian Defense."
+  },
+  "ai_models": {
+    "m1": "openai/gpt-4o",
+    "m3": "google/gemini-1.5-pro"
+  },
+  "chess_expert_model": "google/gemini-1.5-pro"
 }
 ```
 
-The application will automatically pick up these changes the next time you run it.
+## Usage
 
-## How to Run
-
-To start the application, run the `main.py` script:
-
+### How to Run
+To start the application, run the `main.py` script from the root directory:
 ```bash
 python src/main.py
 ```
 
-You will be greeted with the Main Menu, which is the central hub for all application features. From here, you can choose to start a new game, load an existing game, or exit the application.
+### Main Menu
+You will be greeted with the Main Menu, which is the central hub for all application features.
+*   `1`: Play a New AI vs AI Game
+*   `2`: Load a Saved Game
+*   `3`: Load a Practice Position
+*   `?`: Ask a Chess Expert
+*   `4`: Quit
 
-### Main Menu Options
-
-1.  **New Game:** Start a new AI vs. AI game with your chosen settings.
-2.  **Load Game:** Load a previously saved game from a file.
-3.  **Practice Mode:** Enter practice mode to play out classic endgame scenarios against an AI.
-4.  **Exit:** Close the application.
+### In-Game Controls
+While a game is in progress, you can press `Enter` to let the AI make its move, or you can type `m` to access the in-game menu. This menu allows you to load another game, load a practice position, swap AI models, ask the expert, or return to the main menu.
 
 ## Game Modes
 
