@@ -23,12 +23,12 @@
   "chess_expert_model": "google/gemini-2.5-pro",
   "chess_problems": [
     {
-      "name": "Mate in 1 (Queen & King)",
+      "name": "Mate in 1 (Queen-King)",
       "fen": "6k1/8/6K1/8/8/8/8/5Q2 w - - 0 1",
       "mate_in": 1
     },
     {
-      "name": "Mate in 1 (Rook & King)",
+      "name": "Mate in 1 (Rook-King)",
       "fen": "6k1/8/6K1/8/8/8/8/7R w - - 0 1",
       "mate_in": 1
     },

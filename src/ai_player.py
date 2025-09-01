@@ -27,8 +27,8 @@ class AIPlayer:
         if strategy_message:
             strategy_prompt = f"Your designated strategy is: {strategy_message}."
 
-        prompt = f"""You are a world-class chess grandmaster. {strategy_prompt}
-Analyze the position deeply, considering long-term consequences, threats, and opportunities.
+        prompt = f"""You are a deterministic chess move selector. {strategy_prompt}
+Analyze the position deeply, pick the best move by searching at least 3 moves ahead using minimax principles.
 The current board state in FEN is:
 {board.fen()}
 
