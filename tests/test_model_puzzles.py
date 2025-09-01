@@ -57,7 +57,7 @@ def test_mate_in_1_puzzle(model_name, puzzle):
     print(game.board)
     
     # 2. Get AI Move - Load prompt from the test config file
-    strategy_prompt = "You are a chess grandmaster. Your task is to find the single best move that results in immediate checkmate. Verify that there are no legal moves for the opponent after your move. Your answer must only be the move in UCI format (e.g., e2e4, f1h1)."
+    strategy_prompt = "You are a deterministic chess move selector. Analyze the position deeply, pick the best move by searching at least 3 moves ahead using minimax principles."
     
     move_uci = ai_player.compute_move(game.board, strategy_message=strategy_prompt)
     
