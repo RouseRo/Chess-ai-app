@@ -20,5 +20,24 @@
     "m4": "anthropic/claude-3-opus",
     "m5": "meta-llama/llama-3-70b-instruct"
   },
-  "chess_expert_model": "google/gemini-2.5-pro"
+  "chess_expert_model": "google/gemini-2.5-pro",
+  "chess_problems": [
+    {
+      "name": "Mate in 1 (Queen-King)",
+      "fen": "6k1/8/6K1/8/8/8/8/5Q2 w - - 0 1",
+      "mate_in": 1
+    },
+    {
+      "name": "Mate in 1 (Rook-King)",
+      "fen": "6k1/8/6K1/8/8/8/8/7R w - - 0 1",
+      "mate_in": 1
+    },
+    {
+      "name": "Mate in 2 (Two Rooks)",
+      "fen": "8/k7/8/8/8/8/R7/R5K1 w - - 0 1"
+    }
+  ],
+  "puzzle_solving": {
+    "strategy_prompt": "You are a chess engine. Your task is to find the single best move that results in immediate checkmate. Verify that there are no legal moves for the opponent after your move. Your answer must only be the move in UCI format (e.g., e2e4, f1h1)."
+  }
 }
