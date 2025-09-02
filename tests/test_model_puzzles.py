@@ -33,19 +33,17 @@ main_config = load_main_config()
 def load_players():
     """Loads all player configurations (AI and Stockfish) from the test config."""
     players = []
-    # Load AI Models
     for key, model_name in test_config.get("ai_models", {}).items():
         if not key.startswith("//"):
             players.append(('ai', key, model_name))
-    # Load Stockfish Configs
     for key, sf_config in test_config.get("stockfish_configs", {}).items():
         if not key.startswith("//"):
             players.append(('stockfish', key, sf_config))
     return players
 
 def load_puzzles():
-    """Loads mate-in-1 puzzles from the test config file."""
-    return [p for p in test_config.get("chess_problems", []) if p.get("mate_in") == 1]
+    """Loads all puzzles that have a 'mate_in' key from the test config file."""
+    return [p for p in test_config.get("chess_problems", []) if "mate_in" in p]
 
 def player_id(player_spec):
     """Creates a readable ID for each player test case."""
@@ -62,51 +60,70 @@ def puzzle_id(puzzle):
 
 @pytest.mark.parametrize("player_spec", load_players(), ids=player_id)
 @pytest.mark.parametrize("puzzle", load_puzzles(), ids=puzzle_id)
-def test_mate_in_1_puzzle(player_spec, puzzle):
+def test_puzzle_solving(player_spec, puzzle):
     """
-    Tests if a player (AI or Stockfish) can solve a mate-in-1 puzzle.
+    Tests if a player (AI or Stockfish) can solve a mate-in-N puzzle
+    against a strong Stockfish defender.
     """
     player_type, player_key, player_data = player_spec
     
-    # 1. Setup Player
+    # 1. Setup Player-Under-Test
     if player_type == 'ai':
-        player = AIPlayer(model_name=player_data)
+        player_under_test = AIPlayer(model_name=player_data)
         strategy_prompt = test_config.get("puzzle_solving", {}).get("strategy_prompt")
-        assert strategy_prompt, "Puzzle solving strategy prompt not found in test config."
     elif player_type == 'stockfish':
         stockfish_path = main_config.get("stockfish_path")
         assert stockfish_path and os.path.exists(stockfish_path), f"Stockfish path '{stockfish_path}' from main config.json is invalid."
-        player = StockfishPlayer(path=stockfish_path, parameters=player_data['parameters'])
-        strategy_prompt = None # Stockfish doesn't use a text prompt
+        player_under_test = StockfishPlayer(path=stockfish_path, parameters=player_data['parameters'])
+        strategy_prompt = None
     else:
         pytest.fail(f"Unknown player type: {player_type}")
 
-    print(f"\nTesting player '{player.model_name}' on puzzle '{puzzle['name']}'...")
+    # 2. Setup Defender Player (always a strong Stockfish)
+    defender_params = {"Skill Level": 20, "Minimum Thinking Time": 500}
+    defender = StockfishPlayer(path=main_config.get("stockfish_path"), parameters=defender_params)
 
-    # 2. Setup Game
-    game = Game(player, AIPlayer("opponent")) # Opponent is a placeholder
-    assert game.set_board_from_fen(puzzle["fen"]), f"Failed to load FEN for puzzle {puzzle['name']}"
+    # 3. Setup Game
+    board = chess.Board(puzzle["fen"])
+    moves_to_mate = puzzle["mate_in"]
     
-    print("Board state:")
-    print(game.board)
-    
-    # 3. Get Move
-    move_uci = player.compute_move(game.board, strategy_message=strategy_prompt)
-    
-    assert move_uci is not None, "Player failed to provide a move."
-    print(f"  - Player suggested move: {move_uci}")
+    print(f"\nTesting player '{player_under_test.model_name}' on puzzle '{puzzle['name']}' (Mate in {moves_to_mate})...")
+    print("Initial Board State:")
+    print(board)
 
-    # 4. Validate and Check for Checkmate
-    try:
+    # 4. Main Test Loop
+    for i in range(moves_to_mate):
+        # Player-under-test's turn
+        move_uci = player_under_test.compute_move(board, strategy_message=strategy_prompt)
+        assert move_uci is not None, f"Player failed to provide a move on turn {i+1}."
+        
         move = chess.Move.from_uci(move_uci)
-        assert move in game.board.legal_moves, f"Player returned an illegal move: {move_uci}"
-    except ValueError:
-        pytest.fail(f"Player returned an invalid UCI move string: {move_uci}")
+        assert move in board.legal_moves, f"Player returned an illegal move '{move_uci}' on turn {i+1}."
+        board.push(move)
+        print(f"  - Turn {i+1} (P): {move_uci}")
 
-    game.board.push(move)
-    if not game.board.is_checkmate():
-        print("\nBoard state after player's move (not a checkmate):")
-        print(game.board)
-        pytest.fail(f"The move {move_uci} did not result in a checkmate.")
-    
-    print(f"  - SUCCESS: Player {player.model_name} solved {puzzle['name']} with {move_uci}.")
+        # Check for mate. If found at any point, it's a success.
+        if board.is_checkmate():
+            print("\nFinal board state (Checkmate):")
+            print(board)
+            print(f"  - SUCCESS: Player solved {puzzle['name']} in {i + 1} moves (or fewer).")
+            return # Test passes
+
+        # Defender's turn (if not the last move)
+        if i < moves_to_mate - 1:
+            if board.is_game_over():
+                 pytest.fail(f"Game ended prematurely (e.g., stalemate) after player's move {move_uci}.")
+            
+            defender_move_uci = defender.compute_move(board)
+            assert defender_move_uci is not None, "Defender failed to provide a move."
+            
+            defender_move = chess.Move.from_uci(defender_move_uci)
+            assert defender_move in board.legal_moves, f"Defender made an illegal move: {defender_move_uci}"
+            board.push(defender_move)
+            print(f"  - Turn {i+1} (D): {defender_move_uci}")
+
+    # 5. Final check
+    if not board.is_checkmate():
+        print("\nFinal board state (not a checkmate):")
+        print(board)
+        pytest.fail(f"Player failed to deliver checkmate within {moves_to_mate} moves.")
