@@ -5,6 +5,24 @@ from game import BLUE, ENDC
 class UIManager:
     """Handles all console input and output for the application."""
 
+    # --- Private Helper Methods for Refactoring ---
+
+    @staticmethod
+    def _display_player_options(ai_models, stockfish_configs):
+        """Displays a formatted list of AI and Stockfish player options."""
+        player_list = [f"  {k}: {v}" for k, v in ai_models.items()]
+        player_list += [f"  {k}: Stockfish - {v['name']}" for k, v in stockfish_configs.items()]
+        return player_list
+
+    @staticmethod
+    def _validate_player_keys(white_key, black_key, ai_models, stockfish_configs):
+        """Validates if the given player keys are legitimate choices."""
+        is_white_valid = white_key in ai_models or white_key in stockfish_configs
+        is_black_valid = black_key in ai_models or black_key in stockfish_configs
+        return is_white_valid and is_black_valid
+
+    # --- Public Methods ---
+
     @staticmethod
     def display_message(message):
         """Prints a message to the console."""
@@ -53,9 +71,7 @@ class UIManager:
         """Displays all setup menus in columns and gets the user's combined choice."""
         white_list = [f"  {k}: {v.replace('Play the ', '')}" for k, v in white_openings.items()]
         black_list = [f"  {k}: {v.replace('Play the ', '')}" for k, v in black_defenses.items()]
-        
-        player_list = [f"  {k}: {v}" for k, v in ai_models.items()]
-        player_list += [f"  {k}: Stockfish - {v['name']}" for k, v in stockfish_configs.items()]
+        player_list = UIManager._display_player_options(ai_models, stockfish_configs)
 
         white_width = max(len(s) for s in white_list) + 4
         black_width = max(len(s) for s in black_list) + 4
@@ -81,8 +97,7 @@ class UIManager:
 
                     if (white_opening_key in white_openings and
                         black_defense_key in black_defenses and
-                        (white_player_key in ai_models or white_player_key in stockfish_configs) and
-                        (black_player_key in ai_models or black_player_key in stockfish_configs)):
+                        UIManager._validate_player_keys(white_player_key, black_player_key, ai_models, stockfish_configs)):
                         return white_opening_key, black_defense_key, white_player_key, black_player_key
             
             UIManager.display_message("Invalid input. Please enter a valid string like '1a m1s2' or '1a s1m3'.")
@@ -91,18 +106,16 @@ class UIManager:
     def display_model_menu_and_get_choice(ai_models, stockfish_configs):
         """Displays AI model and Stockfish options and gets the user's choice."""
         UIManager.display_message("\n--- Choose Players for Practice ---")
-        for key, value in ai_models.items():
-            UIManager.display_message(f"  {key}: {value}")
-        for key, value in stockfish_configs.items():
-            UIManager.display_message(f"  {key}: Stockfish - {value['name']}")
+        player_list = UIManager._display_player_options(ai_models, stockfish_configs)
+        for player in player_list:
+            UIManager.display_message(player)
 
         while True:
             choice = UIManager.get_user_input("\nEnter your choice for White and Black players (e.g., 'm1s2'): ").lower()
             if len(choice) == 4:
                 white_player_key = choice[:2]
                 black_player_key = choice[2:]
-                if (white_player_key in ai_models or white_player_key in stockfish_configs) and \
-                   (black_player_key in ai_models or black_player_key in stockfish_configs):
+                if UIManager._validate_player_keys(white_player_key, black_player_key, ai_models, stockfish_configs):
                     return white_player_key, black_player_key
             
             UIManager.display_message("Invalid input. Please enter a valid choice for both players (e.g., 'm1s2').")
