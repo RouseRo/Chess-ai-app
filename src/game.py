@@ -5,6 +5,7 @@ from datetime import datetime
 # ANSI escape codes for colors
 BLUE = '\033[94m'
 RED = '\033[91m'
+GREEN = '\033[92m'
 ENDC = '\033[0m'
 
 class Game:
@@ -129,7 +130,7 @@ class Game:
         """Returns the result of the game as a string."""
         if self.board.is_checkmate():
             winner = "Black" if self.board.turn == chess.WHITE else "White"
-            return f"Checkmate! {winner} wins."
+            return f"\a{GREEN}Checkmate! {winner} wins.{ENDC}"
         if self.board.is_stalemate():
             return "Stalemate! The game is a draw."
         if self.board.is_insufficient_material():

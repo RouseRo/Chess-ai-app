@@ -171,8 +171,40 @@ class UIManager:
 
     @staticmethod
     def display_board(board):
-        """Displays the chess board."""
-        UIManager.display_message("\n" + str(board))
+        """Displays the chess board with rank/file labels and highlights the last move."""
+        last_move = board.peek() if board.move_stack else None
+        from_square = last_move.from_square if last_move else None
+        to_square = last_move.to_square if last_move else None
+
+        board_str = "\n"
+        board_str += "  a b c d e f g h\n"
+        board_str += " -----------------\n"
+
+        for rank in range(7, -1, -1):
+            line = f"{rank + 1}|"
+            for file in range(8):
+                square = chess.square(file, rank)
+                piece = board.piece_at(square)
+                
+                symbol = "."
+                if piece:
+                    symbol = piece.symbol()
+
+                if square == to_square:
+                    line += f" {BLUE}{symbol}{ENDC}"
+                elif square == from_square:
+                    # Highlight the origin square with a blue dot
+                    line += f" {BLUE}.{ENDC}"
+                else:
+                    line += f" {symbol}"
+            
+            line += f" |{rank + 1}\n"
+            board_str += line
+
+        board_str += " -----------------\n"
+        board_str += "  a b c d e f g h\n"
+        
+        UIManager.display_message(board_str)
 
     @staticmethod
     def display_turn_message(game):
