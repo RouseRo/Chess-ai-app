@@ -117,8 +117,8 @@ class ChessApp:
     def parse_log_header(lines):
         header = {}
         patterns = {
-            'white_key': r"White: \w+ \((m\d+|s\d+)\)",
-            'black_key': r"Black: \w+ \((m\d+|s\d+)\)",
+            'white_key': r"White: .* \((m\d+|s\d+)\)",
+            'black_key': r"Black: .* \((m\d+|s\d+)\)",
             'white_strategy': r"White Strategy: (.+)",
             'black_strategy': r"Black Strategy: (.+)",
             'initial_fen': r"Initial FEN: (.+)"
@@ -169,14 +169,12 @@ class ChessApp:
             elif chosen_pos == '?':
                 self._ask_expert()
         except (FileNotFoundError, json.JSONDecodeError):
-            self.ui.display_message("Could not load practice positions file.")
+            self.ui.display_message("Could not load practice positions file or invalid input.")
         return 'continue'
 
     def handle_swap_model_in_menu(self, game):
         """Handles swapping an AI model mid-game."""
-        # This logic would need to be expanded to handle swapping Stockfish players as well
         self.ui.display_message("Swap model feature is currently for AI players.")
-        # ... existing logic ...
 
     def handle_in_game_menu(self, game):
         """Displays and handles the in-game menu options."""
@@ -194,7 +192,6 @@ class ChessApp:
             return game, 'continue'
         elif menu_choice == 'q':
             return game, 'exit_to_main'
-        # 'c' is the default
         return game, 'continue'
 
     # --- Core Game Loop ---
@@ -233,7 +230,7 @@ class ChessApp:
                         continue
                     elif action == 'exit_to_main':
                         self.ui.display_message("\nReturning to Main Menu...")
-                        return # Exit play_game
+                        return
                 
                 else:
                     try:
@@ -321,7 +318,7 @@ class ChessApp:
                     self._ask_expert()
                     continue
 
-                elif choice == '4': # Quit
+                elif choice == 'q': # Quit
                     self.ui.display_message("Thank you for playing!")
                     sys.exit()
             

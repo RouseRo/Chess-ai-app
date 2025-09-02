@@ -23,13 +23,13 @@ class UIManager:
         UIManager.display_message("  2: Load a Saved Game")
         UIManager.display_message("  3: Load a Practice Position")
         UIManager.display_message("  ?: Ask a Chess Expert")
-        UIManager.display_message("  4: Quit")
+        UIManager.display_message("  q: Quit")
         while True:
-            choice = UIManager.get_user_input("Enter your choice (1-4, ?): ")
-            if choice in ['1', '2', '3', '4', '?']:
+            choice = UIManager.get_user_input("Enter your choice (1-3, ?, q): ").lower()
+            if choice in ['1', '2', '3', '?', 'q']:
                 return choice
             else:
-                UIManager.display_message("Invalid choice. Please enter a number from 1 to 4, or '?'.")
+                UIManager.display_message("Invalid choice. Please enter 1-3, ?, or Q.")
 
     @staticmethod
     def display_game_menu_and_get_choice():
