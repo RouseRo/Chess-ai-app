@@ -14,8 +14,11 @@ This project is a feature-rich, command-line chess application where you can pit
     *   Take control at any time by manually entering a move for either player.
     *   Swap out the AI model for White or Black mid-game.
     *   Colored game-over messages (checkmate, stalemate, etc.) with total move count.
-*   **Save & Load System:** Save an in-progress game at any time and load it later to continue.
-*   **Game Logging:** Every move is logged to a file (`chess_game.log`), including the author and the board state in FEN notation.
+*   **Save & Load System:** Save an in-progress game at any time. After a game finishes, you are prompted to save the final game log.
+*   **Comprehensive Logging:**
+    *   **Game Logging:** Every move in a standard game is logged to `chess_game.log`, including the author and the board state in FEN notation.
+    *   **Test Logging:** All test games are automatically logged to individual files in the `logs/test_games/` directory for detailed analysis and debugging.
+*   **Advanced Puzzle Testing:** The test suite can handle multi-move checkmate puzzles, pitting players against a strong Stockfish defender to verify their solving ability.
 
 ## Project Structure
 
@@ -28,6 +31,8 @@ The project is organized with a separation of concerns to make it easy to mainta
 *   `src/ui_manager.py`: Handles all console input and output.
 *   `src/config.json`: A JSON file for configuring AI models, Stockfish, strategies, and the chess expert model.
 *   `src/endgame_positions.json`: A JSON file containing classic endgame scenarios for practice mode.
+*   `tests/`: Contains all `pytest` tests for the application.
+*   `logs/`: The default directory where game and test logs are stored.
 
 ## Setup
 
@@ -64,16 +69,6 @@ The project is organized with a separation of concerns to make it easy to mainta
         ```
     *   **Set Stockfish Path:** Open `src/config.json` and update the `stockfish_path` value to the full path of the Stockfish executable you downloaded (e.g., `"C:/path/to/stockfish.exe"`).
 
-## Configuration
-
-You can customize the application by editing the `src/config.json` file.
-
-*   **`ai_models`**: Add, remove, or change the AI models available for games.
-*   **`stockfish_path`**: The absolute path to your Stockfish executable.
-*   **`stockfish_configs`**: Define different Stockfish "personalities" with varying skill levels.
-*   **`white_openings` / `black_defenses`**: Customize the opening strategies.
-*   **`chess_expert_model`**: Specify which model should be used to answer questions.
-
 ## Usage
 
 ### How to Run
@@ -91,7 +86,7 @@ You will be greeted with the Main Menu, which is the central hub for all applica
 *   `Q`: Quit
 
 ### In-Game Controls
-While a game is in progress, you can press `Enter` to let the current player make its move, or you can type `m` to access the in-game menu. This menu allows you to load another game, load a practice position, swap AI models, ask the expert, or return to the main menu.
+While a game is in progress, you can press `Enter` to let the current player make its move, or you can type `m` to access the in-game menu. This menu allows you to load another game, load a practice position, swap AI models, ask the expert, or return to the main menu. After a game concludes, you will be prompted to save the game log before returning to the main menu.
 
 ## Game Modes
 
