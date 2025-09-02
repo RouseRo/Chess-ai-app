@@ -1,11 +1,13 @@
 import chess
 import logging
 from datetime import datetime
+import re
 
 # ANSI escape codes for colors
 BLUE = '\033[94m'
 RED = '\033[91m'
 GREEN = '\033[92m'
+YELLOW = '\033[93m'
 ENDC = '\033[0m'
 
 class Game:
@@ -128,18 +130,21 @@ class Game:
 
     def get_game_result(self):
         """Returns the result of the game as a string."""
+        num_moves = len(self.board.move_stack)
+        moves_str = f" ({num_moves} moves)"
+
         if self.board.is_checkmate():
             winner = "Black" if self.board.turn == chess.WHITE else "White"
-            return f"\a{GREEN}Checkmate! {winner} wins.{ENDC}"
+            return f"\a{GREEN}Checkmate! {winner} wins.{moves_str}{ENDC}"
         if self.board.is_stalemate():
-            return "Stalemate! The game is a draw."
+            return f"{YELLOW}Stalemate! The game is a draw.{moves_str}{ENDC}"
         if self.board.is_insufficient_material():
-            return "Insufficient material! The game is a draw."
+            return f"{YELLOW}Insufficient material! The game is a draw.{moves_str}{ENDC}"
         if self.board.is_seventyfive_moves():
-            return "75-move rule! The game is a draw."
+            return f"{YELLOW}75-move rule! The game is a draw.{moves_str}{ENDC}"
         if self.board.is_fivefold_repetition():
-            return "Fivefold repetition! The game is a draw."
-        return "Game over."
+            return f"{YELLOW}Fivefold repetition! The game is a draw.{moves_str}{ENDC}"
+        return f"Game over.{moves_str}"
 
     def swap_player_model(self, color, new_player):
         """Swaps the AI player for the given color."""
