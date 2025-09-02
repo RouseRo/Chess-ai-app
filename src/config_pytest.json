@@ -1,0 +1,43 @@
+{
+  "white_openings": {
+    "0": "No Classic Chess Opening",
+    "1": "Play the Ruy Lopez.",
+    "2": "Play the Italian Game.",
+    "3": "Play the Queen's Gambit.",
+    "4": "Play the London System.",
+    "5": "Play the King's Gambit."
+  },
+  "black_defenses": {
+    "a": "Play the Sicilian Defense.",
+    "b": "Play the French Defense.",
+    "c": "Play the Caro-Kann Defense.",
+    "z": "No Classic Chess Defense"
+  },
+  "ai_models": {
+    "m1": "openai/gpt-4o",
+    "m2": "deepseek/deepseek-chat-v3.1",
+    "m3": "google/gemini-2.5-pro",
+    "m4": "anthropic/claude-3-opus",
+    "m5": "meta-llama/llama-3-70b-instruct"
+  },
+  "chess_expert_model": "google/gemini-2.5-pro",
+  "chess_problems": [
+    {
+      "name": "Mate in 1 (Queen-King)",
+      "fen": "6k1/8/6K1/8/8/8/8/5Q2 w - - 0 1",
+      "mate_in": 1
+    },
+    {
+      "name": "Mate in 1 (Rook-King)",
+      "fen": "6k1/8/6K1/8/8/8/8/7R w - - 0 1",
+      "mate_in": 1
+    },
+    {
+      "name": "Mate in 2 (Two Rooks)",
+      "fen": "8/k7/8/8/8/8/R7/R5K1 w - - 0 1"
+    }
+  ],
+  "puzzle_solving": {
+    "strategy_prompt": "You are a chess engine. Your task is to find the single best move that results in immediate checkmate. Verify that there are no legal moves for the opponent after your move. Your answer must only be the move in UCI format (e.g., e2e4, f1h1)."
+  }
+}
