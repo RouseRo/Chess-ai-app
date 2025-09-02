@@ -1,5 +1,7 @@
 import sys
 import os
+import logging
+from datetime import datetime
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import pytest
@@ -7,46 +9,93 @@ import json
 import chess
 from src.ai_player import AIPlayer
 from src.stockfish_player import StockfishPlayer
-from src.game import Game
 
-# Use a separate config file for testing
+# --- Test Configuration ---
 TEST_CONFIG_FILE = 'config_pytest.json'
+LOG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'logs', 'test_games'))
+os.makedirs(LOG_DIR, exist_ok=True)
 
-# Helper to get the absolute path to a file in the src directory
+# --- Helper Functions ---
 def get_src_path(filename):
     return os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src', filename))
 
-def load_test_config():
-    """Loads the specified test configuration file."""
+# --- Pytest Fixtures ---
+
+@pytest.fixture(scope="session")
+def test_config():
+    """Loads the test configuration file once per session."""
     with open(get_src_path(TEST_CONFIG_FILE), 'r') as f:
         return json.load(f)
 
-def load_main_config():
-    """Loads the main application configuration file to get the stockfish path."""
+@pytest.fixture(scope="session")
+def main_config():
+    """Loads the main config file once per session to get the stockfish path."""
     with open(get_src_path('config.json'), 'r') as f:
         return json.load(f)
 
-# Load configs once for all test setup functions
-test_config = load_test_config()
-main_config = load_main_config()
+@pytest.fixture
+def player_under_test(request, main_config, test_config):
+    """Creates the player object (AI or Stockfish) to be tested."""
+    player_type, _, player_data = request.param
+    stockfish_path = main_config.get("stockfish_path")
+    assert stockfish_path and os.path.exists(stockfish_path), f"Stockfish path '{stockfish_path}' from main config.json is invalid."
 
-def load_players():
-    """Loads all player configurations (AI and Stockfish) from the test config."""
+    if player_type == 'ai':
+        return AIPlayer(model_name=player_data)
+    elif player_type == 'stockfish':
+        return StockfishPlayer(path=stockfish_path, parameters=player_data['parameters'])
+    else:
+        pytest.fail(f"Unknown player type: {player_type}")
+
+@pytest.fixture(scope="session")
+def defender_player(main_config):
+    """Creates a single, strong Stockfish player to act as the defender for all tests."""
+    stockfish_path = main_config.get("stockfish_path")
+    defender_params = {"Skill Level": 20, "Minimum Thinking Time": 500}
+    return StockfishPlayer(path=stockfish_path, parameters=defender_params)
+
+@pytest.fixture
+def game_logger(request):
+    """Sets up a unique logger for each test case."""
+    player_spec = request.node.callspec.getparam('player_under_test_spec')
+    puzzle = request.node.callspec.getparam('puzzle')
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file_name = f"{player_id(player_spec)}_{puzzle_id(puzzle)}_{timestamp}.log"
+    log_file_path = os.path.join(LOG_DIR, log_file_name)
+    
+    logger = logging.getLogger(log_file_name)
+    logger.setLevel(logging.INFO)
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+    
+    handler = logging.FileHandler(log_file_path)
+    handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
+    logger.addHandler(handler)
+    
+    yield logger # Provide the logger to the test
+    
+    # Teardown: remove handler after test is done
+    for handler in logger.handlers[:]:
+        handler.close()
+        logger.removeHandler(handler)
+
+# --- Test Parametrization Data ---
+
+def load_players(config):
     players = []
-    for key, model_name in test_config.get("ai_models", {}).items():
+    for key, model_name in config.get("ai_models", {}).items():
         if not key.startswith("//"):
             players.append(('ai', key, model_name))
-    for key, sf_config in test_config.get("stockfish_configs", {}).items():
+    for key, sf_config in config.get("stockfish_configs", {}).items():
         if not key.startswith("//"):
             players.append(('stockfish', key, sf_config))
     return players
 
-def load_puzzles():
-    """Loads all puzzles that have a 'mate_in' key from the test config file."""
-    return [p for p in test_config.get("chess_problems", []) if "mate_in" in p]
+def load_puzzles(config):
+    return [p for p in config.get("chess_problems", []) if "mate_in" in p]
 
 def player_id(player_spec):
-    """Creates a readable ID for each player test case."""
     player_type, key, data = player_spec
     if player_type == 'ai':
         return f"AI-{data.split('/')[-1]}"
@@ -55,75 +104,66 @@ def player_id(player_spec):
     return key
 
 def puzzle_id(puzzle):
-    """Creates a readable ID for each puzzle test case."""
     return puzzle['name'].replace('&', '').replace(' ', '-')
 
-@pytest.mark.parametrize("player_spec", load_players(), ids=player_id)
-@pytest.mark.parametrize("puzzle", load_puzzles(), ids=puzzle_id)
-def test_puzzle_solving(player_spec, puzzle):
-    """
-    Tests if a player (AI or Stockfish) can solve a mate-in-N puzzle
-    against a strong Stockfish defender.
-    """
-    player_type, player_key, player_data = player_spec
-    
-    # 1. Setup Player-Under-Test
-    if player_type == 'ai':
-        player_under_test = AIPlayer(model_name=player_data)
-        strategy_prompt = test_config.get("puzzle_solving", {}).get("strategy_prompt")
-    elif player_type == 'stockfish':
-        stockfish_path = main_config.get("stockfish_path")
-        assert stockfish_path and os.path.exists(stockfish_path), f"Stockfish path '{stockfish_path}' from main config.json is invalid."
-        player_under_test = StockfishPlayer(path=stockfish_path, parameters=player_data['parameters'])
-        strategy_prompt = None
-    else:
-        pytest.fail(f"Unknown player type: {player_type}")
+# --- The Test ---
 
-    # 2. Setup Defender Player (always a strong Stockfish)
-    defender_params = {"Skill Level": 20, "Minimum Thinking Time": 500}
-    defender = StockfishPlayer(path=main_config.get("stockfish_path"), parameters=defender_params)
-
-    # 3. Setup Game
+@pytest.mark.parametrize("player_under_test_spec", load_players(load_test_config()), ids=player_id)
+@pytest.mark.parametrize("puzzle", load_puzzles(load_test_config()), ids=puzzle_id)
+@pytest.mark.parametrize("player_under_test", [None], indirect=True) # Connects to the fixture
+def test_puzzle_solving(player_under_test, defender_player, puzzle, game_logger, test_config):
+    """
+    Tests if a player can solve a mate-in-N puzzle against a strong defender.
+    """
+    # 1. Setup Game
     board = chess.Board(puzzle["fen"])
     moves_to_mate = puzzle["mate_in"]
+    strategy_prompt = test_config.get("puzzle_solving", {}).get("strategy_prompt") if isinstance(player_under_test, AIPlayer) else None
     
-    print(f"\nTesting player '{player_under_test.model_name}' on puzzle '{puzzle['name']}' (Mate in {moves_to_mate})...")
+    start_msg = f"Testing player '{player_under_test.model_name}' on puzzle '{puzzle['name']}' (Mate in {moves_to_mate})..."
+    print(f"\n{start_msg}")
+    game_logger.info(start_msg)
+    game_logger.info(f"Initial FEN: {board.fen()}")
     print("Initial Board State:")
     print(board)
 
-    # 4. Main Test Loop
+    # 2. Main Test Loop
     for i in range(moves_to_mate):
-        # Player-under-test's turn
         move_uci = player_under_test.compute_move(board, strategy_message=strategy_prompt)
         assert move_uci is not None, f"Player failed to provide a move on turn {i+1}."
         
         move = chess.Move.from_uci(move_uci)
         assert move in board.legal_moves, f"Player returned an illegal move '{move_uci}' on turn {i+1}."
         board.push(move)
-        print(f"  - Turn {i+1} (P): {move_uci}")
+        
+        turn_msg = f"Turn {i+1} (P): {move_uci}"
+        print(f"  - {turn_msg}")
+        game_logger.info(f"{turn_msg} -> FEN: {board.fen()}")
 
-        # Check for mate. If found at any point, it's a success.
         if board.is_checkmate():
             print("\nFinal board state (Checkmate):")
             print(board)
-            print(f"  - SUCCESS: Player solved {puzzle['name']} in {i + 1} moves (or fewer).")
-            return # Test passes
+            success_msg = f"SUCCESS: Player solved {puzzle['name']} in {i + 1} moves (or fewer)."
+            print(f"  - {success_msg}")
+            game_logger.info(success_msg)
+            return
 
-        # Defender's turn (if not the last move)
         if i < moves_to_mate - 1:
             if board.is_game_over():
                  pytest.fail(f"Game ended prematurely (e.g., stalemate) after player's move {move_uci}.")
             
-            defender_move_uci = defender.compute_move(board)
+            defender_move_uci = defender_player.compute_move(board)
             assert defender_move_uci is not None, "Defender failed to provide a move."
             
             defender_move = chess.Move.from_uci(defender_move_uci)
-            assert defender_move in board.legal_moves, f"Defender made an illegal move: {defender_move_uci}"
             board.push(defender_move)
-            print(f"  - Turn {i+1} (D): {defender_move_uci}")
+            
+            def_turn_msg = f"Turn {i+1} (D): {defender_move_uci}"
+            print(f"  - {def_turn_msg}")
+            game_logger.info(f"{def_turn_msg} -> FEN: {board.fen()}")
 
-    # 5. Final check
-    if not board.is_checkmate():
-        print("\nFinal board state (not a checkmate):")
-        print(board)
-        pytest.fail(f"Player failed to deliver checkmate within {moves_to_mate} moves.")
+    # 3. Final check
+    failure_msg = f"Player failed to deliver checkmate within {moves_to_mate} moves."
+    game_logger.error(failure_msg)
+    print("\nFinal board state (not a checkmate):")
+    print(board)

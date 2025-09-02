@@ -254,6 +254,19 @@ class ChessApp:
         logging.info(f"Game Over. Result: {game.get_game_result()}")
         self.ui.display_game_over_message(game)
 
+        # Ask to save the completed game
+        save_choice = self.ui.get_user_input("\nSave final game log? (y/N): ").lower()
+        if save_choice == 'y':
+            logging.shutdown()
+            try:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                shutil.copy('chess_game.log', f'chess_game_{timestamp}.log')
+                self.ui.display_message(f"Game saved as chess_game_{timestamp}.log")
+            except FileNotFoundError:
+                self.ui.display_message("Log file not found, could not save.")
+        
+        self.ui.get_user_input("Press Enter to return to the main menu.")
+
     # --- Main Application Runner ---
 
     def run(self):
