@@ -3,17 +3,17 @@ import json
 from game import BLUE, ENDC
 
 class UIManager:
-    """Handles all user interface interactions for the console."""
+    """Handles all console input and output for the application."""
+
+    @staticmethod
+    def display_message(message):
+        """Prints a message to the console."""
+        print(message)
 
     @staticmethod
     def get_user_input(prompt):
-        """Gets stripped user input from the console."""
-        return input(prompt).strip()
-
-    @staticmethod
-    def display_message(message, end="\n"):
-        """Prints a message to the console."""
-        print(message, end=end)
+        """Gets input from the user with a given prompt."""
+        return input(prompt)
 
     @staticmethod
     def display_main_menu():
@@ -49,75 +49,81 @@ class UIManager:
                 UIManager.display_message("Invalid choice. Please enter 'l', 'p', 's', 'c', 'q', or '?'.")
 
     @staticmethod
-    def display_setup_menu_and_get_choices(white_openings, black_defenses, ai_models):
+    def display_setup_menu_and_get_choices(white_openings, black_defenses, ai_models, stockfish_configs):
         """Displays all setup menus in columns and gets the user's combined choice."""
         white_list = [f"  {k}: {v.replace('Play the ', '')}" for k, v in white_openings.items()]
         black_list = [f"  {k}: {v.replace('Play the ', '')}" for k, v in black_defenses.items()]
-        model_list = [f"  {k}: {v}" for k, v in ai_models.items()]
+        
+        player_list = [f"  {k}: {v}" for k, v in ai_models.items()]
+        player_list += [f"  {k}: Stockfish - {v['name']}" for k, v in stockfish_configs.items()]
 
         white_width = max(len(s) for s in white_list) + 4
         black_width = max(len(s) for s in black_list) + 4
 
-        UIManager.display_message(f"\n{'--- White Openings ---':<{white_width}}{'--- Black Defenses ---':<{black_width}}{'--- AI Models ---'}")
+        UIManager.display_message(f"\n{'--- White Openings ---':<{white_width}}{'--- Black Defenses ---':<{black_width}}{'--- Player Models ---'}")
         
-        num_rows = max(len(white_list), len(black_list), len(model_list))
+        num_rows = max(len(white_list), len(black_list), len(player_list))
         for i in range(num_rows):
             white_col = white_list[i] if i < len(white_list) else ""
             black_col = black_list[i] if i < len(black_list) else ""
-            model_col = model_list[i] if i < len(model_list) else ""
-            UIManager.display_message(f"{white_col:<{white_width}}{black_col:<{black_width}}{model_col}")
+            player_col = player_list[i] if i < len(player_list) else ""
+            UIManager.display_message(f"{white_col:<{white_width}}{black_col:<{black_width}}{player_col}")
 
         while True:
-            choice = UIManager.get_user_input("\nEnter choices for openings and models (e.g., '1a m1m2'): ").lower()
+            choice = UIManager.get_user_input("\nEnter choices for openings and players (e.g., '1a m1s2'): ").lower()
             parts = choice.split()
             
             if len(parts) == 2:
-                opening_choice, model_choice = parts[0], parts[1]
-                if len(opening_choice) == 2 and len(model_choice) == 4:
+                opening_choice, player_choice = parts[0], parts[1]
+                if len(opening_choice) == 2 and len(player_choice) == 4:
                     white_opening_key, black_defense_key = opening_choice[0], opening_choice[1]
-                    white_model_key, black_model_key = model_choice[:2], model_choice[2:]
+                    white_player_key, black_player_key = player_choice[:2], player_choice[2:]
 
                     if (white_opening_key in white_openings and
                         black_defense_key in black_defenses and
-                        white_model_key in ai_models and
-                        black_model_key in ai_models):
-                        return white_opening_key, black_defense_key, white_model_key, black_model_key
+                        (white_player_key in ai_models or white_player_key in stockfish_configs) and
+                        (black_player_key in ai_models or black_player_key in stockfish_configs)):
+                        return white_opening_key, black_defense_key, white_player_key, black_player_key
             
-            UIManager.display_message("Invalid input. Please enter a valid string like '1a m1m2'.")
+            UIManager.display_message("Invalid input. Please enter a valid string like '1a m1s2' or '1a s1m3'.")
 
     @staticmethod
-    def display_model_menu_and_get_choice(ai_models):
-        """Displays AI model options and gets the user's choice."""
-        UIManager.display_message("\n--- Choose AI Models for Practice ---")
+    def display_model_menu_and_get_choice(ai_models, stockfish_configs):
+        """Displays AI model and Stockfish options and gets the user's choice."""
+        UIManager.display_message("\n--- Choose Players for Practice ---")
         for key, value in ai_models.items():
             UIManager.display_message(f"  {key}: {value}")
+        for key, value in stockfish_configs.items():
+            UIManager.display_message(f"  {key}: Stockfish - {value['name']}")
 
         while True:
-            choice = UIManager.get_user_input("\nEnter your choice for White and Black models (e.g., 'm1m2'): ").lower()
-            if len(choice) == 4 and choice.startswith('m') and choice[2] == 'm':
-                white_model_key = choice[:2]
-                black_model_key = choice[2:]
-                if white_model_key in ai_models and black_model_key in ai_models:
-                    return white_model_key, black_model_key
+            choice = UIManager.get_user_input("\nEnter your choice for White and Black players (e.g., 'm1s2'): ").lower()
+            if len(choice) == 4:
+                white_player_key = choice[:2]
+                black_player_key = choice[2:]
+                if (white_player_key in ai_models or white_player_key in stockfish_configs) and \
+                   (black_player_key in ai_models or black_player_key in stockfish_configs):
+                    return white_player_key, black_player_key
             
-            UIManager.display_message("Invalid input. Please enter a valid choice for both models (e.g., 'm1m2').")
+            UIManager.display_message("Invalid input. Please enter a valid choice for both players (e.g., 'm1s2').")
 
     @staticmethod
     def display_saved_games_and_get_choice(saved_games):
         """Displays a list of saved games and prompts for a choice."""
         UIManager.display_message("\n--- Saved Games ---")
-        for i, filename in enumerate(saved_games):
-            UIManager.display_message(f"  {i + 1}: {filename}")
+        for i, game_file in enumerate(saved_games):
+            UIManager.display_message(f"  {i + 1}: {game_file}")
         
-        try:
-            choice = int(UIManager.get_user_input("Enter the number of the game to load: "))
-            if 1 <= choice <= len(saved_games):
-                return saved_games[choice - 1]
-            else:
-                UIManager.display_message("Invalid number.")
-        except ValueError:
-            UIManager.display_message("Invalid input.")
-        return None
+        while True:
+            choice = UIManager.get_user_input("Enter the number of the game to load: ")
+            try:
+                choice_num = int(choice)
+                if 1 <= choice_num <= len(saved_games):
+                    return saved_games[choice_num - 1]
+                else:
+                    UIManager.display_message("Invalid number.")
+            except ValueError:
+                UIManager.display_message("Invalid input. Please enter a number.")
 
     @staticmethod
     def display_practice_positions_and_get_choice(positions):
@@ -148,29 +154,24 @@ class UIManager:
     @staticmethod
     def display_game_start_message(game):
         """Displays the initial message when a game starts."""
-        UIManager.display_message("\n--- Starting AI vs AI Chess Game ---")
-        UIManager.display_message(f"Player 1 (White): {game.players[chess.WHITE].model_name} (Strategy: {game.strategies[chess.WHITE]})")
-        UIManager.display_message(f"Player 2 (Black): {game.players[chess.BLACK].model_name} (Strategy: {game.strategies[chess.BLACK]})")
-        UIManager.display_message("------------------------------------")
+        UIManager.display_message(f"\nNew game started. White: {game.players[chess.WHITE].model_name}, Black: {game.players[chess.BLACK].model_name}")
+
+    @staticmethod
+    def display_board(board):
+        """Displays the chess board."""
+        UIManager.display_message("\n" + str(board))
 
     @staticmethod
     def display_turn_message(game):
-        """Displays the message indicating whose turn it is."""
-        turn = game.board.turn
-        current_player = game.players[turn]
-        player_name = "Player 1 (White)" if turn == chess.WHITE else "Player 2 (Black)"
-        move_number = game.board.fullmove_number
-        strategy = game.strategies[turn]
-
-        UIManager.display_message(f"\n{BLUE}Move {move_number}:{ENDC} {player_name}'s turn ({current_player.model_name})...")
-        if strategy and game.board.fullmove_number <= 3:
-            UIManager.display_message(f"Strategy: {strategy}")
+        """Displays whose turn it is."""
+        turn_color = "White" if game.board.turn else "Black"
+        player = game.players[game.board.turn]
+        UIManager.display_message(f"\n{turn_color}'s turn ({player.model_name}). Thinking...")
 
     @staticmethod
     def display_game_over_message(game):
-        """Displays the final board and result."""
+        """Displays the game over message."""
         result = game.get_game_result()
         UIManager.display_message("\n--- Game Over ---")
-        game.display_board()
         UIManager.display_message(f"Result: {result}")
-        UIManager.display_message("Game history has been saved to chess_game.log")
+        UIManager.display_board(game.board)

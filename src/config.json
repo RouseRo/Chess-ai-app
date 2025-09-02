@@ -20,6 +20,21 @@
     "m4": "anthropic/claude-3-opus",
     "m5": "meta-llama/llama-3-70b-instruct"
   },
+  "stockfish_path": "C:/stockfish/stockfish-windows-x86-64-avx2/stockfish/stockfish-windows-x86-64-avx2.exe",
+  "stockfish_configs": {
+    "s1": {
+      "name": "Quick, Casual",
+      "parameters": { "Skill Level": 5, "UCI_LimitStrength": "false" }
+    },
+    "s2": {
+      "name": "Balanced, Moderate",
+      "parameters": { "Skill Level": 10, "UCI_LimitStrength": "false" }
+    },
+    "s3": {
+      "name": "Strong, Powerful",
+      "parameters": { "Skill Level": 20, "UCI_LimitStrength": "false" }
+    }
+  },
   "chess_expert_model": "google/gemini-2.5-pro",
   "chess_problems": [
     {
