@@ -19,6 +19,28 @@ os.makedirs(LOG_DIR, exist_ok=True)
 def get_src_path(filename):
     return os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src', filename))
 
+def _load_config_for_parametrization(filename):
+    """Helper to load a config file for use in decorators."""
+    with open(get_src_path(filename), 'r') as f:
+        return json.load(f)
+
+def _record_result(results_dict, player, puzzle, status, moves=None):
+    """Helper to structure and save the result of a single test."""
+    player_name = player.model_name
+    puzzle_name = puzzle['name']
+
+    if player_name not in results_dict:
+        results_dict[player_name] = {"summary": {"pass": 0, "fail": 0}, "puzzles": {}}
+    
+    results_dict[player_name]["summary"][status.lower()] += 1
+    
+    result_entry = {"status": status}
+    if moves:
+        result_entry["moves_taken"] = moves
+        result_entry["moves_expected"] = puzzle['mate_in']
+
+    results_dict[player_name]["puzzles"][puzzle_name] = result_entry
+
 # --- Pytest Fixtures ---
 
 @pytest.fixture(scope="session")
@@ -33,10 +55,23 @@ def main_config():
     with open(get_src_path('config.json'), 'r') as f:
         return json.load(f)
 
+@pytest.fixture(scope="session")
+def test_results():
+    """Initializes a results dictionary and saves it at the end of the session."""
+    results = {}
+    yield results  # Provide the dict to tests
+
+    # This part runs after all tests are done
+    if results:
+        summary_path = os.path.join(LOG_DIR, "test_summary.json")
+        with open(summary_path, 'w') as f:
+            json.dump(results, f, indent=2)
+        print(f"\nTest results summary saved to {summary_path}")
+
 @pytest.fixture
-def player_under_test(request, main_config, test_config):
+def player_under_test(player_under_test_spec, main_config):
     """Creates the player object (AI or Stockfish) to be tested."""
-    player_type, _, player_data = request.param
+    player_type, _, player_data = player_under_test_spec
     stockfish_path = main_config.get("stockfish_path")
     assert stockfish_path and os.path.exists(stockfish_path), f"Stockfish path '{stockfish_path}' from main config.json is invalid."
 
@@ -106,16 +141,17 @@ def player_id(player_spec):
 def puzzle_id(puzzle):
     return puzzle['name'].replace('&', '').replace(' ', '-')
 
+# Load config at module level for parametrization
+_parametrization_config = _load_config_for_parametrization(TEST_CONFIG_FILE)
+
 # --- The Test ---
 
-@pytest.mark.parametrize("player_under_test_spec", load_players(load_test_config()), ids=player_id)
-@pytest.mark.parametrize("puzzle", load_puzzles(load_test_config()), ids=puzzle_id)
-@pytest.mark.parametrize("player_under_test", [None], indirect=True) # Connects to the fixture
-def test_puzzle_solving(player_under_test, defender_player, puzzle, game_logger, test_config):
+@pytest.mark.parametrize("player_under_test_spec", load_players(_parametrization_config), ids=player_id)
+@pytest.mark.parametrize("puzzle", load_puzzles(_parametrization_config), ids=puzzle_id)
+def test_puzzle_solving(player_under_test_spec, player_under_test, defender_player, puzzle, game_logger, test_config, test_results):
     """
     Tests if a player can solve a mate-in-N puzzle against a strong defender.
     """
-    # 1. Setup Game
     board = chess.Board(puzzle["fen"])
     moves_to_mate = puzzle["mate_in"]
     strategy_prompt = test_config.get("puzzle_solving", {}).get("strategy_prompt") if isinstance(player_under_test, AIPlayer) else None
@@ -127,43 +163,51 @@ def test_puzzle_solving(player_under_test, defender_player, puzzle, game_logger,
     print("Initial Board State:")
     print(board)
 
-    # 2. Main Test Loop
-    for i in range(moves_to_mate):
-        move_uci = player_under_test.compute_move(board, strategy_message=strategy_prompt)
-        assert move_uci is not None, f"Player failed to provide a move on turn {i+1}."
-        
-        move = chess.Move.from_uci(move_uci)
-        assert move in board.legal_moves, f"Player returned an illegal move '{move_uci}' on turn {i+1}."
-        board.push(move)
-        
-        turn_msg = f"Turn {i+1} (P): {move_uci}"
-        print(f"  - {turn_msg}")
-        game_logger.info(f"{turn_msg} -> FEN: {board.fen()}")
-
-        if board.is_checkmate():
-            print("\nFinal board state (Checkmate):")
-            print(board)
-            success_msg = f"SUCCESS: Player solved {puzzle['name']} in {i + 1} moves (or fewer)."
-            print(f"  - {success_msg}")
-            game_logger.info(success_msg)
-            return
-
-        if i < moves_to_mate - 1:
-            if board.is_game_over():
-                 pytest.fail(f"Game ended prematurely (e.g., stalemate) after player's move {move_uci}.")
+    try:
+        for i in range(moves_to_mate):
+            move_uci = player_under_test.compute_move(board, strategy_message=strategy_prompt)
+            assert move_uci is not None, f"Player failed to provide a move on turn {i+1}."
             
-            defender_move_uci = defender_player.compute_move(board)
-            assert defender_move_uci is not None, "Defender failed to provide a move."
+            move = chess.Move.from_uci(move_uci)
+            assert move in board.legal_moves, f"Player returned an illegal move '{move_uci}' on turn {i+1}."
+            board.push(move)
             
-            defender_move = chess.Move.from_uci(defender_move_uci)
-            board.push(defender_move)
-            
-            def_turn_msg = f"Turn {i+1} (D): {defender_move_uci}"
-            print(f"  - {def_turn_msg}")
-            game_logger.info(f"{def_turn_msg} -> FEN: {board.fen()}")
+            turn_msg = f"Turn {i+1} (P): {move_uci}"
+            print(f"  - {turn_msg}")
+            game_logger.info(f"{turn_msg} -> FEN: {board.fen()}")
 
-    # 3. Final check
-    failure_msg = f"Player failed to deliver checkmate within {moves_to_mate} moves."
-    game_logger.error(failure_msg)
-    print("\nFinal board state (not a checkmate):")
-    print(board)
+            if board.is_checkmate():
+                print("\nFinal board state (Checkmate):")
+                print(board)
+                success_msg = f"SUCCESS: Player solved {puzzle['name']} in {i + 1} moves (or fewer)."
+                print(f"  - {success_msg}")
+                game_logger.info(success_msg)
+                _record_result(test_results, player_under_test, puzzle, "PASS", moves=i + 1)
+                return
+
+            if i < moves_to_mate - 1:
+                if board.is_game_over():
+                    pytest.fail(f"Game ended prematurely (e.g., stalemate) after player's move {move_uci}.")
+                
+                defender_move_uci = defender_player.compute_move(board)
+                assert defender_move_uci is not None, "Defender failed to provide a move."
+                
+                defender_move = chess.Move.from_uci(defender_move_uci)
+                board.push(defender_move)
+                
+                def_turn_msg = f"Turn {i+1} (D): {defender_move_uci}"
+                print(f"  - {def_turn_msg}")
+                game_logger.info(f"{def_turn_msg} -> FEN: {board.fen()}")
+
+        failure_msg = f"Player failed to deliver checkmate within {moves_to_mate} moves."
+        game_logger.error(failure_msg)
+        print("\nFinal board state (not a checkmate):")
+        print(board)
+        _record_result(test_results, player_under_test, puzzle, "FAIL")
+        pytest.fail(failure_msg)
+
+    except Exception as e:
+        failure_msg = f"Test failed with an exception: {e}"
+        game_logger.error(failure_msg)
+        _record_result(test_results, player_under_test, puzzle, "FAIL")
+        pytest.fail(failure_msg)
