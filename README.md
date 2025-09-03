@@ -88,6 +88,44 @@ You will be greeted with the Main Menu, which is the central hub for all applica
 ### In-Game Controls
 While a game is in progress, you can press `Enter` to let the current player make its move, or you can type `m` to access the in-game menu. This menu allows you to load another game, load a practice position, swap AI models, ask the expert, or return to the main menu. After a game concludes, you will be prompted to save the game log before returning to the main menu.
 
+## Testing
+
+The project uses `pytest` for automated testing, particularly for verifying that players can solve checkmate puzzles. The test suite is configured to run every player against every puzzle defined in `src/config_pytest.json`.
+
+### Useful Pytest Commands
+
+All commands should be run from the root directory of the project. The `-s` flag is recommended to show all output, including the chess boards.
+
+*   **Run All Tests:**
+    Discovers and runs every test case.
+    ```bash
+    pytest -s
+    ```
+
+*   **Run Tests for a Specific Player Type:**
+    Use the `-k` flag to filter tests by keywords.
+    ```bash
+    # Run only Stockfish tests
+    pytest -s -k "Stockfish"
+
+    # Run only AI tests
+    pytest -s -k "AI"
+    ```
+
+*   **Run Tests for a Specific Puzzle:**
+    This is useful for seeing how all players perform on a single puzzle.
+    ```bash
+    # Run only the "Queen-King" puzzle tests
+    pytest -s -k "Queen-King"
+    ```
+
+*   **Run a Single, Highly Specific Test:**
+    Combine keywords with `and` to target one specific test case. This is ideal for debugging.
+    ```bash
+    # Test the 'gpt-4o' model on the 'Queen-King' puzzle
+    pytest -s -k "gpt-4o and Queen-King"
+    ```
+
 ## Game Modes
 
 The application offers several game modes to suit your needs:
