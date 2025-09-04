@@ -1,12 +1,12 @@
-import chess
-import logging
 import os
-import re
-from datetime import datetime
+import sys
+import json
 import glob
 import shutil
-import json
-import sys
+import logging
+import re
+from datetime import datetime
+import chess
 from game import Game, RED, ENDC
 from ai_player import AIPlayer
 from stockfish_player import StockfishPlayer
@@ -247,30 +247,32 @@ class ChessApp:
                     if save_choice == 'y':
                         self._save_game_log()
                     self.ui.display_message("Exiting game.")
-                    break
+                    sys.exit()
                 
                 elif user_input.lower() == 'm':
                     game, action = self.handle_in_game_menu(game)
-                    if action == 'skip_turn':
+                    if action == 'quit_to_menu':
+                        save_choice = self.ui.get_user_input("Save game before quitting? (y/N): ").lower()
+                        if save_choice == 'y':
+                            self._save_game_log()
+                        self.ui.display_message("Exiting game.")
+                        sys.exit()
+                    elif action == 'skip_turn':
                         continue
-                    elif action == 'exit_to_main':
-                        self.ui.display_message("\nReturning to Main Menu...")
-                        return
                 
+                elif user_input.isdigit():
+                    num_moves = int(user_input)
+                    auto_moves_remaining = num_moves * 2 -1
                 else:
-                    try:
-                        num_moves = int(user_input)
-                        auto_moves_remaining = num_moves * 2 -1
-                    except ValueError:
-                        if user_input == '':
-                            pass
+                    if user_input == '':
+                        pass
+                    else:
+                        move_uci = user_input.strip().lower()
+                        if game.make_move(move_uci, author="User"):
+                            is_manual_move = True
                         else:
-                            move_uci = user_input.strip().lower()
-                            if game.make_move(move_uci, author="User"):
-                                is_manual_move = True
-                            else:
-                                self.ui.display_message(f"{RED}Invalid or illegal move. Please try again.{ENDC}")
-                                continue
+                            self.ui.display_message(f"{RED}Invalid or illegal move. Please try again.{ENDC}")
+                            continue
 
             if not is_manual_move:
                 self.ui.display_turn_message(game)
