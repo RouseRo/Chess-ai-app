@@ -185,7 +185,7 @@ class ChessApp:
         return 'continue'
 
     def handle_swap_model_in_menu(self, game):
-        """Handles swapping an AI model mid-game."""
+        """Handles the 'swap model' option from the in-game menu."""
         self.ui.display_message("Swap model feature is currently for AI players.")
 
     def _save_game_log(self):
@@ -203,6 +203,22 @@ class ChessApp:
             self.ui.display_message("Log file not found, could not save.")
         except Exception as e:
             self.ui.display_message(f"An error occurred while saving: {e}")
+
+    def _handle_resignation(self, game):
+        """Handles the logic for a player resigning."""
+        resigning_color = "White" if game.board.turn == chess.WHITE else "Black"
+        resign_message = f"{resigning_color} has resigned."
+        
+        # Log the resignation and display it in red
+        logging.info(resign_message)
+        self.ui.display_message(f"\n{RED}{resign_message}{ENDC}")
+        
+        # Ask to save and then exit
+        save_choice = self.ui.get_user_input("Save final game log? (y/N): ").lower()
+        if save_choice == 'y':
+            self._save_game_log()
+        self.ui.display_message("Exiting application.")
+        sys.exit()
 
     def handle_in_game_menu(self, game):
         """Displays and handles the in-game menu options."""
@@ -245,20 +261,12 @@ class ChessApp:
                 user_input = self.ui.get_user_input(prompt)
                 
                 if user_input.lower() == 'q':
-                    save_choice = self.ui.get_user_input("Save game before quitting? (y/N): ").lower()
-                    if save_choice == 'y':
-                        self._save_game_log()
-                    self.ui.display_message("Exiting game.")
-                    sys.exit()
+                    self._handle_resignation(game)
                 
                 elif user_input.lower() == 'm':
                     game, action = self.handle_in_game_menu(game)
                     if action == 'quit_app':
-                        save_choice = self.ui.get_user_input("Save game before quitting? (y/N): ").lower()
-                        if save_choice == 'y':
-                            self._save_game_log()
-                        self.ui.display_message("Exiting application.")
-                        sys.exit()
+                        self._handle_resignation(game)
                     elif action == 'skip_turn':
                         continue
                 
@@ -320,10 +328,9 @@ class ChessApp:
                     with open('src/endgame_positions.json', 'r') as f:
                         positions = json.load(f)
                     
-                    position_key = self.ui.display_practice_menu_and_get_choice(positions)
-                    if position_key:
-                        position = positions[position_key]
-                        white_player_key, black_player_key = self.ui.display_model_menu_and_get_choice(self.config['ai_models'], self.config['stockfish_configs'])
+                    position = self.ui.display_practice_positions_and_get_choice(positions)
+                    if position and position != '?':
+                        white_player_key, black_player_key = self.ui.display_model_menu_and_get_choice(self.ai_models, self.stockfish_configs)
                         
                         player1 = self._create_player(white_player_key)
                         player2 = self._create_player(black_player_key)
@@ -334,6 +341,9 @@ class ChessApp:
                         
                         self.ui.display_message(f"Loaded practice position: {position['name']}")
                         self.play_game(game)
+                    elif position == '?':
+                        self._ask_expert()
+                        continue
 
                 elif choice == '?':
                     self._ask_expert()
