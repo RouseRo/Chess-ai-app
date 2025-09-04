@@ -14,27 +14,29 @@
     "z": "No Classic Chess Defense"
   },
   "ai_models": {
-    "m1": "openai/gpt-4o",
-    "m2": "deepseek/deepseek-chat-v3.1",
-    "m3": "google/gemini-2.5-pro",
-    "m4": "anthropic/claude-3-opus",
-    "m5": "meta-llama/llama-3-70b-instruct"
+    "m1": "openai/gpt-4o"
+  },
+  "stockfish_configs": {
+    "s1": {
+      "name": "Quick, Casual",
+      "parameters": { "Skill Level": 10, "Minimum Thinking Time": 100 }
+    },
+    "s3": {
+      "name": "Strong, Powerful",
+      "parameters": { "Skill Level": 20, "Minimum Thinking Time": 200 }
+    }
   },
   "chess_expert_model": "google/gemini-2.5-pro",
   "chess_problems": [
     {
-      "name": "Mate in 1 (Queen-King)",
+      "name": "Mate in 3 (Queen-King)",
       "fen": "6k1/8/6K1/8/8/8/8/5Q2 w - - 0 1",
-      "mate_in": 1
+      "mate_in": 3
     },
     {
-      "name": "Mate in 1 (Rook-King)",
+      "name": "Mate in 3 (Rook-King)",
       "fen": "6k1/8/6K1/8/8/8/8/7R w - - 0 1",
-      "mate_in": 1
-    },
-    {
-      "name": "Mate in 2 (Two Rooks)",
-      "fen": "8/k7/8/8/8/8/R7/R5K1 w - - 0 1"
+      "mate_in": 3
     }
   ],
   "puzzle_solving": {

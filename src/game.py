@@ -11,21 +11,30 @@ YELLOW = '\033[93m'
 ENDC = '\033[0m'
 
 class Game:
-    def __init__(self, player1, player2, white_strategy=None, black_strategy=None):
-        """Initializes the chessboard and players."""
-        self.board = chess.Board()
+    """Represents a single game of chess, including board state and players."""
+
+    def __init__(self, player1, player2, white_strategy=None, black_strategy=None, white_player_key=None, black_player_key=None):
         self.players = {chess.WHITE: player1, chess.BLACK: player2}
-        self.strategies = {chess.WHITE: white_strategy, chess.BLACK: black_strategy}
-        
-        # Log initial setup
-        initial_fen = self.board.fen()
+        self.board = chess.Board()
+        self.white_strategy = white_strategy
+        self.black_strategy = black_strategy
+        self.strategies = {
+            chess.WHITE: white_strategy,
+            chess.BLACK: black_strategy
+        }
+        self.white_player_key = white_player_key
+        self.black_player_key = black_player_key
+
+    def initialize_game(self):
+        """Sets up the initial state of the game and logs the setup."""
         logging.info("New Game Started")
-        # This part of logging might need adjustment if player keys are needed here
-        logging.info(f"White: {player1.model_name}")
-        logging.info(f"Black: {player2.model_name}")
-        logging.info(f"White Strategy: {white_strategy or 'None'}")
-        logging.info(f"Black Strategy: {black_strategy or 'None'}")
-        logging.info(f"Initial FEN: {initial_fen}")
+        logging.info(f"White: {self.players[chess.WHITE].model_name} ({self.white_player_key})")
+        logging.info(f"Black: {self.players[chess.BLACK].model_name} ({self.black_player_key})")
+        if self.white_strategy:
+            logging.info(f"White Strategy: {self.white_strategy}")
+        if self.black_strategy:
+            logging.info(f"Black Strategy: {self.black_strategy}")
+        logging.info(f"Initial FEN: {self.board.fen()}")
 
     def set_opening_strategy(self, color, strategy_message):
         """Sets an opening strategy message for the given player color."""
