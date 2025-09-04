@@ -221,8 +221,10 @@ class ChessApp:
         elif menu_choice == '?':
             self._ask_expert()
             return game, 'continue'
+        elif menu_choice == 'r':
+            return game, 'continue'
         elif menu_choice == 'q':
-            return game, 'exit_to_main'
+            return game, 'quit_app'
         return game, 'continue'
 
     # --- Core Game Loop ---
@@ -251,11 +253,11 @@ class ChessApp:
                 
                 elif user_input.lower() == 'm':
                     game, action = self.handle_in_game_menu(game)
-                    if action == 'quit_to_menu':
+                    if action == 'quit_app':
                         save_choice = self.ui.get_user_input("Save game before quitting? (y/N): ").lower()
                         if save_choice == 'y':
                             self._save_game_log()
-                        self.ui.display_message("Exiting game.")
+                        self.ui.display_message("Exiting application.")
                         sys.exit()
                     elif action == 'skip_turn':
                         continue

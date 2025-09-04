@@ -58,13 +58,14 @@ class UIManager:
         UIManager.display_message("  s: Save Game")
         UIManager.display_message("  c: Change AI Model")
         UIManager.display_message("  ?: Ask a Chess Expert")
-        UIManager.display_message("  q: Quit to Main Menu")
+        UIManager.display_message("  r: Return to Game")
+        UIManager.display_message("  q: Quit Application")
         while True:
             choice = UIManager.get_user_input("Enter your choice: ").lower()
-            if choice in ['l', 'p', 's', 'c', 'q', '?']:
+            if choice in ['l', 'p', 's', 'c', 'q', '?', 'r']:
                 return choice
             else:
-                UIManager.display_message("Invalid choice. Please enter 'l', 'p', 's', 'c', 'q', or '?'.")
+                UIManager.display_message("Invalid choice. Please enter a valid option.")
 
     @staticmethod
     def display_setup_menu_and_get_choices(white_openings, black_defenses, ai_models, stockfish_configs):
