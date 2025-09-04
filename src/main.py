@@ -12,7 +12,12 @@ from ai_player import AIPlayer
 from stockfish_player import StockfishPlayer
 from ui_manager import UIManager
 
+# --- Constants ---
+LOG_FILE = 'chess_game.log'
+PLAYER_STATS_FILE = 'logs/player_stats.json'
+
 class ChessApp:
+    """The main application class that orchestrates the game."""
     def __init__(self):
         """Initializes the application, loading configurations."""
         self.ui = UIManager()
@@ -204,6 +209,50 @@ class ChessApp:
         except Exception as e:
             self.ui.display_message(f"An error occurred while saving: {e}")
 
+    def _load_player_stats(self):
+        """Loads player statistics from the JSON file."""
+        if not os.path.exists(PLAYER_STATS_FILE):
+            return {}
+        try:
+            with open(PLAYER_STATS_FILE, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError):
+            return {}
+
+    def _save_player_stats(self, stats):
+        """Saves player statistics to the JSON file."""
+        os.makedirs(os.path.dirname(PLAYER_STATS_FILE), exist_ok=True)
+        with open(PLAYER_STATS_FILE, 'w') as f:
+            json.dump(stats, f, indent=2)
+
+    def _update_player_stats(self, white_player, black_player, result):
+        """Updates and saves the win/loss/draw stats for players."""
+        stats = self._load_player_stats()
+        
+        players = {white_player.model_name, black_player.model_name}
+        for player_name in players:
+            if player_name not in stats:
+                stats[player_name] = {"wins": 0, "losses": 0, "draws": 0}
+
+        if result == "1-0": # White wins
+            stats[white_player.model_name]["wins"] += 1
+            stats[black_player.model_name]["losses"] += 1
+        elif result == "0-1": # Black wins
+            stats[black_player.model_name]["wins"] += 1
+            stats[white_player.model_name]["losses"] += 1
+        elif result == "1/2-1/2": # Draw
+            stats[white_player.model_name]["draws"] += 1
+            stats[black_player.model_name]["draws"] += 1
+        
+        self._save_player_stats(stats)
+        self.ui.display_message("\nPlayer stats have been updated.")
+
+    def _view_player_stats(self):
+        """Loads and displays player statistics."""
+        stats = self._load_player_stats()
+        self.ui.display_player_stats(stats)
+        self.ui.get_user_input("Press Enter to return to the main menu.")
+
     def _handle_resignation(self, game):
         """Handles the logic for a player resigning."""
         resigning_color = "White" if game.board.turn == chess.WHITE else "Black"
@@ -212,6 +261,10 @@ class ChessApp:
         # Log the resignation and display it in red
         logging.info(resign_message)
         self.ui.display_message(f"\n{RED}{resign_message}{ENDC}")
+
+        # Update stats based on resignation
+        result = "0-1" if resigning_color == "White" else "1-0"
+        self._update_player_stats(game.players[chess.WHITE], game.players[chess.BLACK], result)
         
         # Ask to save and then exit
         save_choice = self.ui.get_user_input("Save final game log? (y/N): ").lower()
@@ -271,25 +324,18 @@ class ChessApp:
                         continue
                 
                 elif user_input.isdigit():
-                    num_moves = int(user_input)
-                    auto_moves_remaining = num_moves * 2 -1
+                    auto_moves_remaining = int(user_input)
                 else:
-                    if user_input == '':
-                        pass
-                    else:
-                        move_uci = user_input.strip().lower()
-                        if game.make_move(move_uci, author="User"):
-                            is_manual_move = True
-                        else:
-                            self.ui.display_message(f"{RED}Invalid or illegal move. Please try again.{ENDC}")
-                            continue
+                    is_manual_move = True
 
             if not is_manual_move:
                 self.ui.display_turn_message(game)
                 game.play_turn()
 
+        # --- Game Over ---
         logging.info(f"Game Over. Result: {game.get_game_result()}")
         self.ui.display_game_over_message(game)
+        self._update_player_stats(game.players[chess.WHITE], game.players[chess.BLACK], game.board.result())
 
         # Ask to save the completed game
         save_choice = self.ui.get_user_input("\nSave final game log? (y/N): ").lower()
@@ -307,11 +353,10 @@ class ChessApp:
 
             try:
                 if choice == '1': # New Game
-                    logging.basicConfig(filename='chess_game.log', level=logging.INFO, format='%(asctime)s - %(message)s', filemode='w')
-                    logging.getLogger("httpx").setLevel(logging.WARNING)
-                    game = self.setup_new_game()
-                    self.ui.display_game_start_message(game)
-                    self.play_game(game)
+                    game = self.start_new_game()
+                    if game:
+                        self.ui.display_game_start_message(game)
+                        self.play_game(game)
 
                 elif choice == '2': # Load Saved Game
                     saved_games = glob.glob('chess_game_*.log')
@@ -344,6 +389,10 @@ class ChessApp:
                     elif position == '?':
                         self._ask_expert()
                         continue
+
+                elif choice == '4': # View Player Stats
+                    self._view_player_stats()
+                    continue
 
                 elif choice == '?':
                     self._ask_expert()

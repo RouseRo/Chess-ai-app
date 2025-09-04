@@ -36,18 +36,19 @@ class UIManager:
     @staticmethod
     def display_main_menu():
         """Displays the main menu and gets the user's choice."""
-        UIManager.display_message("\n--- Main Menu ---")
-        UIManager.display_message("  1: Play a New AI vs AI Game")
-        UIManager.display_message("  2: Load a Saved Game")
-        UIManager.display_message("  3: Load a Practice Position")
-        UIManager.display_message("  ?: Ask a Chess Expert")
-        UIManager.display_message("  q: Quit")
         while True:
-            choice = UIManager.get_user_input("Enter your choice (1-3, ?, q): ").lower()
-            if choice in ['1', '2', '3', '?', 'q']:
+            UIManager.display_message("\n--- Main Menu ---")
+            UIManager.display_message("  1: Play a New Game")
+            UIManager.display_message("  2: Load a Saved Game")
+            UIManager.display_message("  3: Load a Practice Position")
+            UIManager.display_message("  4: View Player Stats")
+            UIManager.display_message("  ?: Ask a Chess Expert")
+            UIManager.display_message("  Q: Quit")
+            choice = UIManager.get_user_input("Enter your choice: ").lower()
+            if choice in ['1', '2', '3', '4', 'q', '?']:
                 return choice
             else:
-                UIManager.display_message("Invalid choice. Please enter 1-3, ?, or Q.")
+                UIManager.display_message("Invalid choice. Please enter a valid option.")
 
     @staticmethod
     def display_game_menu_and_get_choice():
@@ -68,8 +69,35 @@ class UIManager:
                 UIManager.display_message("Invalid choice. Please enter a valid option.")
 
     @staticmethod
+    def display_player_stats(stats):
+        """Displays player statistics in a formatted table."""
+        UIManager.display_message("\n--- Player Statistics ---")
+        if not stats:
+            UIManager.display_message("No player statistics found.")
+            return
+
+        # Sort players by wins (descending)
+        sorted_players = sorted(stats.items(), key=lambda item: item[1]['wins'], reverse=True)
+
+        # Find max name length for formatting
+        max_name_len = max(len(name) for name, _ in sorted_players) if sorted_players else 20
+
+        # Header
+        header = f"{'Player':<{max_name_len}} | {'Wins':>5} | {'Losses':>7} | {'Draws':>5}"
+        UIManager.display_message(header)
+        UIManager.display_message('-' * len(header))
+
+        # Rows
+        for player_name, data in sorted_players:
+            wins = data.get('wins', 0)
+            losses = data.get('losses', 0)
+            draws = data.get('draws', 0)
+            row = f"{player_name:<{max_name_len}} | {wins:>5} | {losses:>7} | {draws:>5}"
+            UIManager.display_message(row)
+
+    @staticmethod
     def display_setup_menu_and_get_choices(white_openings, black_defenses, ai_models, stockfish_configs):
-        """Displays all setup menus in columns and gets the user's combined choice."""
+        """Displays the new game setup menu and gets user choices."""
         white_list = [f"  {k}: {v.replace('Play the ', '')}" for k, v in white_openings.items()]
         black_list = [f"  {k}: {v.replace('Play the ', '')}" for k, v in black_defenses.items()]
         player_list = UIManager._display_player_options(ai_models, stockfish_configs)
