@@ -53,12 +53,12 @@ class UIManager:
     def display_game_menu_and_get_choice():
         """Displays the in-game menu and gets the user's choice."""
         UIManager.display_message("\n--- Game Menu ---")
-        UIManager.display_message("  l: Load a saved game")
-        UIManager.display_message("  p: Load a practice position")
-        UIManager.display_message("  s: Swap AI Model")
+        UIManager.display_message("  l: Load Another Game")
+        UIManager.display_message("  p: Load Practice Position")
+        UIManager.display_message("  s: Save Game")
+        UIManager.display_message("  c: Change AI Model")
         UIManager.display_message("  ?: Ask a Chess Expert")
-        UIManager.display_message("  q: Return to Main Menu")
-        UIManager.display_message("  c: Cancel and continue game")
+        UIManager.display_message("  q: Quit to Main Menu")
         while True:
             choice = UIManager.get_user_input("Enter your choice: ").lower()
             if choice in ['l', 'p', 's', 'c', 'q', '?']:
@@ -208,10 +208,11 @@ class UIManager:
 
     @staticmethod
     def display_turn_message(game):
-        """Displays whose turn it is."""
+        """Displays whose turn it is, including the move number."""
+        move_number = game.board.fullmove_number
         turn_color = "White" if game.board.turn else "Black"
         player = game.players[game.board.turn]
-        UIManager.display_message(f"\n{turn_color}'s turn ({player.model_name}). Thinking...")
+        UIManager.display_message(f"\nMove {move_number} ({turn_color}): {player.model_name} is thinking...")
 
     @staticmethod
     def display_game_over_message(game):
