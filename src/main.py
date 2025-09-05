@@ -10,6 +10,7 @@ import chess
 from game import Game, RED, ENDC
 from ai_player import AIPlayer
 from stockfish_player import StockfishPlayer
+from human_player import HumanPlayer
 from ui_manager import UIManager
 from file_manager import FileManager
 
@@ -41,85 +42,39 @@ class ChessApp:
                 self.ai_models = config.get("ai_models", {})
                 self.stockfish_path = config.get("stockfish_path")
                 self.stockfish_configs = config.get("stockfish_configs", {})
-                self.chess_expert_model = config.get("chess_expert_model")
-                if not self.chess_expert_model:
-                    raise ValueError("chess_expert_model not found in config.")
-        except (FileNotFoundError, json.JSONDecodeError, ValueError) as e:
-            self.ui.display_message(f"Error loading config.json: {e}")
-            self.ui.display_message("Please ensure src/config.json exists and is correctly formatted.")
+                self.chess_expert_model = config.get('chess_expert_model', 'google/gemini-2.5-pro')
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            self.ui.display_message(f"{RED}Fatal Error: Could not load or parse 'src/config.json'.{ENDC}")
+            self.ui.display_message(f"Reason: {e}")
+            self.ui.display_message("Please ensure the file exists and is a valid JSON.")
             sys.exit(1)
 
     def _create_player(self, player_key):
-        """Creates a player object (AI or Stockfish) based on the key."""
+        """Creates a player object based on the provided key."""
         if player_key.startswith('m'):
-            model_name = self.ai_models[player_key]
-            return AIPlayer(model_name=model_name)
+            model_name = self.ai_models.get(player_key)
+            if model_name:
+                return AIPlayer(model_name=model_name)
         elif player_key.startswith('s'):
-            if not self.stockfish_path or not os.path.exists(self.stockfish_path):
-                raise FileNotFoundError(f"Stockfish executable not found at path: {self.stockfish_path}. Please check your config.json.")
-            config = self.stockfish_configs[player_key]
-            return StockfishPlayer(path=self.stockfish_path, parameters=config['parameters'])
-        else:
-            raise ValueError(f"Unknown player key: {player_key}")
-
-    def _ask_expert(self, question=None):
-        """Handles the logic for asking the chess expert a question."""
-        if not question:
-            question = self.ui.get_chess_question()
+            config = self.stockfish_configs.get(player_key)
+            if config:
+                return StockfishPlayer(self.stockfish_path, parameters=config['parameters'])
+        elif player_key == 'hu':
+            # This path is for loading games, where we don't have the color context easily.
+            # We'll create a generic human player and the game logic will handle the rest.
+            # A more robust implementation might parse the player name from the log.
+            return HumanPlayer(name="Human")
         
-        if not question:
-            return
-
-        self.ui.display_message("\nConsulting the expert...")
-        expert_player = AIPlayer(model_name=self.chess_expert_model)
-        system_prompt = "You are a chess expert playing at the grandmaster level."
-        
-        answer = expert_player.ask_question(question, system_prompt)
-        
-        self.ui.display_message("\n--- Grandmaster's Answer ---")
-        self.ui.display_message(answer)
-        self.ui.display_message("----------------------------")
-        self.ui.get_user_input("Press Enter to return to the menu.")
-
-    def _get_fun_fact(self):
-        """Gets a fun chess fact from the expert AI."""
-        self.ui.display_message("\nAsking the Grandmaster for a fun fact...")
-        expert_player = AIPlayer(model_name=self.chess_expert_model)
-        
-        question = "Tell me a fun, interesting, and little-known fact about chess history, a famous player, or a specific opening."
-        system_prompt = "You are a chess historian and grandmaster. Provide a single, interesting fact."
-        
-        answer = expert_player.ask_question(question, system_prompt)
-        
-        self.ui.display_message("\n--- Fun Chess Fact ---")
-        self.ui.display_message(answer)
-        self.ui.display_message("----------------------")
-        self.ui.get_user_input("Press Enter to return to the main menu.")
-
-    # --- Game Setup & Loading Methods ---
-
-    def setup_new_game(self):
-        """Handles the user interaction for setting up a new game."""
-        white_opening_key, black_defense_key, white_player_key, black_player_key = \
-            self.ui.display_setup_menu_and_get_choices(self.white_openings, self.black_defenses, self.ai_models, self.stockfish_configs)
-
-        player1 = self._create_player(white_player_key)
-        player2 = self._create_player(black_player_key)
-
-        white_strategy = self.white_openings[white_opening_key] if white_opening_key != '0' else None
-        black_strategy = self.black_defenses[black_defense_key] if black_defense_key != 'z' else None
-
-        game = Game(player1, player2, white_strategy, black_strategy, white_player_key, black_player_key)
-        game.initialize_game()
-        return game
+        raise ValueError(f"Unknown player key: {player_key}")
 
     def load_game_from_log(self, log_file):
-        """Loads game settings and board state from a log file."""
+        """Loads a game state from a log file."""
         try:
             with open(log_file, 'r') as f:
                 lines = f.readlines()
             
-            header, error_reason = self.parse_log_header(lines)
+            all_keys = list(self.ai_models.keys()) + list(self.stockfish_configs.keys()) + ['hu']
+            header, error_reason = self.parse_log_header(lines, all_keys)
             if not header:
                 self.ui.display_message(f"Failed to load game: {error_reason}")
                 return None
@@ -127,7 +82,7 @@ class ChessApp:
             player1 = self._create_player(header['white_key'])
             player2 = self._create_player(header['black_key'])
             
-            game = Game(player1, player2, white_strategy=header['white_strategy'], black_strategy=header['black_strategy'])
+            game = Game(player1, player2, white_strategy=header['white_strategy'], black_strategy=header['black_strategy'], white_player_key=header['white_key'], black_player_key=header['black_key'])
             
             last_fen = header['initial_fen']
             for line in lines:
@@ -141,27 +96,50 @@ class ChessApp:
             return None
 
     @staticmethod
-    def parse_log_header(lines):
-        header = {
-            'white_strategy': None,
-            'black_strategy': None
-        }
-        patterns = {
-            'white_key': r"White: .* \((m\d+|s\d+)\)",
-            'black_key': r"Black: .* \((m\d+|s\d+)\)",
-            'white_strategy': r"White Strategy: (.+)",
-            'black_strategy': r"Black Strategy: (.+)",
-            'initial_fen': r"Initial FEN: (.+)"
-        }
-        for line in lines[:6]: # Header should be in the first few lines
-            for key, pattern in patterns.items():
-                match = re.search(pattern, line)
-                if match:
-                    header[key] = match.group(1).strip()
+    def parse_log_header(lines, all_keys):
+        """Parses the header of a log file to extract game setup information."""
+        header = {}
+
+        for line in lines:
+            if "Move:" in line:
+                break # End of header
+
+            # Modern format (explicit keys)
+            if "White Player Key:" in line:
+                header["white_key"] = line.split(":", 1)[1].strip()
+            elif "Black Player Key:" in line:
+                header["black_key"] = line.split(":", 1)[1].strip()
+            
+            # Fallback for older logs (infer keys)
+            elif "White:" in line and "white_key" not in header:
+                player_name = line.split(":", 1)[1].strip()
+                for key in all_keys:
+                    if f"({key})" in player_name:
+                        header["white_key"] = key
+                        break
+            elif "Black:" in line and "black_key" not in header:
+                player_name = line.split(":", 1)[1].strip()
+                for key in all_keys:
+                    if f"({key})" in player_name:
+                        header["black_key"] = key
+                        break
+
+            # Common fields
+            elif "White Strategy:" in line:
+                header["white_strategy"] = line.split(":", 1)[1].strip()
+            elif "Black Strategy:" in line:
+                header["black_strategy"] = line.split(":", 1)[1].strip()
+            elif "Initial FEN:" in line:
+                header["initial_fen"] = line.split(":", 1)[1].strip()
+
+        # Validation
+        required_fields = ["white_key", "black_key", "initial_fen"]
+        missing_fields = [field for field in required_fields if field not in header]
         
-        required_fields = ['white_key', 'black_key', 'initial_fen']
-        missing_fields = [field for field in required_fields if not header.get(field)]
-        
+        # Set default for optional strategy fields
+        header.setdefault('white_strategy', 'No Classic Chess Opening')
+        header.setdefault('black_strategy', 'No Classic Chess Opening')
+
         if not missing_fields:
             return header, None
         else:
@@ -206,8 +184,8 @@ class ChessApp:
         if position and position not in ['?', 'm', 'q']:
             white_player_key, black_player_key = self.ui.display_model_menu_and_get_choice(self.ai_models, self.stockfish_configs)
             
-            player1 = self._create_player(white_player_key)
-            player2 = self._create_player(black_player_key)
+            player1 = self._create_player_with_name_prompt(white_player_key, "White")
+            player2 = self._create_player_with_name_prompt(black_player_key, "Black")
 
             new_game = Game(player1, player2, white_player_key=white_player_key, black_player_key=black_player_key)
             new_game.set_board_from_fen(position['fen'])
@@ -254,6 +232,28 @@ class ChessApp:
         self.ui.display_player_stats(stats)
         self.ui.get_user_input("Press Enter to return to the main menu.")
 
+    def _handle_quit_request(self, game):
+        """
+        Handles a quit request. For a human, asks to resign/save/cancel.
+        For an AI, triggers resignation. Exits the app on resign/save.
+        Returns True if the game loop should continue (i.e., user cancelled).
+        """
+        current_player = game.get_current_player()
+        if isinstance(current_player, HumanPlayer):
+            quit_choice = self.ui.get_human_quit_choice()
+            if quit_choice == 'r':
+                self._handle_resignation(game)  # This exits
+            elif quit_choice == 's':
+                self.file_manager.save_game_log()
+                self.ui.display_message("Game saved. Exiting application.")
+                sys.exit()
+            else:  # 'c' to cancel
+                return True  # Signal to continue
+        else:
+            self._handle_resignation(game)  # This exits
+        
+        return False # Should not be reached if resignation happens
+
     def _handle_resignation(self, game):
         """Handles the logic for a player resigning."""
         resigning_color = "White" if game.board.turn == chess.WHITE else "Black"
@@ -292,6 +292,7 @@ class ChessApp:
         elif menu_choice == 'r':
             return game, 'continue'
         elif menu_choice == 'q':
+            # The quit logic is now handled in the play_game loop
             return game, 'quit_app'
         return game, 'continue'
 
@@ -308,18 +309,25 @@ class ChessApp:
                 if game.board.turn == chess.WHITE:
                     auto_moves_remaining -= 1
             else:
+                current_player = game.get_current_player()
                 turn_color = "White" if game.board.turn else "Black"
                 move_number = game.board.fullmove_number
-                prompt = f"Move {move_number} ({turn_color}): Press Enter for AI move, 'q' to quit, 'm' for menu, a number for auto-play, or enter a move (e.g. e2e4): "
+
+                if isinstance(current_player, HumanPlayer):
+                    prompt = f"Move {move_number} ({current_player.model_name} as {turn_color}): Enter your move (e.g. e2e4), 'q' to quit, or 'm' for menu: "
+                else:
+                    prompt = f"Move {move_number} ({turn_color}): Press Enter for AI move, 'q' to quit, 'm' for menu, a number for auto-play, or enter a move (e.g. e2e4): "
+                
                 user_input = self.ui.get_user_input(prompt)
                 
                 if user_input.lower() == 'q':
-                    self._handle_resignation(game)
-                
+                    if self._handle_quit_request(game):
+                        continue
                 elif user_input.lower() == 'm':
                     game, action = self.handle_in_game_menu(game)
                     if action == 'quit_app':
-                        self._handle_resignation(game)
+                        if self._handle_quit_request(game):
+                            continue
                     elif action == 'skip_turn':
                         continue
                     elif action == 'continue':
@@ -328,7 +336,7 @@ class ChessApp:
                 elif user_input.isdigit():
                     auto_moves_remaining = int(user_input)
 
-                elif user_input == "": # User pressed Enter for AI move
+                elif user_input == "" and not isinstance(current_player, HumanPlayer): # User pressed Enter for AI move
                     is_manual_move = False
 
                 else: # Any other text is treated as a manual move
@@ -363,6 +371,7 @@ class ChessApp:
 
             try:
                 if choice == '1': # New Game
+                    self._initialize_new_game_log()
                     game = self.setup_new_game()
                     if game:
                         self.ui.display_game_start_message(game)
@@ -396,8 +405,8 @@ class ChessApp:
                     if position and position not in ['?', 'm', 'q']:
                         white_player_key, black_player_key = self.ui.display_model_menu_and_get_choice(self.ai_models, self.stockfish_configs)
                         
-                        player1 = self._create_player(white_player_key)
-                        player2 = self._create_player(black_player_key)
+                        player1 = self._create_player_with_name_prompt(white_player_key, "White")
+                        player2 = self._create_player_with_name_prompt(black_player_key, "Black")
 
                         game = Game(player1, player2, white_player_key=white_player_key, black_player_key=black_player_key)
                         game.set_board_from_fen(position['fen'])

@@ -26,14 +26,18 @@ class Game:
         self.black_player_key = black_player_key
 
     def initialize_game(self):
-        """Sets up the initial state of the game and logs the setup."""
+        """Logs the initial game state and player info."""
         logging.info("New Game Started")
-        logging.info(f"White: {self.players[chess.WHITE].model_name} ({self.white_player_key})")
-        logging.info(f"Black: {self.players[chess.BLACK].model_name} ({self.black_player_key})")
-        if self.white_strategy:
-            logging.info(f"White Strategy: {self.white_strategy}")
-        if self.black_strategy:
-            logging.info(f"Black Strategy: {self.black_strategy}")
+        logging.info(f"White: {self.players[chess.WHITE].model_name}")
+        logging.info(f"Black: {self.players[chess.BLACK].model_name}")
+        logging.info(f"White Player Key: {self.white_player_key}")
+        logging.info(f"Black Player Key: {self.black_player_key}")
+        
+        white_strat_msg = self.white_strategy if self.white_strategy else "No Classic Chess Opening"
+        black_strat_msg = self.black_strategy if self.black_strategy else "No Classic Chess Opening"
+        logging.info(f"White Strategy: {white_strat_msg}")
+        logging.info(f"Black Strategy: {black_strat_msg}")
+        
         logging.info(f"Initial FEN: {self.board.fen()}")
 
     def set_opening_strategy(self, color, strategy_message):
@@ -71,16 +75,29 @@ class Game:
         print("  a b c d e f g h")
 
     def play_turn(self):
-        """Gets a move from the current player and applies it to the board."""
-        current_player = self.players[self.board.turn]
-        strategy = self.strategies[self.board.turn]
+        """
+        Computes and makes a move for the current player.
+        Logs the move and its author.
+        """
+        player = self.get_current_player()
+        author = player.model_name
         
-        move_uci = current_player.compute_move(self.board, strategy_message=strategy)
+        # Prepare arguments for the AI model
+        kwargs = {}
+        if self.board.turn == chess.WHITE and self.white_strategy:
+            kwargs['strategy'] = self.white_strategy
+        elif self.board.turn == chess.BLACK and self.black_strategy:
+            kwargs['strategy'] = self.black_strategy
+
+        move = player.compute_move(self.board, **kwargs)
         
-        if move_uci:
-            self.make_move(move_uci, author=current_player.model_name)
-        else:
-            logging.error(f"Player {current_player.model_name} failed to compute a move.")
+        if move is None:
+            # This can happen if the AI fails or if it's a human player's turn
+            # in a context where manual input is expected.
+            return
+
+        self.board.push(move)
+        self._log_move(move, author)
 
     def make_move(self, uci_move, author="System"):
         """
