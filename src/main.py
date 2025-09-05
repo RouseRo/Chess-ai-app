@@ -60,9 +60,11 @@ class ChessApp:
         else:
             raise ValueError(f"Unknown player key: {player_key}")
 
-    def _ask_expert(self):
+    def _ask_expert(self, question=None):
         """Handles the logic for asking the chess expert a question."""
-        question = self.ui.get_chess_question()
+        if not question:
+            question = self.ui.get_chess_question()
+        
         if not question:
             return
 
@@ -189,8 +191,9 @@ class ChessApp:
             
             self.ui.display_message(f"Loaded practice position: {position['name']}")
             return new_game, 'skip_turn'
-        elif position == '?':
-            self._ask_expert()
+        elif position and position.startswith('?'):
+            question = position[1:].strip()
+            self._ask_expert(question)
         elif position == 'm':
             return game, 'quit_to_menu'
         elif position == 'q':
@@ -290,8 +293,9 @@ class ChessApp:
         elif menu_choice == 's':
             self._save_game_log()
             return game, 'continue'
-        elif menu_choice == '?':
-            self._ask_expert()
+        elif menu_choice.startswith('?'):
+            question = menu_choice[1:].strip()
+            self._ask_expert(question)
             return game, 'continue'
         elif menu_choice == 'r':
             return game, 'continue'
@@ -401,8 +405,9 @@ class ChessApp:
                         
                         self.ui.display_message(f"Loaded practice position: {position['name']}")
                         self.play_game(game)
-                    elif position == '?':
-                        self._ask_expert()
+                    elif position and position.startswith('?'):
+                        question = position[1:].strip()
+                        self._ask_expert(question)
                     elif position == 'm':
                         continue
                     elif position == 'q':
@@ -413,8 +418,9 @@ class ChessApp:
                     self._view_player_stats()
                     continue
 
-                elif choice == '?':
-                    self._ask_expert()
+                elif choice.startswith('?'):
+                    question = choice[1:].strip()
+                    self._ask_expert(question)
                     continue
 
                 elif choice == 'q': # Quit

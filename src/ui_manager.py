@@ -17,9 +17,18 @@ class UIManager:
             valid_choices.append(str(key))
         
         while True:
-            choice = UIManager.get_user_input(prompt).lower()
-            if choice in valid_choices:
+            choice = UIManager.get_user_input(prompt).strip()
+            if not choice:
+                continue
+
+            # Handle direct question
+            if choice.startswith('?'):
                 return choice
+
+            # Handle single character choices
+            choice_lower = choice.lower()
+            if choice_lower in valid_choices:
+                return choice_lower
             else:
                 UIManager.display_message("Invalid choice. Please enter a valid option.")
 
@@ -35,9 +44,16 @@ class UIManager:
                 UIManager.display_message(f"  {key}: {desc}")
 
         while True:
-            choice = UIManager.get_user_input(prompt)
-            if extra_options and choice in extra_options:
+            choice = UIManager.get_user_input(prompt).strip()
+            if not choice:
+                continue
+
+            # Handle direct question or other letter options
+            if choice.startswith('?'):
                 return choice
+            if extra_options and choice.lower() in extra_options:
+                return choice.lower()
+
             try:
                 choice_num = int(choice)
                 if 1 <= choice_num <= len(items):
