@@ -313,7 +313,8 @@ class ChessApp:
                     auto_moves_remaining -= 1
             else:
                 turn_color = "White" if game.board.turn else "Black"
-                prompt = f"Press Enter for AI move, 'q' to quit, 'm' for menu, a number for auto-play, or enter a move for {turn_color} (e.g. e2e4): "
+                move_number = game.board.fullmove_number
+                prompt = f"Move {move_number} ({turn_color}): Press Enter for AI move, 'q' to quit, 'm' for menu, a number for auto-play, or enter a move (e.g. e2e4): "
                 user_input = self.ui.get_user_input(prompt)
                 
                 if user_input.lower() == 'q':
