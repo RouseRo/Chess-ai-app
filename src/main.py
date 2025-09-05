@@ -100,7 +100,7 @@ class ChessApp:
         saved_games = sorted(glob.glob('chess_game_*.log'), reverse=True)
 
         for log_file in saved_games:
-            summary = {'filename': log_file, 'white': 'N/A', 'black': 'N/A', 'date': 'N/A', 'status': 'In Progress', 'moves': 0}
+            summary = {'filename': log_file, 'white': 'N/A', 'black': 'N/A', 'date': 'N/A', 'status': 'In Progress'}
             try:
                 with open(log_file, 'r') as f:
                     lines = f.readlines()
@@ -110,23 +110,21 @@ class ChessApp:
                 if match:
                     summary['date'] = f"{match.group(1)}-{match.group(2)}-{match.group(3)} {match.group(4)}:{match.group(5)}"
 
-                # Extract player names, status, and move count
-                last_move_number = 0
+                # Extract player names, status, and count moves
+                move_count = 0
+                status = "In Progress"
                 for line in lines:
                     if "White:" in line:
-                        # Split on "White:" and take the second part
                         summary['white'] = line.split("White:", 1)[1].strip()
                     elif "Black:" in line:
-                        # Split on "Black:" and take the second part
                         summary['black'] = line.split("Black:", 1)[1].strip()
                     elif "Game Over" in line or "resigned" in line:
-                        summary['status'] = 'Finished'
+                        status = 'Finished'
                     
-                    turn_match = re.search(r"Turn (\d+)", line)
-                    if turn_match:
-                        last_move_number = int(turn_match.group(1))
+                    if "Move:" in line:
+                        move_count += 1
                 
-                summary['moves'] = last_move_number
+                summary['status'] = f"{status} ({move_count})"
                 summaries.append(summary)
             except Exception as e:
                 # If a file is unreadable, print the error and skip it
@@ -504,7 +502,6 @@ class ChessApp:
             except (FileNotFoundError, RuntimeError, ValueError) as e:
                 self.ui.display_message(f"{RED}An error occurred: {e}{ENDC}")
                 self.ui.get_user_input("Press Enter to return to the main menu.")
-
 if __name__ == "__main__":
     app = ChessApp()
     app.run()

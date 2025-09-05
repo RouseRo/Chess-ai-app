@@ -43,7 +43,7 @@ class UIManager:
             max_white = max(len(s['white']) for s in items) if items else 10
             max_black = max(len(s['black']) for s in items) if items else 10
             
-            header = f"  # | {'Date':<16} | {'White Player':<{max_white}} | {'Black Player':<{max_black}} | Status"
+            header = f"  # | {'Date':<16} | {'White Player':<{max_white}} | {'Black Player':<{max_black}} | Status (Last Move)"
             UIManager.display_message(header)
             UIManager.display_message('-' * len(header))
 
