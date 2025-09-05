@@ -176,15 +176,28 @@ class ChessApp:
             positions = json.load(f)
         
         position = self.ui.display_practice_positions_and_get_choice(positions)
-        if position and position != '?':
-            if game.set_board_from_fen(position['fen']):
-                self.ui.display_message(f"Loaded position: {position['name']}")
-                return 'skip_turn'
-            else:
-                self.ui.display_message("Failed to load position.")
+
+        if position and position not in ['?', 'm', 'q']:
+            white_player_key, black_player_key = self.ui.display_model_menu_and_get_choice(self.ai_models, self.stockfish_configs)
+            
+            player1 = self._create_player(white_player_key)
+            player2 = self._create_player(black_player_key)
+
+            new_game = Game(player1, player2, white_player_key=white_player_key, black_player_key=black_player_key)
+            new_game.set_board_from_fen(position['fen'])
+            new_game.initialize_game()
+            
+            self.ui.display_message(f"Loaded practice position: {position['name']}")
+            return new_game, 'skip_turn'
         elif position == '?':
             self._ask_expert()
-        return 'continue'
+        elif position == 'm':
+            return game, 'quit_to_menu'
+        elif position == 'q':
+            self.ui.display_message("Exiting application.")
+            sys.exit()
+            
+        return game, 'continue'
 
     def _save_game_log(self):
         """Saves the current game log to a timestamped file."""
@@ -312,6 +325,8 @@ class ChessApp:
                         self._handle_resignation(game)
                     elif action == 'skip_turn':
                         continue
+                    elif action == 'continue':
+                        continue
                 
                 elif user_input.isdigit():
                     auto_moves_remaining = int(user_input)
@@ -372,7 +387,8 @@ class ChessApp:
                         positions = json.load(f)
                     
                     position = self.ui.display_practice_positions_and_get_choice(positions)
-                    if position and position != '?':
+                    
+                    if position and position not in ['?', 'm', 'q']:
                         white_player_key, black_player_key = self.ui.display_model_menu_and_get_choice(self.ai_models, self.stockfish_configs)
                         
                         player1 = self._create_player(white_player_key)
@@ -386,7 +402,11 @@ class ChessApp:
                         self.play_game(game)
                     elif position == '?':
                         self._ask_expert()
+                    elif position == 'm':
                         continue
+                    elif position == 'q':
+                        self.ui.display_message("Exiting application.")
+                        sys.exit()
 
                 elif choice == '4': # View Player Stats
                     self._view_player_stats()

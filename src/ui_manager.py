@@ -208,17 +208,21 @@ class UIManager:
     def display_practice_positions_and_get_choice(positions):
         """Displays a list of practice positions and prompts for a choice."""
         position_names = [p['name'] for p in positions]
-        extra_opts = {'?': "Ask a question about chess"}
+        extra_opts = {
+            '?': "Ask a question about chess",
+            'm': "Return to Main Menu",
+            'q': "Quit Application"
+        }
         
         choice = UIManager._get_numbered_choice(
             "--- Practice Checkmate Positions ---",
             position_names,
-            "Enter the number of the position to load, or '?' to ask a question: ",
+            "Enter the number of the position to load, or a letter for other options: ",
             extra_options=extra_opts
         )
 
-        if choice == '?':
-            return '?'
+        if choice in extra_opts:
+            return choice
         
         # Find the full position dictionary that matches the chosen name
         for pos in positions:
