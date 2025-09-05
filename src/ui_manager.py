@@ -36,8 +36,25 @@ class UIManager:
     def _get_numbered_choice(title, items, prompt, extra_options=None):
         """A generic helper for numbered lists."""
         UIManager.display_message(f"\n{title}")
-        for i, item in enumerate(items):
-            UIManager.display_message(f"  {i + 1}: {item}")
+        
+        # This part is now specific to the new summary format
+        if items and isinstance(items[0], dict) and 'filename' in items[0]:
+            # Find max width for formatting
+            max_white = max(len(s['white']) for s in items) if items else 10
+            max_black = max(len(s['black']) for s in items) if items else 10
+            
+            header = f"  # | {'Date':<16} | {'White Player':<{max_white}} | {'Black Player':<{max_black}} | Status"
+            UIManager.display_message(header)
+            UIManager.display_message('-' * len(header))
+
+            for i, summary in enumerate(items):
+                white = summary['white']
+                black = summary['black']
+                row = f"  {i+1:<1} | {summary['date']:<16} | {white:<{max_white}} | {black:<{max_black}} | {summary['status']}"
+                UIManager.display_message(row)
+        else: # Fallback for simple lists
+            for i, item in enumerate(items):
+                UIManager.display_message(f"  {i + 1}: {item}")
         
         if extra_options:
             for key, desc in extra_options.items():
@@ -213,12 +230,17 @@ class UIManager:
             UIManager.display_message("Invalid input. Please enter a valid choice for both players (e.g., 'm1s2').")
 
     @staticmethod
-    def display_saved_games_and_get_choice(saved_games):
+    def display_saved_games_and_get_choice(game_summaries):
         """Displays a list of saved games and prompts for a choice."""
+        extra_opts = {
+            'm': "Return to Main Menu",
+            'q': "Quit Application"
+        }
         return UIManager._get_numbered_choice(
             "--- Saved Games ---",
-            saved_games,
-            "Enter the number of the game to load: "
+            game_summaries,
+            "Enter the number of the game to load, or a letter for other options: ",
+            extra_options=extra_opts
         )
 
     @staticmethod

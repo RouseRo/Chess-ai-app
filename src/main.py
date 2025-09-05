@@ -94,6 +94,46 @@ class ChessApp:
         self.ui.display_message("----------------------")
         self.ui.get_user_input("Press Enter to return to the main menu.")
 
+    def _get_saved_game_summaries(self):
+        """Parses all saved game logs to create a list of summaries."""
+        summaries = []
+        saved_games = sorted(glob.glob('chess_game_*.log'), reverse=True)
+
+        for log_file in saved_games:
+            summary = {'filename': log_file, 'white': 'N/A', 'black': 'N/A', 'date': 'N/A', 'status': 'In Progress', 'moves': 0}
+            try:
+                with open(log_file, 'r') as f:
+                    lines = f.readlines()
+                
+                # Extract date from filename
+                match = re.search(r'(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})', log_file)
+                if match:
+                    summary['date'] = f"{match.group(1)}-{match.group(2)}-{match.group(3)} {match.group(4)}:{match.group(5)}"
+
+                # Extract player names, status, and move count
+                last_move_number = 0
+                for line in lines:
+                    if "White:" in line:
+                        # Split on "White:" and take the second part
+                        summary['white'] = line.split("White:", 1)[1].strip()
+                    elif "Black:" in line:
+                        # Split on "Black:" and take the second part
+                        summary['black'] = line.split("Black:", 1)[1].strip()
+                    elif "Game Over" in line or "resigned" in line:
+                        summary['status'] = 'Finished'
+                    
+                    turn_match = re.search(r"Turn (\d+)", line)
+                    if turn_match:
+                        last_move_number = int(turn_match.group(1))
+                
+                summary['moves'] = last_move_number
+                summaries.append(summary)
+            except Exception as e:
+                # If a file is unreadable, print the error and skip it
+                self.ui.display_message(f"\n{RED}Warning: Could not parse '{log_file}'. Error: {e}{ENDC}")
+                continue
+        return summaries
+
     # --- Game Setup & Loading Methods ---
 
     def setup_new_game(self):
@@ -170,13 +210,20 @@ class ChessApp:
 
     def handle_load_game_in_menu(self, game):
         """Handles the 'load game' option from the in-game menu."""
-        saved_games = glob.glob('chess_game_*.log')
-        if not saved_games:
+        game_summaries = self._get_saved_game_summaries()
+        if not game_summaries:
             self.ui.display_message("No saved games found.")
             return game, 'continue'
 
-        chosen_file = self.ui.display_saved_games_and_get_choice(saved_games)
-        if chosen_file:
+        chosen_summary = self.ui.display_saved_games_and_get_choice(game_summaries)
+        
+        if chosen_summary == 'm':
+            return game, 'quit_to_menu'
+        elif chosen_summary == 'q':
+            self.ui.display_message("Exiting application.")
+            sys.exit()
+        elif chosen_summary:
+            chosen_file = chosen_summary['filename']
             loaded_game = self.load_game_from_log(chosen_file)
             if loaded_game:
                 logging.shutdown()
@@ -392,12 +439,20 @@ class ChessApp:
                         self.play_game(game)
 
                 elif choice == '2': # Load Saved Game
-                    saved_games = glob.glob('chess_game_*.log')
-                    if not saved_games:
+                    game_summaries = self._get_saved_game_summaries()
+                    if not game_summaries:
                         self.ui.display_message("No saved games found.")
                         continue
-                    chosen_file = self.ui.display_saved_games_and_get_choice(saved_games)
-                    if chosen_file:
+                    
+                    chosen_summary = self.ui.display_saved_games_and_get_choice(game_summaries)
+
+                    if chosen_summary == 'm':
+                        continue
+                    elif chosen_summary == 'q':
+                        self.ui.display_message("Exiting application.")
+                        sys.exit()
+                    elif chosen_summary:
+                        chosen_file = chosen_summary['filename']
                         game = self.load_game_from_log(chosen_file)
                         if game:
                             self.play_game(game)
