@@ -11,6 +11,7 @@ from game import Game, RED, ENDC
 from ai_player import AIPlayer
 from stockfish_player import StockfishPlayer
 from ui_manager import UIManager
+from file_manager import FileManager
 
 # --- Constants ---
 LOG_FILE = 'chess_game.log'
@@ -21,6 +22,7 @@ class ChessApp:
     def __init__(self):
         """Initializes the application, loading configurations."""
         self.ui = UIManager()
+        self.file_manager = FileManager(self.ui)
         self.white_openings = {}
         self.black_defenses = {}
         self.ai_models = {}
@@ -93,44 +95,6 @@ class ChessApp:
         self.ui.display_message(answer)
         self.ui.display_message("----------------------")
         self.ui.get_user_input("Press Enter to return to the main menu.")
-
-    def _get_saved_game_summaries(self):
-        """Parses all saved game logs to create a list of summaries."""
-        summaries = []
-        saved_games = sorted(glob.glob('chess_game_*.log'), reverse=True)
-
-        for log_file in saved_games:
-            summary = {'filename': log_file, 'white': 'N/A', 'black': 'N/A', 'date': 'N/A', 'status': 'In Progress'}
-            try:
-                with open(log_file, 'r') as f:
-                    lines = f.readlines()
-                
-                # Extract date from filename
-                match = re.search(r'(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})', log_file)
-                if match:
-                    summary['date'] = f"{match.group(1)}-{match.group(2)}-{match.group(3)} {match.group(4)}:{match.group(5)}"
-
-                # Extract player names, status, and count moves
-                move_count = 0
-                status = "In Progress"
-                for line in lines:
-                    if "White:" in line:
-                        summary['white'] = line.split("White:", 1)[1].strip()
-                    elif "Black:" in line:
-                        summary['black'] = line.split("Black:", 1)[1].strip()
-                    elif "Game Over" in line or "resigned" in line:
-                        status = 'Finished'
-                    
-                    if "Move:" in line:
-                        move_count += 1
-                
-                summary['status'] = f"{status} ({move_count})"
-                summaries.append(summary)
-            except Exception as e:
-                # If a file is unreadable, print the error and skip it
-                self.ui.display_message(f"\n{RED}Warning: Could not parse '{log_file}'. Error: {e}{ENDC}")
-                continue
-        return summaries
 
     # --- Game Setup & Loading Methods ---
 
@@ -208,7 +172,7 @@ class ChessApp:
 
     def handle_load_game_in_menu(self, game):
         """Handles the 'load game' option from the in-game menu."""
-        game_summaries = self._get_saved_game_summaries()
+        game_summaries = self.file_manager.get_saved_game_summaries()
         if not game_summaries:
             self.ui.display_message("No saved games found.")
             return game, 'continue'
@@ -262,41 +226,9 @@ class ChessApp:
             
         return game, 'continue'
 
-    def _save_game_log(self):
-        """Saves the current game log to a timestamped file."""
-        try:
-            # Ensure all buffered logs are written to disk before copying
-            for handler in logging.getLogger().handlers:
-                handler.flush()
-            
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            save_path = f'chess_game_{timestamp}.log'
-            shutil.copy('chess_game.log', save_path)
-            self.ui.display_message(f"\nGame saved as {save_path}")
-        except FileNotFoundError:
-            self.ui.display_message("Log file not found, could not save.")
-        except Exception as e:
-            self.ui.display_message(f"An error occurred while saving: {e}")
-
-    def _load_player_stats(self):
-        """Loads player statistics from the JSON file."""
-        if not os.path.exists(PLAYER_STATS_FILE):
-            return {}
-        try:
-            with open(PLAYER_STATS_FILE, 'r') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, FileNotFoundError):
-            return {}
-
-    def _save_player_stats(self, stats):
-        """Saves player statistics to the JSON file."""
-        os.makedirs(os.path.dirname(PLAYER_STATS_FILE), exist_ok=True)
-        with open(PLAYER_STATS_FILE, 'w') as f:
-            json.dump(stats, f, indent=2)
-
     def _update_player_stats(self, white_player, black_player, result):
         """Updates and saves the win/loss/draw stats for players."""
-        stats = self._load_player_stats()
+        stats = self.file_manager.load_player_stats()
         
         players = {white_player.model_name, black_player.model_name}
         for player_name in players:
@@ -313,12 +245,12 @@ class ChessApp:
             stats[white_player.model_name]["draws"] += 1
             stats[black_player.model_name]["draws"] += 1
         
-        self._save_player_stats(stats)
+        self.file_manager.save_player_stats(stats)
         self.ui.display_message("\nPlayer stats have been updated.")
 
     def _view_player_stats(self):
         """Loads and displays player statistics."""
-        stats = self._load_player_stats()
+        stats = self.file_manager.load_player_stats()
         self.ui.display_player_stats(stats)
         self.ui.get_user_input("Press Enter to return to the main menu.")
 
@@ -338,7 +270,7 @@ class ChessApp:
         # Ask to save and then exit
         save_choice = self.ui.get_user_input("Save final game log? (y/N): ").lower()
         if save_choice == 'y':
-            self._save_game_log()
+            self.file_manager.save_game_log()
         self.ui.display_message("Exiting application.")
         sys.exit()
 
@@ -351,7 +283,7 @@ class ChessApp:
             action = self.handle_practice_load_in_menu(game)
             return game, action
         elif menu_choice == 's':
-            self._save_game_log()
+            self.file_manager.save_game_log()
             return game, 'continue'
         elif menu_choice.startswith('?'):
             question = menu_choice[1:].strip()
@@ -418,7 +350,7 @@ class ChessApp:
         # Ask to save the completed game
         save_choice = self.ui.get_user_input("\nSave final game log? (y/N): ").lower()
         if save_choice == 'y':
-            self._save_game_log()
+            self.file_manager.save_game_log()
         
         self.ui.get_user_input("Press Enter to return to the main menu.")
 
@@ -437,7 +369,7 @@ class ChessApp:
                         self.play_game(game)
 
                 elif choice == '2': # Load Saved Game
-                    game_summaries = self._get_saved_game_summaries()
+                    game_summaries = self.file_manager.get_saved_game_summaries()
                     if not game_summaries:
                         self.ui.display_message("No saved games found.")
                         continue
@@ -502,6 +434,8 @@ class ChessApp:
             except (FileNotFoundError, RuntimeError, ValueError) as e:
                 self.ui.display_message(f"{RED}An error occurred: {e}{ENDC}")
                 self.ui.get_user_input("Press Enter to return to the main menu.")
+
+# --- Entry Point ---
 if __name__ == "__main__":
     app = ChessApp()
     app.run()
