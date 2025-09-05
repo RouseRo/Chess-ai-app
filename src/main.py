@@ -67,6 +67,60 @@ class ChessApp:
         
         raise ValueError(f"Unknown player key: {player_key}")
 
+    def _create_player_with_name_prompt(self, player_key, color_str):
+        """Creates a player, prompting for a name if the player is human."""        
+        if player_key == 'hu':
+            name = self.ui.get_human_player_name(color_str)
+            return HumanPlayer(name=name)
+        
+        if player_key.startswith('m'):
+            model_name = self.ai_models.get(player_key)
+            if model_name:
+                return AIPlayer(model_name=model_name)
+        elif player_key.startswith('s'):
+            config = self.stockfish_configs.get(player_key)
+            if config:
+                return StockfishPlayer(self.stockfish_path, parameters=config['parameters'])
+        
+        raise ValueError(f"Unknown player key: {player_key}")
+
+    def _ask_expert(self, question=None):
+        """Handles the logic for asking the chess expert a question."""
+        if not question:
+            question = self.ui.get_user_input("What is your chess question? ")
+        
+        if not question:
+            return
+
+        self.ui.display_message("\nAsking the Chess Master...")
+        try:
+            expert_player = AIPlayer(model_name=self.chess_expert_model)
+            answer = expert_player.get_chess_fact_or_answer(question)
+            
+            self.ui.display_message("\n--- Chess Master's Answer ---")
+            self.ui.display_message(answer)
+            self.ui.display_message("-----------------------------")
+        except Exception as e:
+            self.ui.display_message(f"{RED}Sorry, I couldn't get an answer. Error: {e}{ENDC}")
+        
+        self.ui.get_user_input("Press Enter to return.")
+
+    def _get_fun_fact(self):
+        """Gets and displays a fun chess fact from the expert AI."""
+        self.ui.display_message("\nGetting a fun chess fact...")
+        try:
+            expert_player = AIPlayer(model_name=self.chess_expert_model)
+            # Passing no question gets a random fact
+            answer = expert_player.get_chess_fact_or_answer()
+            
+            self.ui.display_message("\n--- Fun Chess Fact ---")
+            self.ui.display_message(answer)
+            self.ui.display_message("----------------------")
+        except Exception as e:
+            self.ui.display_message(f"{RED}Sorry, I couldn't get a fact. Error: {e}{ENDC}")
+
+        self.ui.get_user_input("Press Enter to return to the main menu.")
+
     def load_game_from_log(self, log_file):
         """Loads a game state from a log file."""
         try:
