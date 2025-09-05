@@ -1,0 +1,41 @@
+[
+  {
+    "name": "King and Queen vs. King",
+    "fen": "8/k7/8/8/8/8/K7/7Q w - - 0 1"
+  },
+  {
+    "name": "King and Rook vs. King",
+    "fen": "8/k7/8/8/8/8/K7/7R w - - 0 1"
+  },
+  {
+    "name": "Two Rooks vs. King (Lawnmower)",
+    "fen": "8/k7/8/8/8/8/R7/R5K1 w - - 0 1"
+  },
+  {
+    "name": "Back-Rank Mate Practice",
+    "fen": "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1"
+  },
+  {
+    "name": "Anastasia's Mate Practice",
+    "fen": "8/6pk/8/8/4N3/8/8/R6K w - - 0 1"
+  },
+  {
+    "name": "Smothered Mate Practice",
+    "fen": "r1b2rk1/pp1p1ppp/2n5/2b1q3/2B5/2N2N2/PP3PPP/R2Q1RK1 b - - 1 12"
+  },
+  {
+    "name": "Mate in 1 (Queen-King)",
+    "fen": "6k1/8/6K1/8/8/8/8/5Q2 w - - 0 1",
+    "mate_in": 1
+  },
+  {
+    "name": "Mate in 1 (Rook-King)",
+    "fen": "6k1/8/6K1/8/8/8/8/7R w - - 0 1",
+    "mate_in": 1
+  },
+  {
+    "name": "Mate in 2 (Two Rooks)",
+    "fen": "8/k7/8/8/8/8/R7/R5K1 w - - 0 1",
+    "mate_in": 2
+  }
+]

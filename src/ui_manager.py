@@ -131,7 +131,6 @@ class UIManager:
             'l': "Load Another Game",
             'p': "Load Practice Position",
             's': "Save Game",
-            'c': "Change AI Model",
             '?': "Ask a Chess Expert",
             'r': "Return to Game",
             'q': "Quit Application"
