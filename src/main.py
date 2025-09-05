@@ -172,26 +172,19 @@ class ChessApp:
 
     def handle_practice_load_in_menu(self, game):
         """Handles the 'load practice position' option from the in-game menu."""
-        try:
-            with open('src/endgame_positions.json', 'r') as f:
-                positions = json.load(f)
-            
-            chosen_pos = self.ui.display_practice_positions_and_get_choice(positions)
-            if chosen_pos and chosen_pos != '?':
-                if game.set_board_from_fen(chosen_pos['fen']):
-                    self.ui.display_message(f"Loaded position: {chosen_pos['name']}")
-                    return 'skip_turn'
-                else:
-                    self.ui.display_message("Failed to load position.")
-            elif chosen_pos == '?':
-                self._ask_expert()
-        except (FileNotFoundError, json.JSONDecodeError):
-            self.ui.display_message("Could not load practice positions file or invalid input.")
+        with open('src/puzzles.json', 'r') as f:
+            positions = json.load(f)
+        
+        position = self.ui.display_practice_positions_and_get_choice(positions)
+        if position and position != '?':
+            if game.set_board_from_fen(position['fen']):
+                self.ui.display_message(f"Loaded position: {position['name']}")
+                return 'skip_turn'
+            else:
+                self.ui.display_message("Failed to load position.")
+        elif position == '?':
+            self._ask_expert()
         return 'continue'
-
-    def handle_swap_model_in_menu(self, game):
-        """Handles the 'swap model' option from the in-game menu."""
-        self.ui.display_message("Swap model feature is currently for AI players.")
 
     def _save_game_log(self):
         """Saves the current game log to a timestamped file."""
@@ -284,9 +277,6 @@ class ChessApp:
         elif menu_choice == 's':
             self._save_game_log()
             return game, 'continue'
-        elif menu_choice == 'c':
-            self.handle_swap_model_in_menu(game)
-            return game, 'continue'
         elif menu_choice == '?':
             self._ask_expert()
             return game, 'continue'
@@ -325,8 +315,16 @@ class ChessApp:
                 
                 elif user_input.isdigit():
                     auto_moves_remaining = int(user_input)
-                else:
+
+                elif user_input == "": # User pressed Enter for AI move
+                    is_manual_move = False
+
+                else: # Any other text is treated as a manual move
                     is_manual_move = True
+                    try:
+                        game.make_manual_move(user_input)
+                    except ValueError as e:
+                        self.ui.display_message(f"{RED}Invalid move: {e}{ENDC}")
 
             if not is_manual_move:
                 self.ui.display_turn_message(game)
@@ -353,7 +351,7 @@ class ChessApp:
 
             try:
                 if choice == '1': # New Game
-                    game = self.start_new_game()
+                    game = self.setup_new_game()
                     if game:
                         self.ui.display_game_start_message(game)
                         self.play_game(game)
@@ -370,7 +368,7 @@ class ChessApp:
                             self.play_game(game)
 
                 elif choice == '3': # Load Practice Position
-                    with open('src/endgame_positions.json', 'r') as f:
+                    with open('src/puzzles.json', 'r') as f:
                         positions = json.load(f)
                     
                     position = self.ui.display_practice_positions_and_get_choice(positions)
