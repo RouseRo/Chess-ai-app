@@ -79,6 +79,21 @@ class ChessApp:
         self.ui.display_message("----------------------------")
         self.ui.get_user_input("Press Enter to return to the menu.")
 
+    def _get_fun_fact(self):
+        """Gets a fun chess fact from the expert AI."""
+        self.ui.display_message("\nAsking the Grandmaster for a fun fact...")
+        expert_player = AIPlayer(model_name=self.chess_expert_model)
+        
+        question = "Tell me a fun, interesting, and little-known fact about chess history, a famous player, or a specific opening."
+        system_prompt = "You are a chess historian and grandmaster. Provide a single, interesting fact."
+        
+        answer = expert_player.ask_question(question, system_prompt)
+        
+        self.ui.display_message("\n--- Fun Chess Fact ---")
+        self.ui.display_message(answer)
+        self.ui.display_message("----------------------")
+        self.ui.get_user_input("Press Enter to return to the main menu.")
+
     # --- Game Setup & Loading Methods ---
 
     def setup_new_game(self):
@@ -416,6 +431,10 @@ class ChessApp:
 
                 elif choice == '4': # View Player Stats
                     self._view_player_stats()
+                    continue
+
+                elif choice == '5': # Fun Chess Fact
+                    self._get_fun_fact()
                     continue
 
                 elif choice.startswith('?'):

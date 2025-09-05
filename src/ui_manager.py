@@ -135,6 +135,7 @@ class UIManager:
             '2': "Load a Saved Game",
             '3': "Load a Practice Position",
             '4': "View Player Stats",
+            '5': "Fun Chess Fact from the Chess Master",
             '?': "Ask a Chess Expert",
             'q': "Quit"
         }
