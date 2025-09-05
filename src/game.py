@@ -92,12 +92,39 @@ class Game:
             move = chess.Move.from_uci(uci_move)
             if move in self.board.legal_moves:
                 self.board.push(move)
-                logging.info(f"Move: {uci_move}, Author: {author}, FEN: {self.board.fen()}")
+                self._log_move(move, author)
                 return True
             else:
                 return False
         except ValueError:
             return False
+
+    def make_manual_move(self, uci_move):
+        """
+        Makes a move on the board from a user-provided UCI string.
+        Logs the move with the player's name as the author.
+        Raises ValueError if the move is invalid.
+        """
+        try:
+            move = chess.Move.from_uci(uci_move)
+            if move in self.board.legal_moves:
+                author = self.get_current_player().model_name
+                self.board.push(move)
+                self._log_move(move, author)
+            else:
+                raise ValueError("Illegal move.")
+        except (ValueError, TypeError):
+            raise ValueError("Invalid move format. Use UCI notation (e.g., e2e4).")
+
+    def _log_move(self, move, author):
+        """Logs the move details to the logging file."""
+        turn_number = self.board.fullmove_number
+        color = "White" if self.board.turn != chess.WHITE else "Black" # Color of player who just moved
+        logging.info(f"Turn {turn_number} ({color}): Move: {move.uci()} by {author}, FEN: {self.board.fen()}")
+
+    def get_current_player(self):
+        """Returns the player object for the current turn."""
+        return self.players[self.board.turn]
 
     def load_last_position_from_log(self, filename='chess_game.log'):
         """
