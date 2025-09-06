@@ -27,7 +27,7 @@ class UIManager:
         print("  2: Load a Saved Game")
         print("  3: Load a Practice Position")
         print("  4: View Player Stats")
-        print("  5: Fun Chess Fact from the Chess Master")
+        print("  5: Fun Chess Fact from the Chessmaster")
         print("  ?: Ask a Chess Expert")
         print("  q: Quit")
         return self.get_user_input("Enter your choice: ")
