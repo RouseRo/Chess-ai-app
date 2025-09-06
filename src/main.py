@@ -49,8 +49,8 @@ class ChessApp:
             self.ui.display_message("Please ensure the file exists and is a valid JSON.")
             sys.exit(1)
 
-    def _create_player(self, player_key):
-        """Creates a player object based on the provided key."""
+    def _create_player(self, player_key, player_name=None):
+        """Creates a player object based on the provided key, with an optional name override."""
         if player_key.startswith('m'):
             model_name = self.ai_models.get(player_key)
             if model_name:
@@ -60,10 +60,9 @@ class ChessApp:
             if config:
                 return StockfishPlayer(self.stockfish_path, parameters=config['parameters'])
         elif player_key == 'hu':
-            # This path is for loading games, where we don't have the color context easily.
-            # We'll create a generic human player and the game logic will handle the rest.
-            # A more robust implementation might parse the player name from the log.
-            return HumanPlayer(name="Human")
+            # If a name was parsed from the log, use it. Otherwise, default to a generic name.
+            name_to_use = player_name if player_name else "Human (hu)"
+            return HumanPlayer(name=name_to_use)
         
         raise ValueError(f"Unknown player key: {player_key}")
 
@@ -71,7 +70,8 @@ class ChessApp:
         """Creates a player, prompting for a name if the player is human."""        
         if player_key == 'hu':
             name = self.ui.get_human_player_name(color_str)
-            return HumanPlayer(name=name)
+            # Combine name and key for a unique identifier
+            return HumanPlayer(name=f"{name} ({player_key})")
         
         if player_key.startswith('m'):
             model_name = self.ai_models.get(player_key)
@@ -121,6 +121,19 @@ class ChessApp:
 
         self.ui.get_user_input("Press Enter to return to the main menu.")
 
+    def _initialize_new_game_log(self):
+        """Shuts down existing log handlers and re-initializes the log file in write mode."""
+        # Shut down any existing handlers to release the file lock
+        logging.shutdown()
+        # Re-initialize logging in write mode to clear the file
+        logging.basicConfig(
+            filename=LOG_FILE,
+            level=logging.INFO,
+            format='%(asctime)s - %(message)s',
+            filemode='w'
+        )
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+
     def load_game_from_log(self, log_file):
         """Loads a game state from a log file."""
         try:
@@ -133,8 +146,8 @@ class ChessApp:
                 self.ui.display_message(f"Failed to load game: {error_reason}")
                 return None
 
-            player1 = self._create_player(header['white_key'])
-            player2 = self._create_player(header['black_key'])
+            player1 = self._create_player(header['white_key'], header.get('white_name'))
+            player2 = self._create_player(header['black_key'], header.get('black_name'))
             
             game = Game(player1, player2, white_strategy=header['white_strategy'], black_strategy=header['black_strategy'], white_player_key=header['white_key'], black_player_key=header['black_key'])
             
@@ -167,12 +180,14 @@ class ChessApp:
             # Fallback for older logs (infer keys)
             elif "White:" in line and "white_key" not in header:
                 player_name = line.split(":", 1)[1].strip()
+                header["white_name"] = player_name # Store the full name
                 for key in all_keys:
                     if f"({key})" in player_name:
                         header["white_key"] = key
                         break
             elif "Black:" in line and "black_key" not in header:
                 player_name = line.split(":", 1)[1].strip()
+                header["black_name"] = player_name # Store the full name
                 for key in all_keys:
                     if f"({key})" in player_name:
                         header["black_key"] = key
@@ -259,26 +274,42 @@ class ChessApp:
         return game, 'continue'
 
     def _update_player_stats(self, white_player, black_player, result):
-        """Updates and saves the win/loss/draw stats for players."""
+        """Updates, saves, and displays the win/loss/draw stats for players in the last game."""
         stats = self.file_manager.load_player_stats()
         
-        players = {white_player.model_name, black_player.model_name}
-        for player_name in players:
+        white_name = white_player.model_name
+        black_name = black_player.model_name
+
+        # Ensure players exist in the stats dictionary
+        for player_name in {white_name, black_name}:
             if player_name not in stats:
                 stats[player_name] = {"wins": 0, "losses": 0, "draws": 0}
 
+        # Update stats based on the result
         if result == "1-0": # White wins
-            stats[white_player.model_name]["wins"] += 1
-            stats[black_player.model_name]["losses"] += 1
+            stats[white_name]["wins"] += 1
+            stats[black_name]["losses"] += 1
         elif result == "0-1": # Black wins
-            stats[black_player.model_name]["wins"] += 1
-            stats[white_player.model_name]["losses"] += 1
+            stats[black_name]["wins"] += 1
+            stats[white_name]["losses"] += 1
         elif result == "1/2-1/2": # Draw
-            stats[white_player.model_name]["draws"] += 1
-            stats[black_player.model_name]["draws"] += 1
+            stats[white_name]["draws"] += 1
+            stats[black_name]["draws"] += 1
         
+        # Save the updated stats back to the file
         self.file_manager.save_player_stats(stats)
-        self.ui.display_message("\nPlayer stats have been updated.")
+        
+        # Display the newly updated stats for the players in the game
+        self.ui.display_message("\n--- Updated Player Stats ---")
+        
+        white_stats_str = f"Wins: {stats[white_name]['wins']}, Losses: {stats[white_name]['losses']}, Draws: {stats[white_name]['draws']}"
+        self.ui.display_message(f"{white_name}: {white_stats_str}")
+
+        if white_name != black_name:
+            black_stats_str = f"Wins: {stats[black_name]['wins']}, Losses: {stats[black_name]['losses']}, Draws: {stats[black_name]['draws']}"
+            self.ui.display_message(f"{black_name}: {black_stats_str}")
+        
+        self.ui.display_message("----------------------------")
 
     def _view_player_stats(self):
         """Loads and displays player statistics."""
@@ -314,16 +345,13 @@ class ChessApp:
     def _handle_resignation(self, game):
         """Handles the logic for a player resigning."""
         resigning_color = "White" if game.board.turn == chess.WHITE else "Black"
-        resign_message = f"{resigning_color} has resigned."
+        resigning_player = game.get_current_player().model_name
+        self.ui.display_message(f"\n{resigning_player} ({resigning_color}) has resigned.")
         
-        # Log the resignation and display it in red
-        logging.info(resign_message)
-        self.ui.display_message(f"\n{RED}{resign_message}{ENDC}")
-
-        # Update stats based on resignation
+        # Update stats
         result = "0-1" if resigning_color == "White" else "1-0"
         self._update_player_stats(game.players[chess.WHITE], game.players[chess.BLACK], result)
-        
+
         # Ask to save and then exit
         save_choice = self.ui.get_user_input("Save final game log? (y/N): ").lower()
         if save_choice == 'y':
@@ -332,13 +360,12 @@ class ChessApp:
         sys.exit()
 
     def handle_in_game_menu(self, game):
-        """Displays and handles the in-game menu options."""
-        menu_choice = self.ui.display_game_menu_and_get_choice()
+        """Handles the in-game menu options."""
+        menu_choice = self.ui.display_in_game_menu()
         if menu_choice == 'l':
             return self.handle_load_game_in_menu(game)
         elif menu_choice == 'p':
-            action = self.handle_practice_load_in_menu(game)
-            return game, action
+            return self.handle_practice_load_in_menu(game)
         elif menu_choice == 's':
             self.file_manager.save_game_log()
             return game, 'continue'
@@ -349,7 +376,6 @@ class ChessApp:
         elif menu_choice == 'r':
             return game, 'continue'
         elif menu_choice == 'q':
-            # The quit logic is now handled in the play_game loop
             return game, 'quit_app'
         return game, 'continue'
 
@@ -357,15 +383,12 @@ class ChessApp:
 
     def play_game(self, game):
         """The main loop for a single game."""
-        auto_moves_remaining = 0
-
         while not game.board.is_game_over():
             self.ui.display_board(game.board)
             current_player = game.get_current_player()
 
             try:
                 if isinstance(current_player, HumanPlayer):
-                    # --- Human Player's Turn ---
                     turn_color = "White" if game.board.turn else "Black"
                     move_number = game.board.fullmove_number
                     prompt = f"Move {move_number} ({current_player.model_name} as {turn_color}): Enter your move (e.g. e2e4), 'q' to quit, or 'm' for menu: "
@@ -373,28 +396,21 @@ class ChessApp:
 
                     if user_input.lower() == 'q':
                         if self._handle_quit_request(game):
-                            continue # User cancelled quit
+                            continue
                     elif user_input.lower() == 'm':
-                        game, action = self.handle_in_game_menu(game)
+                        new_game, action = self.handle_in_game_menu(game)
                         if action == 'quit_app':
                             if self._handle_quit_request(game):
                                 continue
-                        elif action in ['skip_turn', 'continue']:
+                        elif action == 'skip_turn':
+                            game = new_game # Reassign to the new game object
+                            continue
+                        elif action == 'continue':
                             continue
                     else:
                         game.make_manual_move(user_input)
-
                 else:
-                    # --- AI Player's Turn ---
-                    if auto_moves_remaining > 0:
-                        if game.board.turn == chess.WHITE: # Decrement only after a full move cycle
-                            auto_moves_remaining -= 1
-                    else: # Not auto-playing, so prompt for interaction
-                        self.ui.display_turn_message(game) # "AI is thinking..."
-                        # Check for user interruption before AI move
-                        # This is a simplified non-blocking check for this example
-                        # A real implementation would need threading for a true non-blocking input
-                        
+                    self.ui.display_turn_message(game)
                     game.play_turn()
 
             except ValueError as e:
@@ -404,7 +420,6 @@ class ChessApp:
         self.ui.display_game_over_message(game)
         self._update_player_stats(game.players[chess.WHITE], game.players[chess.BLACK], game.get_game_result())
         
-        # Ask to save the completed game
         save_choice = self.ui.get_user_input("\nSave final game log? (y/N): ").lower()
         if save_choice == 'y':
             self.file_manager.save_game_log()
@@ -433,67 +448,53 @@ class ChessApp:
                         continue
                     
                     chosen_summary = self.ui.display_saved_games_and_get_choice(game_summaries)
-
-                    if chosen_summary == 'm':
-                        continue
-                    elif chosen_summary == 'q':
-                        self.ui.display_message("Exiting application.")
-                        sys.exit()
-                    elif chosen_summary:
-                        chosen_file = chosen_summary['filename']
-                        game = self.load_game_from_log(chosen_file)
+                    if chosen_summary and chosen_summary not in ['m', 'q']:
+                        game = self.load_game_from_log(chosen_summary['filename'])
                         if game:
                             self.play_game(game)
 
                 elif choice == '3': # Load Practice Position
                     with open('src/puzzles.json', 'r') as f:
                         positions = json.load(f)
-                    
                     position = self.ui.display_practice_positions_and_get_choice(positions)
-                    
-                    if position and position not in ['?', 'm', 'q']:
+                    if position and position not in ['m', 'q']:
+                        self._initialize_new_game_log()
                         white_player_key, black_player_key = self.ui.display_model_menu_and_get_choice(self.ai_models, self.stockfish_configs)
-                        
                         player1 = self._create_player_with_name_prompt(white_player_key, "White")
                         player2 = self._create_player_with_name_prompt(black_player_key, "Black")
-
                         game = Game(player1, player2, white_player_key=white_player_key, black_player_key=black_player_key)
                         game.set_board_from_fen(position['fen'])
-                        game.initialize_game() # Log header with FEN
-                        
-                        self.ui.display_message(f"Loaded practice position: {position['name']}")
+                        game.initialize_game()
                         self.play_game(game)
-                    elif position and position.startswith('?'):
-                        question = position[1:].strip()
-                        self._ask_expert(question)
-                    elif position == 'm':
-                        continue
-                    elif position == 'q':
-                        self.ui.display_message("Exiting application.")
-                        sys.exit()
 
                 elif choice == '4': # View Player Stats
                     self._view_player_stats()
-                    continue
 
-                elif choice == '5': # Fun Chess Fact
+                elif choice == '5': # Fun Fact
                     self._get_fun_fact()
-                    continue
 
                 elif choice.startswith('?'):
                     question = choice[1:].strip()
                     self._ask_expert(question)
-                    continue
 
-                elif choice == 'q': # Quit
-                    self.ui.display_message("Thank you for playing!")
+                elif choice == 'q':
+                    self.ui.display_message("Exiting application.")
                     sys.exit()
-            
-            except (FileNotFoundError, RuntimeError, ValueError) as e:
-                self.ui.display_message(f"{RED}An error occurred: {e}{ENDC}")
-                self.ui.get_user_input("Press Enter to return to the main menu.")
 
-# --- Entry Point ---
+            except Exception as e:
+                self.ui.display_message(f"\n{RED}An unexpected error occurred: {e}{ENDC}")
+                logging.error(f"An unexpected error occurred: {e}", exc_info=True)
+                self.ui.get_user_input("Press Enter to acknowledge and return to the main menu.")
+
+#--- Entry Point ---
 if __name__ == "__main__":
+    logging.basicConfig(
+        filename=LOG_FILE,
+        level=logging.INFO,
+        format='%(asctime)s - %(message)s',
+        filemode='w'
+    )
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    
     app = ChessApp()
     app.run()
