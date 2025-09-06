@@ -1,355 +1,209 @@
+from game import BLUE, GREEN, RED, ENDC
 import chess
-import json
-from game import BLUE, ENDC
+import textwrap
 
 class UIManager:
-    """Handles all console input and output for the application."""
-
-    # --- Private Helper Methods for Refactoring ---
+    """Simple console UI helper. Menu titles are shown in color."""
 
     @staticmethod
-    def _get_menu_choice(title, options, prompt):
-        """A generic helper to display a menu and get a valid choice."""
-        UIManager.display_message(f"\n{title}")
-        valid_choices = []
-        for key, desc in options.items():
-            UIManager.display_message(f"  {key}: {desc}")
-            valid_choices.append(str(key))
-        
-        while True:
-            choice = UIManager.get_user_input(prompt).strip()
-            if not choice:
-                continue
+    def _color_title(title: str) -> str:
+        return f"{BLUE}{title}{ENDC}"
 
-            # Handle direct question
-            if choice.startswith('?'):
-                return choice
+    @staticmethod
+    def display_message(msg: str = "") -> None:
+        print(msg)
 
-            # Handle single character choices
-            choice_lower = choice.lower()
-            if choice_lower in valid_choices:
-                return choice_lower
+    @staticmethod
+    def get_user_input(prompt: str = "") -> str:
+        try:
+            return input(prompt).strip()
+        except (KeyboardInterrupt, EOFError):
+            return ""
+
+    def display_main_menu(self) -> str:
+        title = self._color_title("--- Main Menu ---")
+        print(title)
+        print("  1: Play a New Game")
+        print("  2: Load a Saved Game")
+        print("  3: Load a Practice Position")
+        print("  4: View Player Stats")
+        print("  5: Fun Chess Fact from the Chessmaster")
+        print("  ?: Ask a Chess Expert")
+        print("  q: Quit")
+        return self.get_user_input("Enter your choice: ")
+
+    def display_in_game_menu(self) -> str:
+        title = self._color_title("--- In-Game Menu ---")
+        print(title)
+        print("  l: Load Saved Game")
+        print("  p: Load Practice Position")
+        print("  s: Save Game")
+        print("  r: Return to Game")
+        print("  q: Quit Application")
+        print("  ?<question>: Ask Chess Expert (prefix with '?')")
+        return self.get_user_input("Enter choice: ")
+
+    def display_saved_games_and_get_choice(self, summaries):
+        title = self._color_title("--- Saved Games ---")
+        print(title)
+        if not summaries:
+            print("  (none)")
+            return 'm'
+
+        # Be tolerant of multiple summary formats (dicts with different keys, or simple strings)
+        for i, s in enumerate(summaries, start=1):
+            display = None
+            if isinstance(s, dict):
+                # common explicit display keys
+                display = s.get('display') or s.get('summary') or s.get('title') or s.get('name')
+
+                if not display:
+                    # try to compose a useful line from available fields
+                    filename = s.get('filename') or s.get('file') or ''
+                    date = s.get('date') or s.get('timestamp') or s.get('created') or ''
+                    white = s.get('white') or s.get('white_name') or s.get('white_player') or ''
+                    black = s.get('black') or s.get('black_name') or s.get('black_player') or ''
+                    status = s.get('status') or s.get('last_move') or s.get('status_text') or ''
+                    parts = [p for p in (date, white and f"White: {white}", black and f"Black: {black}", status) if p]
+                    if parts:
+                        display = " | ".join(parts)
+                    else:
+                        display = filename or str(s)
             else:
-                UIManager.display_message("Invalid choice. Please enter a valid option.")
+                # fallback for non-dict summary entries
+                display = str(s)
 
-    @staticmethod
-    def _get_numbered_choice(title, items, prompt, extra_options=None):
-        """A generic helper for numbered lists."""
-        UIManager.display_message(f"\n{title}")
-        
-        # This part is now specific to the new summary format
-        if items and isinstance(items[0], dict) and 'filename' in items[0]:
-            # Find max width for formatting
-            max_white = max(len(s['white']) for s in items) if items else 10
-            max_black = max(len(s['black']) for s in items) if items else 10
-            
-            header = f"  # | {'Date':<16} | {'White Player':<{max_white}} | {'Black Player':<{max_black}} | Status (Last Move)"
-            UIManager.display_message(header)
-            UIManager.display_message('-' * len(header))
+            print(f"  {i}: {display}")
 
-            for i, summary in enumerate(items):
-                white = summary['white']
-                black = summary['black']
-                row = f"  {i+1:<1} | {summary['date']:<16} | {white:<{max_white}} | {black:<{max_black}} | {summary['status']}"
-                UIManager.display_message(row)
-        else: # Fallback for simple lists
-            for i, item in enumerate(items):
-                UIManager.display_message(f"  {i + 1}: {item}")
-        
-        if extra_options:
-            for key, desc in extra_options.items():
-                UIManager.display_message(f"  {key}: {desc}")
-
-        while True:
-            choice = UIManager.get_user_input(prompt).strip()
-            if not choice:
-                continue
-
-            # Handle direct question or other letter options
-            if choice.startswith('?'):
-                return choice
-            if extra_options and choice.lower() in extra_options:
-                return choice.lower()
-
-            try:
-                choice_num = int(choice)
-                if 1 <= choice_num <= len(items):
-                    return items[choice_num - 1]
-                else:
-                    UIManager.display_message("Invalid number.")
-            except ValueError:
-                UIManager.display_message("Invalid input. Please enter a valid number or option.")
-
-    @staticmethod
-    def _display_setup_columns(white_openings, black_defenses, ai_models, stockfish_configs):
-        """Handles the multi-column display for the new game setup."""
-        white_list = [f"  {k}: {v.replace('Play the ', '')}" for k, v in white_openings.items()]
-        black_list = [f"  {k}: {v.replace('Play the ', '')}" for k, v in black_defenses.items()]
-        player_list = UIManager._display_player_options(ai_models, stockfish_configs)
-
-        white_width = max(len(s) for s in white_list) + 4
-        black_width = max(len(s) for s in black_list) + 4
-
-        UIManager.display_message(f"\n{'--- White Openings ---':<{white_width}}{'--- Black Defenses ---':<{black_width}}{'--- Player Models ---'}")
-        
-        num_rows = max(len(white_list), len(black_list), len(player_list))
-        for i in range(num_rows):
-            white_col = white_list[i] if i < len(white_list) else ""
-            black_col = black_list[i] if i < len(black_list) else ""
-            player_col = player_list[i] if i < len(player_list) else ""
-            UIManager.display_message(f"{white_col:<{white_width}}{black_col:<{black_width}}{player_col}")
-
-    @staticmethod
-    def _parse_setup_input(choice, white_openings, black_defenses, ai_models, stockfish_configs):
-        """Parses and validates the complex input string for game setup."""
-        parts = choice.lower().split()
-        if len(parts) != 2: return None
-
-        opening_choice, player_choice = parts[0], parts[1]
-        if len(opening_choice) != 2 or len(player_choice) != 4: return None
-
-        white_opening_key, black_defense_key = opening_choice[0], opening_choice[1]
-        white_player_key, black_player_key = player_choice[:2], player_choice[2:]
-
-        if (white_opening_key in white_openings and
-            black_defense_key in black_defenses and
-            UIManager._validate_player_keys(white_player_key, black_player_key, ai_models, stockfish_configs)):
-            return white_opening_key, black_defense_key, white_player_key, black_player_key
-        
+        print("  m: Return to Main Menu")
+        print("  q: Quit Application")
+        choice = self.get_user_input("Enter the number of the game to load, or a letter for other options: ")
+        if choice.lower() in ['m', 'q']:
+            return choice.lower()
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(summaries):
+                return
+        except Exception:
+            pass
         return None
 
-    @staticmethod
-    def _display_player_options(ai_models, stockfish_configs):
-        """Creates a list of formatted strings for all available player models."""
-        player_list = ["  hu: Human Player"]
-        player_list += [f"  {k}: {v}" for k, v in ai_models.items()]
-        player_list += [f"  {k}: Stockfish - {v['name']}" for k, v in stockfish_configs.items()]
-        return player_list
-
-    @staticmethod
-    def _validate_player_keys(white_key, black_key, ai_models, stockfish_configs):
-        """Validates that the player keys are legitimate."""
-        all_keys = list(ai_models.keys()) + list(stockfish_configs.keys()) + ['hu']
-        is_white_valid = white_key in all_keys
-        is_black_valid = black_key in all_keys
-        return is_white_valid and is_black_valid
-
-    # --- Public Methods ---
-
-    @staticmethod
-    def display_message(message):
-        """Prints a message to the console."""
-        print(message)
-
-    @staticmethod
-    def get_user_input(prompt):
-        """Gets input from the user with a given prompt."""
-        return input(prompt)
-
-    @staticmethod
-    def display_main_menu():
-        """Displays the main menu and gets the user's choice."""
-        options = {
-            '1': "Play a New Game",
-            '2': "Load a Saved Game",
-            '3': "Load a Practice Position",
-            '4': "View Player Stats",
-            '5': "Fun Chess Fact from the Chess Master",
-            '?': "Ask a Chess Expert",
-            'q': "Quit"
-        }
-        return UIManager._get_menu_choice("--- Main Menu ---", options, "Enter your choice: ")
-
-    @staticmethod
-    def display_game_menu_and_get_choice():
-        """Displays the in-game menu and gets the user's choice."""
-        options = {
-            'l': "Load Another Game",
-            'p': "Load Practice Position",
-            's': "Save Game",
-            '?': "Ask a Chess Expert",
-            'r': "Return to Game",
-            'q': "Quit Application"
-        }
-        return UIManager._get_menu_choice("--- Game Menu ---", options, "Enter your choice: ")
-
-    @staticmethod
-    def display_player_stats(stats):
-        """Displays player statistics in a formatted table."""
-        UIManager.display_message("\n--- Player Statistics ---")
-        if not stats:
-            UIManager.display_message("No player statistics found.")
-            return
-
-        # Sort players by wins (descending)
-        sorted_players = sorted(stats.items(), key=lambda item: item[1]['wins'], reverse=True)
-
-        # Find max name length for formatting
-        max_name_len = max(len(name) for name, _ in sorted_players) if sorted_players else 20
-
-        # Header
-        header = f"{'Player':<{max_name_len}} | {'Wins':>5} | {'Losses':>7} | {'Draws':>5}"
-        UIManager.display_message(header)
-        UIManager.display_message('-' * len(header))
-
-        # Rows
-        for player_name, data in sorted_players:
-            wins = data.get('wins', 0)
-            losses = data.get('losses', 0)
-            draws = data.get('draws', 0)
-            row = f"{player_name:<{max_name_len}} | {wins:>5} | {losses:>7} | {draws:>5}"
-            UIManager.display_message(row)
-
-    @staticmethod
-    def display_setup_menu_and_get_choices(white_openings, black_defenses, ai_models, stockfish_configs):
-        """Displays the new game setup menu and gets user choices."""
-        UIManager._display_setup_columns(white_openings, black_defenses, ai_models, stockfish_configs)
-
-        while True:
-            choice = UIManager.get_user_input("\nEnter choices for openings and players (e.g., '1a m1s2'): ")
-            parsed_keys = UIManager._parse_setup_input(choice, white_openings, black_defenses, ai_models, stockfish_configs)
-            if parsed_keys:
-                return parsed_keys
-            
-            UIManager.display_message("Invalid input. Please enter a valid string like '1a m1s2' or '1a s1m3'.")
-
-    @staticmethod
-    def get_human_player_name(color_str):
-        """Prompts the user to enter a name for a human player."""
-        while True:
-            name = UIManager.get_user_input(f"Enter name for the Human player ({color_str}): ").strip()
-            if name:
-                return name
-            UIManager.display_message("Name cannot be empty.")
-
-    @staticmethod
-    def get_human_quit_choice():
-        """Asks a human player how they want to quit."""
-        options = {
-            'r': "Resign the game",
-            's': "Save and quit",
-            'q': "Quit without saving",
-            'c': "Cancel and return to game"
-        }
-        return UIManager._get_menu_choice("--- Quit Options ---", options, "Enter your choice: ")
-
-    @staticmethod
-    def display_model_menu_and_get_choice(ai_models, stockfish_configs):
-        """Displays the player model selection menu and gets the user's choice."""
-        UIManager.display_message("\n--- Choose Player Models ---")
-        player_list = UIManager._display_player_options(ai_models, stockfish_configs)
-        for player in player_list:
-            UIManager.display_message(player)
-
-        while True:
-            choice = UIManager.get_user_input("\nEnter your choice for White and Black players (e.g., 'm1s2'): ").lower()
-            if len(choice) == 4:
-                white_player_key = choice[:2]
-                black_player_key = choice[2:]
-                if UIManager._validate_player_keys(white_player_key, black_player_key, ai_models, stockfish_configs):
-                    return white_player_key, black_player_key
-            
-            UIManager.display_message("Invalid input. Please enter a valid choice for both players (e.g., 'm1s2').")
-
-    @staticmethod
-    def display_saved_games_and_get_choice(game_summaries):
-        """Displays a list of saved games and prompts for a choice."""
-        extra_opts = {
-            'm': "Return to Main Menu",
-            'q': "Quit Application"
-        }
-        return UIManager._get_numbered_choice(
-            "--- Saved Games ---",
-            game_summaries,
-            "Enter the number of the game to load, or a letter for other options: ",
-            extra_options=extra_opts
-        )
-
-    @staticmethod
-    def display_practice_positions_and_get_choice(positions):
-        """Displays a list of practice positions and prompts for a choice."""
-        position_names = [p['name'] for p in positions]
-        extra_opts = {
-            '?': "Ask a question about chess",
-            'm': "Return to Main Menu",
-            'q': "Quit Application"
-        }
-        
-        choice = UIManager._get_numbered_choice(
-            "--- Practice Checkmate Positions ---",
-            position_names,
-            "Enter the number of the position to load, or a letter for other options: ",
-            extra_options=extra_opts
-        )
-
-        if choice in extra_opts:
+    def display_practice_positions_and_get_choice(self, positions):
+        title = self._color_title("--- Practice Positions ---")
+        print(title)
+        for i, p in enumerate(positions, start=1):
+            print(f"  {i}: {p.get('name','Unknown')}  ({p.get('fen','')})")
+        print("  m: Return to Main Menu")
+        print("  q: Quit Application")
+        print("  ?<question>: Ask Chess Expert")
+        choice = self.get_user_input("Enter the number of the position to load, or a letter for other options: ")
+        if choice.lower().startswith('?'):
             return choice
-        
-        # Find the full position dictionary that matches the chosen name
-        for pos in positions:
-            if pos['name'] == choice:
-                return pos
-        return None # Should not happen if logic is correct
+        if choice.lower() in ['m', 'q']:
+            return choice.lower()
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(positions):
+                return positions[idx]
+        except Exception:
+            pass
+        return None
 
-    @staticmethod
-    def get_chess_question():
-        """Prompts the user to enter their chess question."""
-        return UIManager.get_user_input("What is your question for the Grandmaster? ")
+    def display_model_menu_and_get_choice(self, ai_models, stockfish_configs):
+        title = self._color_title("--- Choose Player Models ---")
+        print(title)
+        print("Available AI models:")
+        for k, v in ai_models.items():
+            print(f"  {k}: {v}")
+        print("Available Stockfish configs:")
+        for k, v in stockfish_configs.items():
+            print(f"  {k}: Stockfish - {v.get('name')}")
+        print("  hu: Human Player")
+        choice = self.get_user_input("Enter choice for White and Black players (e.g., 'm1s2'): ")
+        # accept combined like 'm1s2' or 'm1 s2'
+        parts = choice.replace(" ", "")
+        if len(parts) >= 4:
+            return parts[:2], parts[2:4]
+        return None, None
 
-    @staticmethod
-    def display_game_start_message(game):
-        """Displays the initial message when a game starts."""
-        UIManager.display_message(f"\nNew game started. White: {game.players[chess.WHITE].model_name}, Black: {game.players[chess.BLACK].model_name}")
+    def display_setup_menu_and_get_choices(self, white_openings, black_defenses, ai_models, stockfish_configs):
+        title = self._color_title("--- Setup New Game ---")
+        print(title)
+        # Simplified setup flow
+        print("Choose white opening (enter key or leave blank for default):")
+        for k, v in white_openings.items():
+            print(f"  {k}: {v}")
+        white_opening = self.get_user_input("White opening key: ") or list(white_openings.keys())[0] if white_openings else ""
+        print("Choose black defense (enter key or leave blank for default):")
+        for k, v in black_defenses.items():
+            print(f"  {k}: {v}")
+        black_defense = self.get_user_input("Black defense key: ") or list(black_defenses.keys())[0] if black_defenses else ""
+        white_key, black_key = self.display_model_menu_and_get_choice(ai_models, stockfish_configs)
+        if not white_key or not black_key:
+            return None
+        return white_opening, black_defense, white_key, black_key
 
-    @staticmethod
-    def display_board(board):
-        """Displays the chess board with rank/file labels and highlights the last move."""
-        last_move = board.peek() if board.move_stack else None
-        from_square = last_move.from_square if last_move else None
-        to_square = last_move.to_square if last_move else None
+    def display_player_stats(self, stats):
+        title = self._color_title("--- Player Statistics ---")
+        print(title)
+        print(f"{'Player':30} | {'Wins':>4} | {'Losses':>6} | {'Draws':>5}")
+        print("-" * 57)
+        for name, v in sorted(stats.items(), key=lambda x: (-x[1].get('wins',0), x[0])):
+            wins = v.get('wins', 0)
+            losses = v.get('losses', 0)
+            draws = v.get('draws', 0)
+            print(f"{name:30} | {wins:4} | {losses:6} | {draws:5}")
 
-        board_str = "\n"
-        board_str += "  a b c d e f g h\n"
-        board_str += " -----------------\n"
+    def display_game_start_message(self, game):
+        title = self._color_title("--- Game Started ---")
+        print(title)
+        white = game.players[chess.WHITE].model_name
+        black = game.players[chess.BLACK].model_name
+        print(f"White: {white}")
+        print(f"Black: {black}")
+        print(f"Initial FEN: {game.board.fen()}")
 
-        for rank in range(7, -1, -1):
-            line = f"{rank + 1}|"
-            for file in range(8):
-                square = chess.square(file, rank)
+    def display_board(self, board: chess.Board):
+        # Minimal ascii board
+        ranks = []
+        for r in range(8, 0, -1):
+            row = []
+            for f in range(1, 9):
+                square = chess.square(f-1, r-1)
                 piece = board.piece_at(square)
-                
-                symbol = "."
-                if piece:
-                    symbol = piece.symbol()
+                row.append(piece.symbol() if piece else '.')
+            ranks.append(" ".join(row))
+        print()
+        print("  a b c d e f g h")
+        print(" -----------------")
+        for i, row in enumerate(ranks, start=8):
+            print(f"{9-i}| {row} |{9-i}")
+        print(" -----------------")
+        print("  a b c d e f g h")
+        print()
 
-                if square == to_square:
-                    line += f" {BLUE}{symbol}{ENDC}"
-                elif square == from_square:
-                    # Highlight the origin square with a blue dot
-                    line += f" {BLUE}.{ENDC}"
-                else:
-                    line += f" {symbol}"
-            
-            line += f" |{rank + 1}\n"
-            board_str += line
-
-        board_str += " -----------------\n"
-        board_str += "  a b c d e f g h\n"
-        
-        UIManager.display_message(board_str)
-
-    @staticmethod
-    def display_turn_message(game):
-        """Displays whose turn it is, including the move number."""
-        move_number = game.board.fullmove_number
+    def display_turn_message(self, game):
+        cur = game.get_current_player()
         turn_color = "White" if game.board.turn else "Black"
-        player = game.players[game.board.turn]
-        UIManager.display_message(f"\nMove {move_number} ({turn_color}): {player.model_name} is thinking...")
+        msg = f"{turn_color}'s turn ({cur.model_name}), move {game.board.fullmove_number}."
+        if game.is_game_over():
+            result = game.get_game_result()
+            msg += f" Game over: {result}"
+        self.display_message(msg)
 
-    @staticmethod
-    def display_game_over_message(game):
-        """Displays the game over message."""
+    def display_game_over_message(self, game):
         result = game.get_game_result()
-        UIManager.display_message("\n--- Game Over ---")
-        UIManager.display_message(f"Result: {result}")
-        UIManager.display_board(game.board)
+        title = self._color_title("--- Game Over ---")
+        print(title)
+        print(f"Result: {result}")
+        self.display_board(game.board)
+
+    def display_ask_expert_menu(self):
+        """Show the Ask the Chessmaster menu with a colored title and return the user's choice."""
+        title = self._color_title("--- Ask the Chessmaster ---")
+        print(title)
+        print("  1: Ask a chess question")
+        print("  2: Tell me a chess joke")
+        print("  3: Tell me some chess news")
+        print("  m) Return to previous menu")
+        return self.get_user_input("Enter choice: ")

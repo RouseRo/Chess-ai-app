@@ -5,8 +5,9 @@ import glob
 import shutil
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 import chess
+
 from game import Game, RED, ENDC
 from ai_player import AIPlayer
 from stockfish_player import StockfishPlayer
@@ -85,28 +86,107 @@ class ChessApp:
         raise ValueError(f"Unknown player key: {player_key}")
 
     def _ask_expert(self, question=None):
-        """Handles the logic for asking the chess expert a question."""
-        if not question:
-            question = self.ui.get_user_input("What is your chess question? ")
-        
-        if not question:
-            return
+        """Handles the logic for asking the chess expert a question.
 
-        self.ui.display_message("\nAsking the Chess Master...")
+        If question is empty, show a small menu:
+          1: Ask a chess question
+          2: Tell me a chess joke
+          3: Tell me some chess news
+        """
+        request_type = None
+
+        # If caller passed an explicit empty string (user typed just '?'), show the menu
+        if not question or not question.strip():
+            choice = self.ui.display_ask_expert_menu().strip().lower()
+
+            if choice == '1':
+                question = self.ui.get_user_input("What is your chess question? ").strip()
+                if not question:
+                    return
+                request_type = 'question'
+            elif choice == '2':
+                question = "Tell me a short, clean chess joke."
+                request_type = 'joke'
+            elif choice == '3':
+                question = "Provide 3 brief, recent chess news headlines with one-sentence summaries. Be concise."
+                request_type = 'news'
+            else:
+                # m or any other input -> return
+                return
+
+        # Ask the expert with the resolved question text
+        self.ui.display_message("\nAsking the Chessmaster...")
         try:
             expert_player = AIPlayer(model_name=self.chess_expert_model)
             answer = expert_player.get_chess_fact_or_answer(question)
             
-            self.ui.display_message("\n--- Chess Master's Answer ---")
+            self.ui.display_message("\n--- Chessmaster's Answer ---")
             self.ui.display_message(answer)
             self.ui.display_message("-----------------------------")
+
+            # If this was a joke request, try to save it to docs/CHESS_JOKES.md
+            if request_type == 'joke' and answer:
+                saved = self._save_chess_joke(answer)
+                if saved:
+                    self.ui.display_message("Joke saved to docs/CHESS_JOKES.md")
+                else:
+                    self.ui.display_message("Joke appears recently in CHESS_JOKES.md — not saved.")
         except Exception as e:
             self.ui.display_message(f"{RED}Sorry, I couldn't get an answer. Error: {e}{ENDC}")
         
         self.ui.get_user_input("Press Enter to return.")
 
+    def _save_chess_joke(self, joke_text):
+        """
+        Append a numbered, dated joke to docs/CHESS_JOKES.md.
+        Avoids adding the same joke if it appears in the most recent N entries.
+        Returns True if appended, False if skipped as duplicate or on error.
+        """
+        try:
+            docs_dir = os.path.join(os.getcwd(), "docs")
+            os.makedirs(docs_dir, exist_ok=True)
+            jokes_path = os.path.join(docs_dir, "CHESS_JOKES.md")
+
+            # Ensure file exists with a header
+            if not os.path.exists(jokes_path):
+                with open(jokes_path, "w", encoding="utf-8") as f:
+                    f.write("# Chess Jokes\n\n")
+                    f.write("_Generated chess jokes. Duplicates within recent entries are skipped._\n\n---\n\n")
+
+            with open(jokes_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Split entries by the separator '---' and ignore header part before first separator
+            entries = [e.strip() for e in re.split(r"\n-{3,}\n", content) if e.strip()]
+            RECENT_CHECK = 50
+            recent_entries = entries[-RECENT_CHECK:] if len(entries) > 1 else []
+
+            normalized_new = re.sub(r"\s+", " ", joke_text.strip()).lower()
+            for entry in recent_entries:
+                parts = entry.split("\n\n", 1)
+                body = parts[1].strip() if len(parts) > 1 else parts[0].strip()
+                if re.sub(r"\s+", " ", body).lower() == normalized_new:
+                    return False  # duplicate found in recent entries
+
+            # Determine next index by finding the max existing numbered headings (### N.)
+            existing_nums = re.findall(r"^###\s+(\d+)\.", content, flags=re.M)
+            if existing_nums:
+                nums = [int(n) for n in existing_nums]
+                next_num = max(nums) + 1
+            else:
+                next_num = 1
+            date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+            entry_block = f"### {next_num}. {date_str}\n\n{joke_text.strip()}\n\n---\n\n"
+            with open(jokes_path, "a", encoding="utf-8") as f:
+                f.write(entry_block)
+
+            return True
+        except Exception:
+            return False
+
     def _get_fun_fact(self):
-        """Gets and displays a fun chess fact from the expert AI."""
+        """Gets and displays a fun chess fact from the expert AI and records it to docs/CHESS_FUN_FACTS.md."""
         self.ui.display_message("\nGetting a fun chess fact...")
         try:
             expert_player = AIPlayer(model_name=self.chess_expert_model)
@@ -116,10 +196,67 @@ class ChessApp:
             self.ui.display_message("\n--- Fun Chess Fact ---")
             self.ui.display_message(answer)
             self.ui.display_message("----------------------")
+
+            saved = self._save_fun_fact(answer)
+            if saved:
+                self.ui.display_message(f"Fun fact saved to docs/CHESS_FUN_FACTS.md")
+            else:
+                self.ui.display_message("This fact appears recently in CHESS_FUN_FACTS.md — not saved.")
         except Exception as e:
             self.ui.display_message(f"{RED}Sorry, I couldn't get a fact. Error: {e}{ENDC}")
 
         self.ui.get_user_input("Press Enter to return to the main menu.")
+
+    def _save_fun_fact(self, fact_text):
+        """
+        Append a numbered, dated fun fact to docs/CHESS_FUN_FACTS.md.
+        Avoids adding the same fact if it appears in the most recent N entries.
+        Returns True if appended, False if skipped as duplicate.
+        """
+        try:
+            docs_dir = os.path.join(os.getcwd(), "docs")
+            os.makedirs(docs_dir, exist_ok=True)
+            facts_path = os.path.join(docs_dir, "CHESS_FUN_FACTS.md")
+
+            # Ensure file exists with a header
+            if not os.path.exists(facts_path):
+                with open(facts_path, "w", encoding="utf-8") as f:
+                    f.write("# Chess Fun Facts\n\n")
+                    f.write("_Generated fun facts. Duplicates within recent entries are skipped._\n\n---\n\n")
+
+            with open(facts_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Split entries by the separator '---' and ignore the header part before the first separator
+            entries = [e.strip() for e in re.split(r"\n-{3,}\n", content) if e.strip()]
+            # Last N entries to check for repeats
+            RECENT_CHECK = 20
+            recent_entries = entries[-RECENT_CHECK:] if len(entries) > 1 else []
+
+            normalized_new = re.sub(r"\s+", " ", fact_text.strip()).lower()
+            for entry in recent_entries:
+                # Extract body text (after the first blank line or after the title line)
+                parts = entry.split("\n\n", 1)
+                body = parts[1].strip() if len(parts) > 1 else parts[0].strip()
+                if re.sub(r"\s+", " ", body).lower() == normalized_new:
+                    return False  # duplicate found in recent entries
+
+            # Determine next index by finding the max existing numbered headings (### N.)
+            existing_nums = re.findall(r"^###\s+(\d+)\.", content, flags=re.M)
+            if existing_nums:
+                nums = [int(n) for n in existing_nums]
+                next_num = max(nums) + 1
+            else:
+                next_num = 1
+            date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+            entry_block = f"### {next_num}. {date_str}\n\n{fact_text.strip()}\n\n---\n\n"
+            with open(facts_path, "a", encoding="utf-8") as f:
+                f.write(entry_block)
+
+            return True
+        except Exception:
+            return False
 
     def _initialize_new_game_log(self):
         """Shuts down existing log handlers and re-initializes the log file in write mode."""
@@ -512,8 +649,6 @@ class ChessApp:
                     self.ui.display_message(f"\n{RED}An unexpected error occurred: {e}{ENDC}")
                     logging.error(f"An unexpected error occurred: {e}", exc_info=True)
                     self.ui.get_user_input("Press Enter to acknowledge and return to the main menu.")
-
-
 #--- Entry Point ---
 if __name__ == "__main__":
     logging.basicConfig(

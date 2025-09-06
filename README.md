@@ -4,9 +4,9 @@ This project is a feature-rich, command-line chess application where you can pit
 
 ## Documentation
 
-For a detailed explanation of the chess notations used in this application (such as for move input and in the game logs), please see our documentation file:
-
--   **[Chess Notation and FEN Explained](docs/CHESS_NOTATION.md)**
+- CHESS notation & guides: docs/CHESS_NOTATION.md
+- Chess fun facts (appended by the app): docs/CHESS_FUN_FACTS.md
+- Chess jokes (appended by the app): docs/CHESS_JOKES.md
 
 ## Features
 
