@@ -97,12 +97,7 @@ class ChessApp:
 
         # If caller passed an explicit empty string (user typed just '?'), show the menu
         if not question or not question.strip():
-            self.ui.display_message("\n--- Ask the Chessmaster ---")
-            self.ui.display_message("  1: Ask a chess question")
-            self.ui.display_message("  2: Tell me a chess joke")
-            self.ui.display_message("  3: Tell me some chess news")
-            self.ui.display_message("  m: Return to previous menu")
-            choice = self.ui.get_user_input("Enter choice: ").strip().lower()
+            choice = self.ui.display_ask_expert_menu().strip().lower()
 
             if choice == '1':
                 question = self.ui.get_user_input("What is your chess question? ").strip()

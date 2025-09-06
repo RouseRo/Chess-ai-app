@@ -197,3 +197,13 @@ class UIManager:
         print(title)
         print(f"Result: {result}")
         self.display_board(game.board)
+
+    def display_ask_expert_menu(self):
+        """Show the Ask the Chessmaster menu with a colored title and return the user's choice."""
+        title = self._color_title("--- Ask the Chessmaster ---")
+        print(title)
+        print("  1: Ask a chess question")
+        print("  2: Tell me a chess joke")
+        print("  3: Tell me some chess news")
+        print("  m) Return to previous menu")
+        return self.get_user_input("Enter choice: ")
