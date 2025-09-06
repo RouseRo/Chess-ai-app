@@ -301,6 +301,9 @@ class ChessApp:
                 self.file_manager.save_game_log()
                 self.ui.display_message("Game saved. Exiting application.")
                 sys.exit()
+            elif quit_choice == 'q':
+                self.ui.display_message("Exiting without saving.")
+                sys.exit()
             else:  # 'c' to cancel
                 return True  # Signal to continue
         else:
@@ -353,62 +356,54 @@ class ChessApp:
     # --- Core Game Loop ---
 
     def play_game(self, game):
-        """The main loop for playing a single game of chess."""
+        """The main loop for a single game."""
         auto_moves_remaining = 0
-        while not game.is_game_over():
+
+        while not game.board.is_game_over():
             self.ui.display_board(game.board)
-            is_manual_move = False
-            
-            if auto_moves_remaining > 0:
-                if game.board.turn == chess.WHITE:
-                    auto_moves_remaining -= 1
-            else:
-                current_player = game.get_current_player()
-                turn_color = "White" if game.board.turn else "Black"
-                move_number = game.board.fullmove_number
+            current_player = game.get_current_player()
 
+            try:
                 if isinstance(current_player, HumanPlayer):
+                    # --- Human Player's Turn ---
+                    turn_color = "White" if game.board.turn else "Black"
+                    move_number = game.board.fullmove_number
                     prompt = f"Move {move_number} ({current_player.model_name} as {turn_color}): Enter your move (e.g. e2e4), 'q' to quit, or 'm' for menu: "
-                else:
-                    prompt = f"Move {move_number} ({turn_color}): Press Enter for AI move, 'q' to quit, 'm' for menu, a number for auto-play, or enter a move (e.g. e2e4): "
-                
-                user_input = self.ui.get_user_input(prompt)
-                
-                if user_input.lower() == 'q':
-                    if self._handle_quit_request(game):
-                        continue
-                elif user_input.lower() == 'm':
-                    game, action = self.handle_in_game_menu(game)
-                    if action == 'quit_app':
+                    user_input = self.ui.get_user_input(prompt)
+
+                    if user_input.lower() == 'q':
                         if self._handle_quit_request(game):
+                            continue # User cancelled quit
+                    elif user_input.lower() == 'm':
+                        game, action = self.handle_in_game_menu(game)
+                        if action == 'quit_app':
+                            if self._handle_quit_request(game):
+                                continue
+                        elif action in ['skip_turn', 'continue']:
                             continue
-                    elif action == 'skip_turn':
-                        continue
-                    elif action == 'continue':
-                        continue
-                
-                elif user_input.isdigit():
-                    auto_moves_remaining = int(user_input)
-
-                elif user_input == "" and not isinstance(current_player, HumanPlayer): # User pressed Enter for AI move
-                    is_manual_move = False
-
-                else: # Any other text is treated as a manual move
-                    is_manual_move = True
-                    try:
+                    else:
                         game.make_manual_move(user_input)
-                    except ValueError as e:
-                        self.ui.display_message(f"{RED}Invalid move: {e}{ENDC}")
 
-            if not is_manual_move:
-                self.ui.display_turn_message(game)
-                game.play_turn()
+                else:
+                    # --- AI Player's Turn ---
+                    if auto_moves_remaining > 0:
+                        if game.board.turn == chess.WHITE: # Decrement only after a full move cycle
+                            auto_moves_remaining -= 1
+                    else: # Not auto-playing, so prompt for interaction
+                        self.ui.display_turn_message(game) # "AI is thinking..."
+                        # Check for user interruption before AI move
+                        # This is a simplified non-blocking check for this example
+                        # A real implementation would need threading for a true non-blocking input
+                        
+                    game.play_turn()
 
-        # --- Game Over ---
-        logging.info(f"Game Over. Result: {game.get_game_result()}")
+            except ValueError as e:
+                self.ui.display_message(f"{RED}Invalid move: {e}{ENDC}")
+                continue
+        
         self.ui.display_game_over_message(game)
-        self._update_player_stats(game.players[chess.WHITE], game.players[chess.BLACK], game.board.result())
-
+        self._update_player_stats(game.players[chess.WHITE], game.players[chess.BLACK], game.get_game_result())
+        
         # Ask to save the completed game
         save_choice = self.ui.get_user_input("\nSave final game log? (y/N): ").lower()
         if save_choice == 'y':

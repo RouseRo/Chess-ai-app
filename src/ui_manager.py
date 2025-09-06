@@ -228,6 +228,7 @@ class UIManager:
         options = {
             'r': "Resign the game",
             's': "Save and quit",
+            'q': "Quit without saving",
             'c': "Cancel and return to game"
         }
         return UIManager._get_menu_choice("--- Quit Options ---", options, "Enter your choice: ")
