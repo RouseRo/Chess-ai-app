@@ -2,6 +2,12 @@
 
 This project is a feature-rich, command-line chess application where you can pit AI players, powered by large language models, against each other or against a classic chess engine like Stockfish. It is designed with a clean, object-oriented structure that separates application logic, user interface, and configuration.
 
+## Documentation
+
+For a detailed explanation of the chess notations used in this application (such as for move input and in the game logs), please see our documentation file:
+
+-   **[Chess Notation and FEN Explained](docs/CHESS_NOTATION.md)**
+
 ## Features
 
 *   **AI vs. Engine:** Play against various skill levels of the powerful Stockfish chess engine.

@@ -1,94 +1,76 @@
 import os
-from dotenv import load_dotenv
-import chess
-from openai import OpenAI
+import re
 import openai
-import random
+import chess
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class AIPlayer:
+    """Represents a player using an AI model via OpenRouter."""
+
     def __init__(self, model_name):
         self.model_name = model_name
-
-        load_dotenv() # Load environment variables from .env file
-        
-        # Initialize the OpenAI API client to use OpenRouter
-        self.client = OpenAI(
+        self.client = openai.OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=os.getenv("OPENAI_API_KEY"),
         )
 
-    def compute_move(self, board: chess.Board, strategy_message=None):
+    def _get_ai_response(self, messages):
+        """Generic method to get a response from the AI model."""
+        response = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=messages,
+        )
+        return response.choices[0].message.content
+
+    def get_chess_fact_or_answer(self, question=None):
         """
-        Computes the next move using the specified AI model.
+        Gets a chess fact or an answer to a specific question from the AI.
         """
-        legal_moves_uci = [move.uci() for move in board.legal_moves]
+        if question:
+            system_prompt = "You are a world-class chess grandmaster and historian. Answer the user's question about chess concisely and accurately."
+            user_prompt = question
+        else:
+            system_prompt = "You are a chess historian. Provide one interesting, little-known fun fact about the history of chess. Be concise."
+            user_prompt = "Tell me a fun chess fact."
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        return self._get_ai_response(messages)
+
+    def compute_move(self, board, strategy=None):
+        """
+        Computes the best move using the AI model.
+        """
+        system_prompt = "You are a world-class chess engine. Your only goal is to win. Analyze the given FEN position and provide the best move in UCI notation (e.g., e2e4, g1f3). Do not provide any explanation, commentary, or any text other than the single move in UCI format."
         
-        strategy_prompt = ""
-        if strategy_message:
-            strategy_prompt = f"Your designated strategy is: {strategy_message}."
+        strategy_text = ""
+        if strategy:
+            strategy_text = f"As a reminder, your strategy for this game is: {strategy}"
 
-        prompt = f"""You are a deterministic chess move selector. {strategy_prompt}
-Analyze the position deeply, pick the best move by searching at least 3 moves ahead using minimax principles.
-The current board state in FEN is:
-{board.fen()}
+        user_prompt = f"Current FEN: {board.fen()}. {strategy_text} It is your turn to move. What is your move?"
 
-The legal moves are: {', '.join(legal_moves_uci)}.
-Your task is to select the absolute best possible move from the list of legal moves.
-Respond with only the chosen move in UCI notation (e.g., 'e2e4')."""
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
 
-        max_retries = 3
-        for attempt in range(max_retries):
+        uci_move = self._get_ai_response(messages).strip()
+        
+        # Find a valid UCI move in the response, as models sometimes add extra text.
+        match = re.search(r'[a-h][1-8][a-h][1-8][qrbn]?', uci_move)
+        if match:
+            uci_move = match.group(0)
             try:
-                completion = self.client.chat.completions.create(
-                    model=self.model_name,
-                    messages=[
-                        {"role": "system", "content": 
-                         "You are a helpful chess assistant that provides moves in UCI format."},
-                        {"role": "user", "content": prompt},
-                    ],
-                    temperature=0.5,
-                    max_tokens=10,
-                )
-                
-                model_response = completion.choices[0].message.content.strip()
-
-                # Check if the returned move is legal
-                if model_response in legal_moves_uci:
-                    print(f"Model {self.model_name} chose: {model_response}")
-                    return model_response
-                else:
-                    print(f"Warning: Model returned an illegal move '{model_response}'. Attempt {attempt + 1}/{max_retries}")
-
-            except Exception as e:
-                print(f"An error occurred calling the API: {e}")
+                move = chess.Move.from_uci(uci_move)
+                if move in board.legal_moves:
+                    return move
+            except ValueError:
+                # The model returned an invalid UCI string
+                pass
         
-        # Fallback strategy if the model fails to provide a valid move
-        print("AI failed to provide a valid move. Choosing a random legal move.")
-        return random.choice(legal_moves_uci)
-
-
-    def switch_model(self, new_model_name):
-        self.model_name = new_model_name
-        # Optionally reinitialize the API client if needed
-
-    def ask_question(self, question, system_prompt):
-        """Sends a general question to the AI model and returns the answer."""
-        try:
-            completion = self.client.chat.completions.create(
-                model=self.model_name,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": question}
-                ],
-                temperature=0.5,
-            )
-            return completion.choices[0].message.content
-        except openai.APIConnectionError as e:
-            print(f"Failed to connect to API: {e}")
-            return "Error: Could not connect to the AI service."
-        except openai.APIError as e:
-            print(f"An API error occurred: {e}")
-            return f"Error: An API error occurred: {e}"
-
-# Load environment variables
-load_dotenv()
+        # If parsing fails, we cannot make a move.
+        return None

@@ -10,7 +10,9 @@ import chess
 from game import Game, RED, ENDC
 from ai_player import AIPlayer
 from stockfish_player import StockfishPlayer
+from human_player import HumanPlayer
 from ui_manager import UIManager
+from file_manager import FileManager
 
 # --- Constants ---
 LOG_FILE = 'chess_game.log'
@@ -21,6 +23,7 @@ class ChessApp:
     def __init__(self):
         """Initializes the application, loading configurations."""
         self.ui = UIManager()
+        self.file_manager = FileManager(self.ui)
         self.white_openings = {}
         self.black_defenses = {}
         self.ai_models = {}
@@ -39,131 +42,114 @@ class ChessApp:
                 self.ai_models = config.get("ai_models", {})
                 self.stockfish_path = config.get("stockfish_path")
                 self.stockfish_configs = config.get("stockfish_configs", {})
-                self.chess_expert_model = config.get("chess_expert_model")
-                if not self.chess_expert_model:
-                    raise ValueError("chess_expert_model not found in config.")
-        except (FileNotFoundError, json.JSONDecodeError, ValueError) as e:
-            self.ui.display_message(f"Error loading config.json: {e}")
-            self.ui.display_message("Please ensure src/config.json exists and is correctly formatted.")
+                self.chess_expert_model = config.get('chess_expert_model', 'google/gemini-2.5-pro')
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            self.ui.display_message(f"{RED}Fatal Error: Could not load or parse 'src/config.json'.{ENDC}")
+            self.ui.display_message(f"Reason: {e}")
+            self.ui.display_message("Please ensure the file exists and is a valid JSON.")
             sys.exit(1)
 
-    def _create_player(self, player_key):
-        """Creates a player object (AI or Stockfish) based on the key."""
+    def _create_player(self, player_key, player_name=None):
+        """Creates a player object based on the provided key, with an optional name override."""
         if player_key.startswith('m'):
-            model_name = self.ai_models[player_key]
-            return AIPlayer(model_name=model_name)
+            model_name = self.ai_models.get(player_key)
+            if model_name:
+                return AIPlayer(model_name=model_name)
         elif player_key.startswith('s'):
-            if not self.stockfish_path or not os.path.exists(self.stockfish_path):
-                raise FileNotFoundError(f"Stockfish executable not found at path: {self.stockfish_path}. Please check your config.json.")
-            config = self.stockfish_configs[player_key]
-            return StockfishPlayer(path=self.stockfish_path, parameters=config['parameters'])
-        else:
-            raise ValueError(f"Unknown player key: {player_key}")
+            config = self.stockfish_configs.get(player_key)
+            if config:
+                return StockfishPlayer(self.stockfish_path, parameters=config['parameters'])
+        elif player_key == 'hu':
+            # If a name was parsed from the log, use it. Otherwise, default to a generic name.
+            name_to_use = player_name if player_name else "Human (hu)"
+            return HumanPlayer(name=name_to_use)
+        
+        raise ValueError(f"Unknown player key: {player_key}")
+
+    def _create_player_with_name_prompt(self, player_key, color_str):
+        """Creates a player, prompting for a name if the player is human."""        
+        if player_key == 'hu':
+            name = self.ui.get_human_player_name(color_str)
+            # Combine name and key for a unique identifier
+            return HumanPlayer(name=f"{name} ({player_key})")
+        
+        if player_key.startswith('m'):
+            model_name = self.ai_models.get(player_key)
+            if model_name:
+                return AIPlayer(model_name=model_name)
+        elif player_key.startswith('s'):
+            config = self.stockfish_configs.get(player_key)
+            if config:
+                return StockfishPlayer(self.stockfish_path, parameters=config['parameters'])
+        
+        raise ValueError(f"Unknown player key: {player_key}")
 
     def _ask_expert(self, question=None):
         """Handles the logic for asking the chess expert a question."""
         if not question:
-            question = self.ui.get_chess_question()
+            question = self.ui.get_user_input("What is your chess question? ")
         
         if not question:
             return
 
-        self.ui.display_message("\nConsulting the expert...")
-        expert_player = AIPlayer(model_name=self.chess_expert_model)
-        system_prompt = "You are a chess expert playing at the grandmaster level."
+        self.ui.display_message("\nAsking the Chess Master...")
+        try:
+            expert_player = AIPlayer(model_name=self.chess_expert_model)
+            answer = expert_player.get_chess_fact_or_answer(question)
+            
+            self.ui.display_message("\n--- Chess Master's Answer ---")
+            self.ui.display_message(answer)
+            self.ui.display_message("-----------------------------")
+        except Exception as e:
+            self.ui.display_message(f"{RED}Sorry, I couldn't get an answer. Error: {e}{ENDC}")
         
-        answer = expert_player.ask_question(question, system_prompt)
-        
-        self.ui.display_message("\n--- Grandmaster's Answer ---")
-        self.ui.display_message(answer)
-        self.ui.display_message("----------------------------")
-        self.ui.get_user_input("Press Enter to return to the menu.")
+        self.ui.get_user_input("Press Enter to return.")
 
     def _get_fun_fact(self):
-        """Gets a fun chess fact from the expert AI."""
-        self.ui.display_message("\nAsking the Grandmaster for a fun fact...")
-        expert_player = AIPlayer(model_name=self.chess_expert_model)
-        
-        question = "Tell me a fun, interesting, and little-known fact about chess history, a famous player, or a specific opening."
-        system_prompt = "You are a chess historian and grandmaster. Provide a single, interesting fact."
-        
-        answer = expert_player.ask_question(question, system_prompt)
-        
-        self.ui.display_message("\n--- Fun Chess Fact ---")
-        self.ui.display_message(answer)
-        self.ui.display_message("----------------------")
+        """Gets and displays a fun chess fact from the expert AI."""
+        self.ui.display_message("\nGetting a fun chess fact...")
+        try:
+            expert_player = AIPlayer(model_name=self.chess_expert_model)
+            # Passing no question gets a random fact
+            answer = expert_player.get_chess_fact_or_answer()
+            
+            self.ui.display_message("\n--- Fun Chess Fact ---")
+            self.ui.display_message(answer)
+            self.ui.display_message("----------------------")
+        except Exception as e:
+            self.ui.display_message(f"{RED}Sorry, I couldn't get a fact. Error: {e}{ENDC}")
+
         self.ui.get_user_input("Press Enter to return to the main menu.")
 
-    def _get_saved_game_summaries(self):
-        """Parses all saved game logs to create a list of summaries."""
-        summaries = []
-        saved_games = sorted(glob.glob('chess_game_*.log'), reverse=True)
-
-        for log_file in saved_games:
-            summary = {'filename': log_file, 'white': 'N/A', 'black': 'N/A', 'date': 'N/A', 'status': 'In Progress'}
-            try:
-                with open(log_file, 'r') as f:
-                    lines = f.readlines()
-                
-                # Extract date from filename
-                match = re.search(r'(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})', log_file)
-                if match:
-                    summary['date'] = f"{match.group(1)}-{match.group(2)}-{match.group(3)} {match.group(4)}:{match.group(5)}"
-
-                # Extract player names, status, and count moves
-                move_count = 0
-                status = "In Progress"
-                for line in lines:
-                    if "White:" in line:
-                        summary['white'] = line.split("White:", 1)[1].strip()
-                    elif "Black:" in line:
-                        summary['black'] = line.split("Black:", 1)[1].strip()
-                    elif "Game Over" in line or "resigned" in line:
-                        status = 'Finished'
-                    
-                    if "Move:" in line:
-                        move_count += 1
-                
-                summary['status'] = f"{status} ({move_count})"
-                summaries.append(summary)
-            except Exception as e:
-                # If a file is unreadable, print the error and skip it
-                self.ui.display_message(f"\n{RED}Warning: Could not parse '{log_file}'. Error: {e}{ENDC}")
-                continue
-        return summaries
-
-    # --- Game Setup & Loading Methods ---
-
-    def setup_new_game(self):
-        """Handles the user interaction for setting up a new game."""
-        white_opening_key, black_defense_key, white_player_key, black_player_key = \
-            self.ui.display_setup_menu_and_get_choices(self.white_openings, self.black_defenses, self.ai_models, self.stockfish_configs)
-
-        player1 = self._create_player(white_player_key)
-        player2 = self._create_player(black_player_key)
-
-        white_strategy = self.white_openings[white_opening_key] if white_opening_key != '0' else None
-        black_strategy = self.black_defenses[black_defense_key] if black_defense_key != 'z' else None
-
-        game = Game(player1, player2, white_strategy, black_strategy, white_player_key, black_player_key)
-        game.initialize_game()
-        return game
+    def _initialize_new_game_log(self):
+        """Shuts down existing log handlers and re-initializes the log file in write mode."""
+        # Shut down any existing handlers to release the file lock
+        logging.shutdown()
+        # Re-initialize logging in write mode to clear the file
+        logging.basicConfig(
+            filename=LOG_FILE,
+            level=logging.INFO,
+            format='%(asctime)s - %(message)s',
+            filemode='w'
+        )
+        logging.getLogger("httpx").setLevel(logging.WARNING)
 
     def load_game_from_log(self, log_file):
-        """Loads game settings and board state from a log file."""
+        """Loads a game state from a log file."""
         try:
             with open(log_file, 'r') as f:
                 lines = f.readlines()
             
-            header, error_reason = self.parse_log_header(lines)
+            all_keys = list(self.ai_models.keys()) + list(self.stockfish_configs.keys()) + ['hu']
+            header, error_reason = self.parse_log_header(lines, all_keys)
             if not header:
                 self.ui.display_message(f"Failed to load game: {error_reason}")
                 return None
 
-            player1 = self._create_player(header['white_key'])
-            player2 = self._create_player(header['black_key'])
+            player1 = self._create_player(header['white_key'], header.get('white_name'))
+            player2 = self._create_player(header['black_key'], header.get('black_name'))
             
-            game = Game(player1, player2, white_strategy=header['white_strategy'], black_strategy=header['black_strategy'])
+            game = Game(player1, player2, white_strategy=header['white_strategy'], black_strategy=header['black_strategy'], white_player_key=header['white_key'], black_player_key=header['black_key'])
             
             last_fen = header['initial_fen']
             for line in lines:
@@ -177,27 +163,52 @@ class ChessApp:
             return None
 
     @staticmethod
-    def parse_log_header(lines):
-        header = {
-            'white_strategy': None,
-            'black_strategy': None
-        }
-        patterns = {
-            'white_key': r"White: .* \((m\d+|s\d+)\)",
-            'black_key': r"Black: .* \((m\d+|s\d+)\)",
-            'white_strategy': r"White Strategy: (.+)",
-            'black_strategy': r"Black Strategy: (.+)",
-            'initial_fen': r"Initial FEN: (.+)"
-        }
-        for line in lines[:6]: # Header should be in the first few lines
-            for key, pattern in patterns.items():
-                match = re.search(pattern, line)
-                if match:
-                    header[key] = match.group(1).strip()
+    def parse_log_header(lines, all_keys):
+        """Parses the header of a log file to extract game setup information."""
+        header = {}
+
+        for line in lines:
+            if "Move:" in line:
+                break # End of header
+
+            # Modern format (explicit keys)
+            if "White Player Key:" in line:
+                header["white_key"] = line.split(":", 1)[1].strip()
+            elif "Black Player Key:" in line:
+                header["black_key"] = line.split(":", 1)[1].strip()
+            
+            # Fallback for older logs (infer keys)
+            elif "White:" in line and "white_key" not in header:
+                player_name = line.split(":", 1)[1].strip()
+                header["white_name"] = player_name # Store the full name
+                for key in all_keys:
+                    if f"({key})" in player_name:
+                        header["white_key"] = key
+                        break
+            elif "Black:" in line and "black_key" not in header:
+                player_name = line.split(":", 1)[1].strip()
+                header["black_name"] = player_name # Store the full name
+                for key in all_keys:
+                    if f"({key})" in player_name:
+                        header["black_key"] = key
+                        break
+
+            # Common fields
+            elif "White Strategy:" in line:
+                header["white_strategy"] = line.split(":", 1)[1].strip()
+            elif "Black Strategy:" in line:
+                header["black_strategy"] = line.split(":", 1)[1].strip()
+            elif "Initial FEN:" in line:
+                header["initial_fen"] = line.split(":", 1)[1].strip()
+
+        # Validation
+        required_fields = ["white_key", "black_key", "initial_fen"]
+        missing_fields = [field for field in required_fields if field not in header]
         
-        required_fields = ['white_key', 'black_key', 'initial_fen']
-        missing_fields = [field for field in required_fields if not header.get(field)]
-        
+        # Set default for optional strategy fields
+        header.setdefault('white_strategy', 'No Classic Chess Opening')
+        header.setdefault('black_strategy', 'No Classic Chess Opening')
+
         if not missing_fields:
             return header, None
         else:
@@ -208,7 +219,7 @@ class ChessApp:
 
     def handle_load_game_in_menu(self, game):
         """Handles the 'load game' option from the in-game menu."""
-        game_summaries = self._get_saved_game_summaries()
+        game_summaries = self.file_manager.get_saved_game_summaries()
         if not game_summaries:
             self.ui.display_message("No saved games found.")
             return game, 'continue'
@@ -242,8 +253,8 @@ class ChessApp:
         if position and position not in ['?', 'm', 'q']:
             white_player_key, black_player_key = self.ui.display_model_menu_and_get_choice(self.ai_models, self.stockfish_configs)
             
-            player1 = self._create_player(white_player_key)
-            player2 = self._create_player(black_player_key)
+            player1 = self._create_player_with_name_prompt(white_player_key, "White")
+            player2 = self._create_player_with_name_prompt(black_player_key, "Black")
 
             new_game = Game(player1, player2, white_player_key=white_player_key, black_player_key=black_player_key)
             new_game.set_board_from_fen(position['fen'])
@@ -262,246 +273,256 @@ class ChessApp:
             
         return game, 'continue'
 
-    def _save_game_log(self):
-        """Saves the current game log to a timestamped file."""
-        try:
-            # Ensure all buffered logs are written to disk before copying
-            for handler in logging.getLogger().handlers:
-                handler.flush()
-            
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            save_path = f'chess_game_{timestamp}.log'
-            shutil.copy('chess_game.log', save_path)
-            self.ui.display_message(f"\nGame saved as {save_path}")
-        except FileNotFoundError:
-            self.ui.display_message("Log file not found, could not save.")
-        except Exception as e:
-            self.ui.display_message(f"An error occurred while saving: {e}")
-
-    def _load_player_stats(self):
-        """Loads player statistics from the JSON file."""
-        if not os.path.exists(PLAYER_STATS_FILE):
-            return {}
-        try:
-            with open(PLAYER_STATS_FILE, 'r') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, FileNotFoundError):
-            return {}
-
-    def _save_player_stats(self, stats):
-        """Saves player statistics to the JSON file."""
-        os.makedirs(os.path.dirname(PLAYER_STATS_FILE), exist_ok=True)
-        with open(PLAYER_STATS_FILE, 'w') as f:
-            json.dump(stats, f, indent=2)
-
     def _update_player_stats(self, white_player, black_player, result):
-        """Updates and saves the win/loss/draw stats for players."""
-        stats = self._load_player_stats()
+        """Updates, saves, and displays the win/loss/draw stats for players in the last game."""
+        stats = self.file_manager.load_player_stats() or {}
         
-        players = {white_player.model_name, black_player.model_name}
-        for player_name in players:
+        white_name = white_player.model_name
+        black_name = black_player.model_name
+
+        # Ensure players exist in the stats dictionary
+        for player_name in {white_name, black_name}:
             if player_name not in stats:
                 stats[player_name] = {"wins": 0, "losses": 0, "draws": 0}
 
-        if result == "1-0": # White wins
-            stats[white_player.model_name]["wins"] += 1
-            stats[black_player.model_name]["losses"] += 1
-        elif result == "0-1": # Black wins
-            stats[black_player.model_name]["wins"] += 1
-            stats[white_player.model_name]["losses"] += 1
-        elif result == "1/2-1/2": # Draw
-            stats[white_player.model_name]["draws"] += 1
-            stats[black_player.model_name]["draws"] += 1
+        # Update stats based on the result
+        if result == "1-0":  # White wins
+            stats[white_name]["wins"] += 1
+            stats[black_name]["losses"] += 1
+        elif result == "0-1":  # Black wins
+            stats[black_name]["wins"] += 1
+            stats[white_name]["losses"] += 1
+        elif result == "1/2-1/2":  # Draw
+            stats[white_name]["draws"] += 1
+            stats[black_name]["draws"] += 1
         
-        self._save_player_stats(stats)
-        self.ui.display_message("\nPlayer stats have been updated.")
+        # Save the updated stats back to the file
+        self.file_manager.save_player_stats(stats)
+
+        # Reload from disk to ensure we're displaying the persisted values
+        stats = self.file_manager.load_player_stats() or {}
+
+        # Display the newly updated stats for the players in the game
+        self.ui.display_message("\n--- Updated Player Stats ---")
+        
+        white_stats = stats.get(white_name, {"wins": 0, "losses": 0, "draws": 0})
+        white_stats_str = f"Wins: {white_stats['wins']}, Losses: {white_stats['losses']}, Draws: {white_stats['draws']}"
+        self.ui.display_message(f"{white_name}: {white_stats_str}")
+
+        if white_name != black_name:
+            black_stats = stats.get(black_name, {"wins": 0, "losses": 0, "draws": 0})
+            black_stats_str = f"Wins: {black_stats['wins']}, Losses: {black_stats['losses']}, Draws: {black_stats['draws']}"
+            self.ui.display_message(f"{black_name}: {black_stats_str}")
+        
+        self.ui.display_message("----------------------------")
 
     def _view_player_stats(self):
         """Loads and displays player statistics."""
-        stats = self._load_player_stats()
+        stats = self.file_manager.load_player_stats()
         self.ui.display_player_stats(stats)
         self.ui.get_user_input("Press Enter to return to the main menu.")
+
+    def _handle_quit_request(self, game):
+        """
+        Handles a quit request. For a human, asks to resign/save/cancel.
+        For an AI, triggers resignation. Exits the app on resign/save.
+        Returns True if the game loop should continue (i.e., user cancelled).
+        """
+        current_player = game.get_current_player()
+        if isinstance(current_player, HumanPlayer):
+            quit_choice = self.ui.get_human_quit_choice()
+            if quit_choice == 'r':
+                self._handle_resignation(game)  # This exits
+            elif quit_choice == 's':
+                self.file_manager.save_game_log()
+                self.ui.display_message("Game saved. Exiting application.")
+                sys.exit()
+            elif quit_choice == 'q':
+                self.ui.display_message("Exiting without saving.")
+                sys.exit()
+            else:  # 'c' to cancel
+                return True  # Signal to continue
+        else:
+            self._handle_resignation(game)  # This exits
+        
+        return False # Should not be reached if resignation happens
 
     def _handle_resignation(self, game):
         """Handles the logic for a player resigning."""
         resigning_color = "White" if game.board.turn == chess.WHITE else "Black"
-        resign_message = f"{resigning_color} has resigned."
+        resigning_player = game.get_current_player().model_name
+        self.ui.display_message(f"\n{resigning_player} ({resigning_color}) has resigned.")
         
-        # Log the resignation and display it in red
-        logging.info(resign_message)
-        self.ui.display_message(f"\n{RED}{resign_message}{ENDC}")
-
-        # Update stats based on resignation
+        # Update stats
         result = "0-1" if resigning_color == "White" else "1-0"
         self._update_player_stats(game.players[chess.WHITE], game.players[chess.BLACK], result)
-        
+
         # Ask to save and then exit
         save_choice = self.ui.get_user_input("Save final game log? (y/N): ").lower()
         if save_choice == 'y':
-            self._save_game_log()
+            self.file_manager.save_game_log()
         self.ui.display_message("Exiting application.")
         sys.exit()
 
     def handle_in_game_menu(self, game):
-        """Displays and handles the in-game menu options."""
-        menu_choice = self.ui.display_game_menu_and_get_choice()
-        if menu_choice == 'l':
+        """Handles the in-game menu options, returning a new game object and an action."""
+        menu_choice = self.ui.display_in_game_menu()
+
+        if menu_choice == 'l': # Load Game
             return self.handle_load_game_in_menu(game)
-        elif menu_choice == 'p':
-            action = self.handle_practice_load_in_menu(game)
-            return game, action
-        elif menu_choice == 's':
-            self._save_game_log()
+        elif menu_choice == 'p': # Load Practice
+            return self.handle_practice_load_in_menu(game)
+        elif menu_choice == 's': # Save
+            self.file_manager.save_game_log()
             return game, 'continue'
-        elif menu_choice.startswith('?'):
+        elif menu_choice.startswith('?'): # Ask Expert
             question = menu_choice[1:].strip()
             self._ask_expert(question)
             return game, 'continue'
-        elif menu_choice == 'r':
+        elif menu_choice == 'r': # Return to Game
             return game, 'continue'
-        elif menu_choice == 'q':
-            return game, 'quit_app'
+        elif menu_choice == 'q': # Quit
+            return game, 'quit'
+        
         return game, 'continue'
 
-    # --- Core Game Loop ---
+    def play_turn(self, game):
+        """Plays a single turn of the game, returning the game object and an action."""
+        self.ui.display_board(game.board)
+        current_player = game.get_current_player()
 
-    def play_game(self, game):
-        """The main loop for playing a single game of chess."""
-        auto_moves_remaining = 0
-        while not game.is_game_over():
-            self.ui.display_board(game.board)
-            is_manual_move = False
-            
-            if auto_moves_remaining > 0:
-                if game.board.turn == chess.WHITE:
-                    auto_moves_remaining -= 1
-            else:
+        try:
+            if isinstance(current_player, HumanPlayer):
                 turn_color = "White" if game.board.turn else "Black"
                 move_number = game.board.fullmove_number
-                prompt = f"Move {move_number} ({turn_color}): Press Enter for AI move, 'q' to quit, 'm' for menu, a number for auto-play, or enter a move (e.g. e2e4): "
+                prompt = f"Move {move_number} ({current_player.model_name} as {turn_color}): Enter your move (e.g. e2e4), 'q' to quit, or 'm' for menu: "
                 user_input = self.ui.get_user_input(prompt)
-                
+
                 if user_input.lower() == 'q':
-                    self._handle_resignation(game)
-                
+                    return game, 'quit'
                 elif user_input.lower() == 'm':
-                    game, action = self.handle_in_game_menu(game)
-                    if action == 'quit_app':
-                        self._handle_resignation(game)
-                    elif action == 'skip_turn':
-                        continue
-                    elif action == 'continue':
-                        continue
-                
-                elif user_input.isdigit():
-                    auto_moves_remaining = int(user_input)
-
-                elif user_input == "": # User pressed Enter for AI move
-                    is_manual_move = False
-
-                else: # Any other text is treated as a manual move
-                    is_manual_move = True
-                    try:
-                        game.make_manual_move(user_input)
-                    except ValueError as e:
-                        self.ui.display_message(f"{RED}Invalid move: {e}{ENDC}")
-
-            if not is_manual_move:
+                    return self.handle_in_game_menu(game)
+                else:
+                    game.make_manual_move(user_input)
+            else:
                 self.ui.display_turn_message(game)
                 game.play_turn()
+        except ValueError as e:
+            self.ui.display_message(f"{RED}Invalid move: {e}{ENDC}")
 
-        # --- Game Over ---
-        logging.info(f"Game Over. Result: {game.get_game_result()}")
-        self.ui.display_game_over_message(game)
-        self._update_player_stats(game.players[chess.WHITE], game.players[chess.BLACK], game.board.result())
+        return game, 'continue'
 
-        # Ask to save the completed game
-        save_choice = self.ui.get_user_input("\nSave final game log? (y/N): ").lower()
-        if save_choice == 'y':
-            self._save_game_log()
-        
-        self.ui.get_user_input("Press Enter to return to the main menu.")
+    def _determine_game_result(self, game):
+        """Return canonical result string ('1-0', '0-1', '1/2-1/2') based on board state."""
+        board = game.board
+        # Checkmate: the side to move has been checkmated, so the winner is the opposite color
+        if board.is_checkmate():
+            winner = not board.turn
+            return "1-0" if winner == chess.WHITE else "0-1"
+        # Draw conditions
+        if board.is_stalemate() or board.is_insufficient_material() or board.can_claim_threefold_repetition() or board.can_claim_fifty_moves():
+            return "1/2-1/2"
+        # Fallback to board.result() which returns '1-0', '0-1' or '1/2-1/2'
+        try:
+            return board.result()
+        except Exception:
+            return "1/2-1/2"
 
     # --- Main Application Runner ---
 
     def run(self):
         """Main function to run the chess application."""
+        game = None
         while True:
-            choice = self.ui.display_main_menu()
+            if game:
+                if game.board.is_game_over():
+                    self.ui.display_game_over_message(game)
+                    # determine result from board state to avoid incorrect mappings
+                    result = self._determine_game_result(game)
+                    self._update_player_stats(game.players[chess.WHITE], game.players[chess.BLACK], result)
+                    save_choice = self.ui.get_user_input("\nSave final game log? (y/N): ").lower()
+                    if save_choice == 'y':
+                        self.file_manager.save_game_log()
+                    self.ui.get_user_input("Press Enter to return to the main menu.")
+                    game = None # Game is over, return to main
+                    continue
 
-            try:
-                if choice == '1': # New Game
-                    game = self.setup_new_game()
-                    if game:
-                        self.ui.display_game_start_message(game)
-                        self.play_game(game)
+                new_game, action = self.play_turn(game)
+                game = new_game # Always update the game object
 
-                elif choice == '2': # Load Saved Game
-                    game_summaries = self._get_saved_game_summaries()
-                    if not game_summaries:
-                        self.ui.display_message("No saved games found.")
+                if action == 'quit':
+                    if self._handle_quit_request(game):
+                        continue # User cancelled quit
+                    else:
+                        game = None # Quit was handled, return to menu
                         continue
-                    
-                    chosen_summary = self.ui.display_saved_games_and_get_choice(game_summaries)
-
-                    if chosen_summary == 'm':
-                        continue
-                    elif chosen_summary == 'q':
-                        self.ui.display_message("Exiting application.")
-                        sys.exit()
-                    elif chosen_summary:
-                        chosen_file = chosen_summary['filename']
-                        game = self.load_game_from_log(chosen_file)
+                elif action == 'quit_to_menu':
+                    game = None
+                    continue
+                elif action in ['continue', 'skip_turn']:
+                    continue
+            else:
+                # --- Main Menu ---
+                choice = self.ui.display_main_menu()
+                try:
+                    if choice == '1': # New Game
+                        self._initialize_new_game_log()
+                        game = self.setup_new_game()
                         if game:
-                            self.play_game(game)
+                            self.ui.display_game_start_message(game)
 
-                elif choice == '3': # Load Practice Position
-                    with open('src/puzzles.json', 'r') as f:
-                        positions = json.load(f)
-                    
-                    position = self.ui.display_practice_positions_and_get_choice(positions)
-                    
-                    if position and position not in ['?', 'm', 'q']:
-                        white_player_key, black_player_key = self.ui.display_model_menu_and_get_choice(self.ai_models, self.stockfish_configs)
-                        
-                        player1 = self._create_player(white_player_key)
-                        player2 = self._create_player(black_player_key)
+                    elif choice == '2': # Load Saved Game
+                        game_summaries = self.file_manager.get_saved_game_summaries()
+                        if not game_summaries:
+                            self.ui.display_message("No saved games found.")
+                            continue
+                        chosen_summary = self.ui.display_saved_games_and_get_choice(game_summaries)
+                        if chosen_summary and chosen_summary not in ['m', 'q']:
+                            game = self.load_game_from_log(chosen_summary['filename'])
 
-                        game = Game(player1, player2, white_player_key=white_player_key, black_player_key=black_player_key)
-                        game.set_board_from_fen(position['fen'])
-                        game.initialize_game() # Log header with FEN
-                        
-                        self.ui.display_message(f"Loaded practice position: {position['name']}")
-                        self.play_game(game)
-                    elif position and position.startswith('?'):
-                        question = position[1:].strip()
+                    elif choice == '3': # Load Practice Position
+                        with open('src/puzzles.json', 'r') as f:
+                            positions = json.load(f)
+                        position = self.ui.display_practice_positions_and_get_choice(positions)
+                        if position and position not in ['m', 'q']:
+                            self._initialize_new_game_log()
+                            white_player_key, black_player_key = self.ui.display_model_menu_and_get_choice(self.ai_models, self.stockfish_configs)
+                            player1 = self._create_player_with_name_prompt(white_player_key, "White")
+                            player2 = self._create_player_with_name_prompt(black_player_key, "Black")
+                            game = Game(player1, player2, white_player_key=white_player_key, black_player_key=black_player_key)
+                            game.set_board_from_fen(position['fen'])
+                            game.initialize_game()
+                            self.ui.display_game_start_message(game)
+
+                    elif choice == '4': # View Player Stats
+                        self._view_player_stats()
+
+                    elif choice == '5': # Fun Fact
+                        self._get_fun_fact()
+
+                    elif choice.startswith('?'):
+                        question = choice[1:].strip()
                         self._ask_expert(question)
-                    elif position == 'm':
-                        continue
-                    elif position == 'q':
+
+                    elif choice == 'q':
                         self.ui.display_message("Exiting application.")
                         sys.exit()
 
-                elif choice == '4': # View Player Stats
-                    self._view_player_stats()
-                    continue
+                except Exception as e:
+                    self.ui.display_message(f"\n{RED}An unexpected error occurred: {e}{ENDC}")
+                    logging.error(f"An unexpected error occurred: {e}", exc_info=True)
+                    self.ui.get_user_input("Press Enter to acknowledge and return to the main menu.")
 
-                elif choice == '5': # Fun Chess Fact
-                    self._get_fun_fact()
-                    continue
 
-                elif choice.startswith('?'):
-                    question = choice[1:].strip()
-                    self._ask_expert(question)
-                    continue
-
-                elif choice == 'q': # Quit
-                    self.ui.display_message("Thank you for playing!")
-                    sys.exit()
-            
-            except (FileNotFoundError, RuntimeError, ValueError) as e:
-                self.ui.display_message(f"{RED}An error occurred: {e}{ENDC}")
-                self.ui.get_user_input("Press Enter to return to the main menu.")
+#--- Entry Point ---
 if __name__ == "__main__":
+    logging.basicConfig(
+        filename=LOG_FILE,
+        level=logging.INFO,
+        format='%(asctime)s - %(message)s',
+        filemode='w'
+    )
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    
     app = ChessApp()
     app.run()

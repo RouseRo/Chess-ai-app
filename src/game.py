@@ -26,14 +26,18 @@ class Game:
         self.black_player_key = black_player_key
 
     def initialize_game(self):
-        """Sets up the initial state of the game and logs the setup."""
+        """Logs the initial game state and player info."""
         logging.info("New Game Started")
-        logging.info(f"White: {self.players[chess.WHITE].model_name} ({self.white_player_key})")
-        logging.info(f"Black: {self.players[chess.BLACK].model_name} ({self.black_player_key})")
-        if self.white_strategy:
-            logging.info(f"White Strategy: {self.white_strategy}")
-        if self.black_strategy:
-            logging.info(f"Black Strategy: {self.black_strategy}")
+        logging.info(f"White: {self.players[chess.WHITE].model_name}")
+        logging.info(f"Black: {self.players[chess.BLACK].model_name}")
+        logging.info(f"White Player Key: {self.white_player_key}")
+        logging.info(f"Black Player Key: {self.black_player_key}")
+        
+        white_strat_msg = self.white_strategy if self.white_strategy else "No Classic Chess Opening"
+        black_strat_msg = self.black_strategy if self.black_strategy else "No Classic Chess Opening"
+        logging.info(f"White Strategy: {white_strat_msg}")
+        logging.info(f"Black Strategy: {black_strat_msg}")
+        
         logging.info(f"Initial FEN: {self.board.fen()}")
 
     def set_opening_strategy(self, color, strategy_message):
@@ -71,16 +75,29 @@ class Game:
         print("  a b c d e f g h")
 
     def play_turn(self):
-        """Gets a move from the current player and applies it to the board."""
-        current_player = self.players[self.board.turn]
-        strategy = self.strategies[self.board.turn]
+        """
+        Computes and makes a move for the current player.
+        Logs the move and its author.
+        """
+        player = self.get_current_player()
+        author = player.model_name
         
-        move_uci = current_player.compute_move(self.board, strategy_message=strategy)
+        # Prepare arguments for the AI model
+        kwargs = {}
+        if self.board.turn == chess.WHITE and self.white_strategy:
+            kwargs['strategy'] = self.white_strategy
+        elif self.board.turn == chess.BLACK and self.black_strategy:
+            kwargs['strategy'] = self.black_strategy
+
+        move = player.compute_move(self.board, **kwargs)
         
-        if move_uci:
-            self.make_move(move_uci, author=current_player.model_name)
-        else:
-            logging.error(f"Player {current_player.model_name} failed to compute a move.")
+        if move is None:
+            # This can happen if the AI fails or if it's a human player's turn
+            # in a context where manual input is expected.
+            return
+
+        self.board.push(move)
+        self._log_move(move, author)
 
     def make_move(self, uci_move, author="System"):
         """
@@ -92,12 +109,39 @@ class Game:
             move = chess.Move.from_uci(uci_move)
             if move in self.board.legal_moves:
                 self.board.push(move)
-                logging.info(f"Move: {uci_move}, Author: {author}, FEN: {self.board.fen()}")
+                self._log_move(move, author)
                 return True
             else:
                 return False
         except ValueError:
             return False
+
+    def make_manual_move(self, uci_move):
+        """
+        Makes a move on the board from a user-provided UCI string.
+        Logs the move with the player's name as the author.
+        Raises ValueError if the move is invalid.
+        """
+        try:
+            move = chess.Move.from_uci(uci_move)
+            if move in self.board.legal_moves:
+                author = self.get_current_player().model_name
+                self.board.push(move)
+                self._log_move(move, author)
+            else:
+                raise ValueError("Illegal move.")
+        except (ValueError, TypeError):
+            raise ValueError("Invalid move format. Use UCI notation (e.g., e2e4).")
+
+    def _log_move(self, move, author):
+        """Logs the move details to the logging file."""
+        turn_number = self.board.fullmove_number
+        color = "White" if self.board.turn != chess.WHITE else "Black" # Color of player who just moved
+        logging.info(f"Turn {turn_number} ({color}): Move: {move.uci()} by {author}, FEN: {self.board.fen()}")
+
+    def get_current_player(self):
+        """Returns the player object for the current turn."""
+        return self.players[self.board.turn]
 
     def load_last_position_from_log(self, filename='chess_game.log'):
         """

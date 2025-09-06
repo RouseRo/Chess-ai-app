@@ -120,16 +120,18 @@ class UIManager:
 
     @staticmethod
     def _display_player_options(ai_models, stockfish_configs):
-        """Displays a formatted list of AI and Stockfish player options."""
-        player_list = [f"  {k}: {v}" for k, v in ai_models.items()]
+        """Creates a list of formatted strings for all available player models."""
+        player_list = ["  hu: Human Player"]
+        player_list += [f"  {k}: {v}" for k, v in ai_models.items()]
         player_list += [f"  {k}: Stockfish - {v['name']}" for k, v in stockfish_configs.items()]
         return player_list
 
     @staticmethod
     def _validate_player_keys(white_key, black_key, ai_models, stockfish_configs):
-        """Validates if the given player keys are legitimate choices."""
-        is_white_valid = white_key in ai_models or white_key in stockfish_configs
-        is_black_valid = black_key in ai_models or black_key in stockfish_configs
+        """Validates that the player keys are legitimate."""
+        all_keys = list(ai_models.keys()) + list(stockfish_configs.keys()) + ['hu']
+        is_white_valid = white_key in all_keys
+        is_black_valid = black_key in all_keys
         return is_white_valid and is_black_valid
 
     # --- Public Methods ---
@@ -212,9 +214,29 @@ class UIManager:
             UIManager.display_message("Invalid input. Please enter a valid string like '1a m1s2' or '1a s1m3'.")
 
     @staticmethod
+    def get_human_player_name(color_str):
+        """Prompts the user to enter a name for a human player."""
+        while True:
+            name = UIManager.get_user_input(f"Enter name for the Human player ({color_str}): ").strip()
+            if name:
+                return name
+            UIManager.display_message("Name cannot be empty.")
+
+    @staticmethod
+    def get_human_quit_choice():
+        """Asks a human player how they want to quit."""
+        options = {
+            'r': "Resign the game",
+            's': "Save and quit",
+            'q': "Quit without saving",
+            'c': "Cancel and return to game"
+        }
+        return UIManager._get_menu_choice("--- Quit Options ---", options, "Enter your choice: ")
+
+    @staticmethod
     def display_model_menu_and_get_choice(ai_models, stockfish_configs):
-        """Displays AI model and Stockfish options and gets the user's choice."""
-        UIManager.display_message("\n--- Choose Players for Practice ---")
+        """Displays the player model selection menu and gets the user's choice."""
+        UIManager.display_message("\n--- Choose Player Models ---")
         player_list = UIManager._display_player_options(ai_models, stockfish_configs)
         for player in player_list:
             UIManager.display_message(player)
