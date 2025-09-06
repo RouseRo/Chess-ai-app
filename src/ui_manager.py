@@ -17,9 +17,18 @@ class UIManager:
             valid_choices.append(str(key))
         
         while True:
-            choice = UIManager.get_user_input(prompt).lower()
-            if choice in valid_choices:
+            choice = UIManager.get_user_input(prompt).strip()
+            if not choice:
+                continue
+
+            # Handle direct question
+            if choice.startswith('?'):
                 return choice
+
+            # Handle single character choices
+            choice_lower = choice.lower()
+            if choice_lower in valid_choices:
+                return choice_lower
             else:
                 UIManager.display_message("Invalid choice. Please enter a valid option.")
 
@@ -27,17 +36,41 @@ class UIManager:
     def _get_numbered_choice(title, items, prompt, extra_options=None):
         """A generic helper for numbered lists."""
         UIManager.display_message(f"\n{title}")
-        for i, item in enumerate(items):
-            UIManager.display_message(f"  {i + 1}: {item}")
+        
+        # This part is now specific to the new summary format
+        if items and isinstance(items[0], dict) and 'filename' in items[0]:
+            # Find max width for formatting
+            max_white = max(len(s['white']) for s in items) if items else 10
+            max_black = max(len(s['black']) for s in items) if items else 10
+            
+            header = f"  # | {'Date':<16} | {'White Player':<{max_white}} | {'Black Player':<{max_black}} | Status (Last Move)"
+            UIManager.display_message(header)
+            UIManager.display_message('-' * len(header))
+
+            for i, summary in enumerate(items):
+                white = summary['white']
+                black = summary['black']
+                row = f"  {i+1:<1} | {summary['date']:<16} | {white:<{max_white}} | {black:<{max_black}} | {summary['status']}"
+                UIManager.display_message(row)
+        else: # Fallback for simple lists
+            for i, item in enumerate(items):
+                UIManager.display_message(f"  {i + 1}: {item}")
         
         if extra_options:
             for key, desc in extra_options.items():
                 UIManager.display_message(f"  {key}: {desc}")
 
         while True:
-            choice = UIManager.get_user_input(prompt)
-            if extra_options and choice in extra_options:
+            choice = UIManager.get_user_input(prompt).strip()
+            if not choice:
+                continue
+
+            # Handle direct question or other letter options
+            if choice.startswith('?'):
                 return choice
+            if extra_options and choice.lower() in extra_options:
+                return choice.lower()
+
             try:
                 choice_num = int(choice)
                 if 1 <= choice_num <= len(items):
@@ -119,6 +152,7 @@ class UIManager:
             '2': "Load a Saved Game",
             '3': "Load a Practice Position",
             '4': "View Player Stats",
+            '5': "Fun Chess Fact from the Chess Master",
             '?': "Ask a Chess Expert",
             'q': "Quit"
         }
@@ -131,7 +165,6 @@ class UIManager:
             'l': "Load Another Game",
             'p': "Load Practice Position",
             's': "Save Game",
-            'c': "Change AI Model",
             '?': "Ask a Chess Expert",
             'r': "Return to Game",
             'q': "Quit Application"
@@ -197,29 +230,38 @@ class UIManager:
             UIManager.display_message("Invalid input. Please enter a valid choice for both players (e.g., 'm1s2').")
 
     @staticmethod
-    def display_saved_games_and_get_choice(saved_games):
+    def display_saved_games_and_get_choice(game_summaries):
         """Displays a list of saved games and prompts for a choice."""
+        extra_opts = {
+            'm': "Return to Main Menu",
+            'q': "Quit Application"
+        }
         return UIManager._get_numbered_choice(
             "--- Saved Games ---",
-            saved_games,
-            "Enter the number of the game to load: "
+            game_summaries,
+            "Enter the number of the game to load, or a letter for other options: ",
+            extra_options=extra_opts
         )
 
     @staticmethod
     def display_practice_positions_and_get_choice(positions):
         """Displays a list of practice positions and prompts for a choice."""
         position_names = [p['name'] for p in positions]
-        extra_opts = {'?': "Ask a question about chess"}
+        extra_opts = {
+            '?': "Ask a question about chess",
+            'm': "Return to Main Menu",
+            'q': "Quit Application"
+        }
         
         choice = UIManager._get_numbered_choice(
             "--- Practice Checkmate Positions ---",
             position_names,
-            "Enter the number of the position to load, or '?' to ask a question: ",
+            "Enter the number of the position to load, or a letter for other options: ",
             extra_options=extra_opts
         )
 
-        if choice == '?':
-            return '?'
+        if choice in extra_opts:
+            return choice
         
         # Find the full position dictionary that matches the chosen name
         for pos in positions:
