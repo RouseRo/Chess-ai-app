@@ -15,6 +15,7 @@ from human_player import HumanPlayer
 from ui_manager import UIManager
 from file_manager import FileManager
 from expert_service import ExpertService
+from player_factory import PlayerFactory
 
 # --- Constants ---
 LOG_FILE = 'chess_game.log'
@@ -33,8 +34,11 @@ class ChessApp:
         self.stockfish_configs = {}
         self.chess_expert_model = ""
         self._load_config()
-        # Initialize expert service after config (needs model name)
+        # Initialize services and factories after config is loaded
         self.expert_service = ExpertService(self.ui, self.chess_expert_model)
+        self.player_factory = PlayerFactory(
+            self.ui, self.ai_models, self.stockfish_configs, self.stockfish_path
+        )
 
     def _load_config(self):
         """Loads configuration from config.json."""
@@ -52,44 +56,6 @@ class ChessApp:
             self.ui.display_message(f"Reason: {e}")
             self.ui.display_message("Please ensure the file exists and is a valid JSON.")
             sys.exit(1)
-
-    def _create_player(self, player_key, player_name=None):
-        """Creates a player object based on the provided key, with an optional name override."""
-        if player_key.startswith('m'):
-            model_name = self.ai_models.get(player_key)
-            if model_name:
-                return AIPlayer(model_name=model_name)
-        elif player_key.startswith('s'):
-            config = self.stockfish_configs.get(player_key)
-            if config:
-                return StockfishPlayer(self.stockfish_path, parameters=config['parameters'])
-        elif player_key == 'hu':
-            # If a name was parsed from the log, use it. Otherwise, default to a generic name.
-            name_to_use = player_name if player_name else "Human (hu)"
-            return HumanPlayer(name=name_to_use)
-        
-        raise ValueError(f"Unknown player key: {player_key}")
-
-    def _create_player_with_name_prompt(self, model_key, color_label):
-        """Safely create a player; gracefully handle None (user cancelled)."""
-        if model_key is None:
-            return None  # caller must handle cancel
-        
-        if model_key == 'hu':
-            name = self.ui.get_human_player_name(color_label)
-            # Combine name and key for a unique identifier
-            return HumanPlayer(name=f"{name} ({model_key})")
-        
-        if model_key.startswith('m'):
-            model_name = self.ai_models.get(model_key)
-            if model_name:
-                return AIPlayer(model_name=model_name)
-        elif model_key.startswith('s'):
-            config = self.stockfish_configs.get(model_key)
-            if config:
-                return StockfishPlayer(self.stockfish_path, parameters=config['parameters'])
-        
-        raise ValueError(f"Unknown player key: {model_key}")
 
     def _initialize_new_game_log(self):
         """Shuts down existing log handlers and re-initializes the log file in write mode."""
@@ -116,8 +82,8 @@ class ChessApp:
                 self.ui.display_message(f"Failed to load game: {error_reason}")
                 return None
 
-            player1 = self._create_player(header['white_key'], header.get('white_name'))
-            player2 = self._create_player(header['black_key'], header.get('black_name'))
+            player1 = self.player_factory.create_player(header['white_key'], name_override=header.get('white_name'))
+            player2 = self.player_factory.create_player(header['black_key'], name_override=header.get('black_name'))
             
             game = Game(player1, player2, white_strategy=header['white_strategy'], black_strategy=header['black_strategy'], white_player_key=header['white_key'], black_player_key=header['black_key'])
             
@@ -223,8 +189,8 @@ class ChessApp:
         if position and position not in ['?', 'm', 'q']:
             white_player_key, black_player_key = self.ui.display_model_menu_and_get_choice(self.ai_models, self.stockfish_configs)
             
-            player1 = self._create_player_with_name_prompt(white_player_key, "White")
-            player2 = self._create_player_with_name_prompt(black_player_key, "Black")
+            player1 = self.player_factory.create_player(white_player_key, color_label="White")
+            player2 = self.player_factory.create_player(black_player_key, color_label="Black")
 
             new_game = Game(player1, player2, white_player_key=white_player_key, black_player_key=black_player_key)
             new_game.set_board_from_fen(position['fen'])
@@ -463,8 +429,8 @@ class ChessApp:
                         if white_key is None or black_key is None:
                             self.ui.display_message("Model selection cancelled. Returning to main menu.")
                             continue
-                        player1 = self._create_player_with_name_prompt(white_key, "White")
-                        player2 = self._create_player_with_name_prompt(black_key, "Black")
+                        player1 = self.player_factory.create_player(white_key, color_label="White")
+                        player2 = self.player_factory.create_player(black_key, color_label="Black")
                         if player1 is None or player2 is None:
                             self.ui.display_message("Player creation cancelled. Returning to main menu.")
                             continue
@@ -506,35 +472,8 @@ class ChessApp:
 
         white_opening, black_defense, white_key, black_key = choices
 
-        # Helper to create a player object for a given key
-        def _make_player(key, color_name):
-            if not key: # Gracefully handle None key
-                return None
-            if key == "hu":
-                name = self.ui.get_human_player_name(color_name)
-                return HumanPlayer(name)
-            # Stockfish config keys typically start with 's'
-            if isinstance(key, str) and key.startswith("s"):
-                cfg = getattr(self, "stockfish_configs", {}).get(key, {})
-                # StockfishPlayer constructors vary; try common signatures
-                try:
-                    return StockfishPlayer(config=cfg)
-                except TypeError:
-                    try:
-                        return StockfishPlayer(skill=cfg.get("skill"))
-                    except Exception:
-                        return StockfishPlayer(key)
-            # AI model keys (m1, m2, ...) -> map to model name
-            model_name = getattr(self, "ai_models", {}).get(key, key)
-            return AIPlayer(model_name=model_name)
-
-        # Prefer any existing helper if present
-        if hasattr(self, "_create_player_with_name_prompt"):
-            white_player = self._create_player_with_name_prompt(white_key, "White")
-            black_player = self._create_player_with_name_prompt(black_key, "Black")
-        else:
-            white_player = _make_player(white_key, "White")
-            black_player = _make_player(black_key, "Black")
+        white_player = self.player_factory.create_player(white_key, color_label="White")
+        black_player = self.player_factory.create_player(black_key, color_label="Black")
 
         game = Game(white_player, black_player, white_player_key=white_key, black_player_key=black_key)
         # apply optional opening/defense if the game API supports it
