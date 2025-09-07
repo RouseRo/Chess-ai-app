@@ -156,20 +156,41 @@ class UIManager:
         print(f"Black: {black}")
         print(f"Initial FEN: {game.board.fen()}")
 
-    def display_board(self, board: chess.Board):
-        """Print the board with ranks 8..1 on the sides and files a..h across the top/bottom."""
+    def display_board(self, board: chess.Board, highlight_last_move: bool = True):
+        """
+        Print the board with ranks 8..1. If highlight_last_move is True, color:
+          - The destination square piece (last move) in GREEN
+          - The origin square (now usually empty) in YELLOW
+        """
+        last_from = last_to = None
+        if highlight_last_move and board.move_stack:
+            try:
+                last_move = board.peek()
+                last_from = last_move.from_square
+                last_to = last_move.to_square
+            except Exception:
+                last_from = last_to = None
+
         print()
-        # shift file letters one position to the right
         print("   a b c d e f g h")
-        # border length adjusted to match row width
         print(" ---------------------")
         for rank in range(8, 0, -1):
-            row_pieces = []
+            row_cells = []
             for file in range(1, 9):
                 square = chess.square(file - 1, rank - 1)
                 piece = board.piece_at(square)
-                row_pieces.append(piece.symbol() if piece else '.')
-            row = " ".join(row_pieces)
+                text = piece.symbol() if piece else '.'
+
+                if square == last_to and piece:
+                    # Moved piece destination
+                    text = f"{GREEN}{text}{ENDC}"
+                elif square == last_from:
+                    # Origin square (now empty or captured-from)
+                    # Keep '.' but color it; if a piece somehow still there, color anyway
+                    text = f"{YELLOW}{text}{ENDC}"
+
+                row_cells.append(text)
+            row = " ".join(row_cells)
             print(f"{rank}| {row} |{rank}")
         print(" ---------------------")
         print("   a b c d e f g h")
