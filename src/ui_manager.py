@@ -38,7 +38,6 @@ class UIManager:
         print(f"  {WHITE}2:{ENDC} {CYAN}Load a Saved Game{ENDC}")
         print(f"  {WHITE}3:{ENDC} {CYAN}Load a Practice Position{ENDC}")
         print(f"  {WHITE}4:{ENDC} {CYAN}View Player Stats{ENDC}")
-        print(f"  {WHITE}5:{ENDC} {CYAN}Fun Chess Fact from the Chessmaster{ENDC}")
         print(f"  {WHITE}?:{ENDC} {CYAN}Ask a Chess Expert{ENDC}")
         print(f"  {WHITE}q:{ENDC} {CYAN}Quit{ENDC}")
         return self.get_user_input("Enter your choice: ")
