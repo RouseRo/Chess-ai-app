@@ -67,8 +67,10 @@ class UIManager:
             white = summary.get('white', 'N/A')
             black = summary.get('black', 'N/A')
             result = summary.get('result', '*') # Use '*' for in-progress games
-            date = summary.get('date', 'Unknown Date')
             
+            # Prioritize the date from the filename, fallback to the date in the log content
+            date = summary.get('file_date', summary.get('date', 'Unknown Date'))
+
             # Truncate long names to keep the display clean
             white_name = (white[:20] + '..') if len(white) > 22 else white
             black_name = (black[:20] + '..') if len(black) > 22 else black

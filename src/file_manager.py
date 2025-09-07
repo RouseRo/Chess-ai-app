@@ -28,10 +28,22 @@ class FileManager:
                 header_info = self._parse_log_header_for_summary(filepath)
                 if header_info:
                     header_info['filename'] = filepath
+                    
+                    # Extract date and time from the filename
+                    match = re.search(r"chess_game_(\d{8}_\d{6})\.log", filename)
+                    if match:
+                        timestamp_str = match.group(1)
+                        try:
+                            # Parse the timestamp and format it for display
+                            dt_obj = datetime.strptime(timestamp_str, "%Y%m%d_%H%M%S")
+                            header_info['file_date'] = dt_obj.strftime("%Y-%m-%d %H:%M:%S")
+                        except ValueError:
+                            pass  # Ignore if the filename format is unexpected
+
                     summaries.append(header_info)
         
-        # Sort by date, most recent first
-        summaries.sort(key=lambda x: x.get('date', '0'), reverse=True)
+        # Sort by the file date, which is more reliable. Fallback to header date.
+        summaries.sort(key=lambda x: x.get('file_date', x.get('date', '0')), reverse=True)
         return summaries
 
     def _parse_log_header_for_summary(self, filepath):
