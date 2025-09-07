@@ -1,89 +1,81 @@
-from game import BLUE, GREEN, RED, ENDC
 import chess
-import textwrap
+from game import BLUE, CYAN, GREEN, YELLOW, RED, WHITE, ENDC
 
 class UIManager:
-    """Simple console UI helper. Menu titles are shown in color."""
+    """Simple console UI helper. Menu titles and option text are shown in color."""
 
     @staticmethod
     def _color_title(title: str) -> str:
         return f"{BLUE}{title}{ENDC}"
 
     @staticmethod
-    def display_message(msg: str = "") -> None:
-        print(msg)
+    def display_message(msg: str = "", color: str | None = None) -> None:
+        """Print a message optionally wrapped in an ANSI color."""
+        if color:
+            print(f"{color}{msg}{ENDC}")
+        else:
+            print(msg)
 
     @staticmethod
     def get_user_input(prompt: str = "") -> str:
         try:
-            return input(prompt).strip()
+            # prompt in yellow to draw attention
+            return input(f"{YELLOW}{prompt}{ENDC}").strip()
         except (KeyboardInterrupt, EOFError):
             return ""
+
+    def get_human_player_name(self, color_str: str = "Human") -> str:
+        """Prompt for a human player's name. Returns a non-empty name (defaults to 'Human')."""
+        prompt = f"Enter name for {color_str} player (leave blank for 'Human'): "
+        name = self.get_user_input(prompt)
+        return name if name else "Human"
 
     def display_main_menu(self) -> str:
         title = self._color_title("--- Main Menu ---")
         print(title)
-        print("  1: Play a New Game")
-        print("  2: Load a Saved Game")
-        print("  3: Load a Practice Position")
-        print("  4: View Player Stats")
-        print("  5: Fun Chess Fact from the Chessmaster")
-        print("  ?: Ask a Chess Expert")
-        print("  q: Quit")
+        # selection number/letter in white, option text in cyan
+        print(f"  {WHITE}1:{ENDC} {CYAN}Play a New Game{ENDC}")
+        print(f"  {WHITE}2:{ENDC} {CYAN}Load a Saved Game{ENDC}")
+        print(f"  {WHITE}3:{ENDC} {CYAN}Load a Practice Position{ENDC}")
+        print(f"  {WHITE}4:{ENDC} {CYAN}View Player Stats{ENDC}")
+        print(f"  {WHITE}5:{ENDC} {CYAN}Fun Chess Fact from the Chessmaster{ENDC}")
+        print(f"  {WHITE}?:{ENDC} {CYAN}Ask a Chess Expert{ENDC}")
+        print(f"  {WHITE}q:{ENDC} {CYAN}Quit{ENDC}")
         return self.get_user_input("Enter your choice: ")
 
     def display_in_game_menu(self) -> str:
         title = self._color_title("--- In-Game Menu ---")
         print(title)
-        print("  l: Load Saved Game")
-        print("  p: Load Practice Position")
-        print("  s: Save Game")
-        print("  r: Return to Game")
-        print("  q: Quit Application")
-        print("  ?<question>: Ask Chess Expert (prefix with '?')")
+        print(f"  {WHITE}l:{ENDC} {CYAN}Load Saved Game{ENDC}")
+        print(f"  {WHITE}p:{ENDC} {CYAN}Load Practice Position{ENDC}")
+        print(f"  {WHITE}s:{ENDC} {CYAN}Save Game{ENDC}")
+        print(f"  {WHITE}r:{ENDC} {CYAN}Return to Game{ENDC}")
+        print(f"  {WHITE}q:{ENDC} {CYAN}Quit Application{ENDC}")
+        print(f"  {WHITE}?:{ENDC} {CYAN}?<question>: Ask Chess Expert (prefix with '?'){ENDC}")
         return self.get_user_input("Enter choice: ")
 
     def display_saved_games_and_get_choice(self, summaries):
         title = self._color_title("--- Saved Games ---")
         print(title)
         if not summaries:
-            print("  (none)")
+            print(f"{CYAN}  (none){ENDC}")
             return 'm'
-
-        # Be tolerant of multiple summary formats (dicts with different keys, or simple strings)
         for i, s in enumerate(summaries, start=1):
-            display = None
+            # caller expects to receive the selected summary object back
             if isinstance(s, dict):
-                # common explicit display keys
-                display = s.get('display') or s.get('summary') or s.get('title') or s.get('name')
-
-                if not display:
-                    # try to compose a useful line from available fields
-                    filename = s.get('filename') or s.get('file') or ''
-                    date = s.get('date') or s.get('timestamp') or s.get('created') or ''
-                    white = s.get('white') or s.get('white_name') or s.get('white_player') or ''
-                    black = s.get('black') or s.get('black_name') or s.get('black_player') or ''
-                    status = s.get('status') or s.get('last_move') or s.get('status_text') or ''
-                    parts = [p for p in (date, white and f"White: {white}", black and f"Black: {black}", status) if p]
-                    if parts:
-                        display = " | ".join(parts)
-                    else:
-                        display = filename or str(s)
+                display = s.get('display') or s.get('summary') or s.get('title') or s.get('name') or s.get('filename') or str(s)
             else:
-                # fallback for non-dict summary entries
                 display = str(s)
-
-            print(f"  {i}: {display}")
-
-        print("  m: Return to Main Menu")
-        print("  q: Quit Application")
+            print(f"  {WHITE}{i}:{ENDC} {CYAN}{display}{ENDC}")
+        print(f"  {WHITE}m:{ENDC} {CYAN}Return to Main Menu{ENDC}")
+        print(f"  {WHITE}q:{ENDC} {CYAN}Quit Application{ENDC}")
         choice = self.get_user_input("Enter the number of the game to load, or a letter for other options: ")
         if choice.lower() in ['m', 'q']:
             return choice.lower()
         try:
             idx = int(choice) - 1
             if 0 <= idx < len(summaries):
-                return
+                return summaries[idx]
         except Exception:
             pass
         return None
@@ -92,10 +84,10 @@ class UIManager:
         title = self._color_title("--- Practice Positions ---")
         print(title)
         for i, p in enumerate(positions, start=1):
-            print(f"  {i}: {p.get('name','Unknown')}  ({p.get('fen','')})")
-        print("  m: Return to Main Menu")
-        print("  q: Quit Application")
-        print("  ?<question>: Ask Chess Expert")
+            print(f"  {WHITE}{i}:{ENDC} {CYAN}{p.get('name','Unknown')}  ({p.get('fen','')}){ENDC}")
+        print(f"  {WHITE}m:{ENDC} {CYAN}Return to Main Menu{ENDC}")
+        print(f"  {WHITE}q:{ENDC} {CYAN}Quit Application{ENDC}")
+        print(f"  {WHITE}?:{ENDC} {CYAN}?<question>: Ask Chess Expert{ENDC}")
         choice = self.get_user_input("Enter the number of the position to load, or a letter for other options: ")
         if choice.lower().startswith('?'):
             return choice
@@ -112,15 +104,17 @@ class UIManager:
     def display_model_menu_and_get_choice(self, ai_models, stockfish_configs):
         title = self._color_title("--- Choose Player Models ---")
         print(title)
-        print("Available AI models:")
+        print(f"{CYAN}Available AI models:{ENDC}")
         for k, v in ai_models.items():
-            print(f"  {k}: {v}")
-        print("Available Stockfish configs:")
+            print(f"  {WHITE}{k}:{ENDC} {CYAN}{v}{ENDC}")
+        print(f"{CYAN}Available Stockfish configs:{ENDC}")
         for k, v in stockfish_configs.items():
-            print(f"  {k}: Stockfish - {v.get('name')}")
-        print("  hu: Human Player")
-        choice = self.get_user_input("Enter choice for White and Black players (e.g., 'm1s2'): ")
-        # accept combined like 'm1s2' or 'm1 s2'
+            print(f"  {WHITE}{k}:{ENDC} {CYAN}Stockfish - {v.get('name')}{ENDC}")
+        print(f"  {WHITE}hu:{ENDC} {CYAN}Human Player{ENDC}")
+        choice = self.get_user_input("Enter choice for White and Black players (e.g., 'm1s2'), or press Enter to return: ")
+        if choice == "":
+            # treat Enter (empty input) as "return to main menu" by returning two None values
+            return None, None
         parts = choice.replace(" ", "")
         if len(parts) >= 4:
             return parts[:2], parts[2:4]
@@ -129,15 +123,14 @@ class UIManager:
     def display_setup_menu_and_get_choices(self, white_openings, black_defenses, ai_models, stockfish_configs):
         title = self._color_title("--- Setup New Game ---")
         print(title)
-        # Simplified setup flow
-        print("Choose white opening (enter key or leave blank for default):")
+        print(f"{CYAN}Choose white opening (enter key or leave blank for default):{ENDC}")
         for k, v in white_openings.items():
-            print(f"  {k}: {v}")
-        white_opening = self.get_user_input("White opening key: ") or list(white_openings.keys())[0] if white_openings else ""
-        print("Choose black defense (enter key or leave blank for default):")
+            print(f"  {WHITE}{k}:{ENDC} {CYAN}{v}{ENDC}")
+        white_opening = self.get_user_input("White opening key: ") or (list(white_openings.keys())[0] if white_openings else "")
+        print(f"{CYAN}Choose black defense (enter key or leave blank for default):{ENDC}")
         for k, v in black_defenses.items():
-            print(f"  {k}: {v}")
-        black_defense = self.get_user_input("Black defense key: ") or list(black_defenses.keys())[0] if black_defenses else ""
+            print(f"  {WHITE}{k}:{ENDC} {CYAN}{v}{ENDC}")
+        black_defense = self.get_user_input("Black defense key: ") or (list(black_defenses.keys())[0] if black_defenses else "")
         white_key, black_key = self.display_model_menu_and_get_choice(ai_models, stockfish_configs)
         if not white_key or not black_key:
             return None
@@ -163,33 +156,52 @@ class UIManager:
         print(f"Black: {black}")
         print(f"Initial FEN: {game.board.fen()}")
 
-    def display_board(self, board: chess.Board):
-        # Minimal ascii board
-        ranks = []
-        for r in range(8, 0, -1):
-            row = []
-            for f in range(1, 9):
-                square = chess.square(f-1, r-1)
-                piece = board.piece_at(square)
-                row.append(piece.symbol() if piece else '.')
-            ranks.append(" ".join(row))
+    def display_board(self, board: chess.Board, highlight_last_move: bool = True):
+        """
+        Print the board with ranks 8..1. If highlight_last_move is True, color:
+          - The destination square piece (last move) in GREEN
+          - The origin square (now usually empty) in YELLOW
+        """
+        last_from = last_to = None
+        if highlight_last_move and board.move_stack:
+            try:
+                last_move = board.peek()
+                last_from = last_move.from_square
+                last_to = last_move.to_square
+            except Exception:
+                last_from = last_to = None
+
         print()
-        print("  a b c d e f g h")
-        print(" -----------------")
-        for i, row in enumerate(ranks, start=8):
-            print(f"{9-i}| {row} |{9-i}")
-        print(" -----------------")
-        print("  a b c d e f g h")
+        print("   a b c d e f g h")
+        print(" ---------------------")
+        for rank in range(8, 0, -1):
+            row_cells = []
+            for file in range(1, 9):
+                square = chess.square(file - 1, rank - 1)
+                piece = board.piece_at(square)
+                text = piece.symbol() if piece else '.'
+
+                if square == last_to and piece:
+                    # Moved piece destination
+                    text = f"{GREEN}{text}{ENDC}"
+                elif square == last_from:
+                    # Origin square (now empty or captured-from)
+                    # Keep '.' but color it; if a piece somehow still there, color anyway
+                    text = f"{YELLOW}{text}{ENDC}"
+
+                row_cells.append(text)
+            row = " ".join(row_cells)
+            print(f"{rank}| {row} |{rank}")
+        print(" ---------------------")
+        print("   a b c d e f g h")
         print()
 
     def display_turn_message(self, game):
         cur = game.get_current_player()
         turn_color = "White" if game.board.turn else "Black"
-        msg = f"{turn_color}'s turn ({cur.model_name}), move {game.board.fullmove_number}."
-        if game.is_game_over():
-            result = game.get_game_result()
-            msg += f" Game over: {result}"
-        self.display_message(msg)
+        msg = f"Move {game.board.fullmove_number} ({turn_color}): {cur.model_name} is thinking..."
+        # show turn message as cyan title to stand out
+        print(f"{CYAN}{msg}{ENDC}")
 
     def display_game_over_message(self, game):
         result = game.get_game_result()
@@ -202,8 +214,35 @@ class UIManager:
         """Show the Ask the Chessmaster menu with a colored title and return the user's choice."""
         title = self._color_title("--- Ask the Chessmaster ---")
         print(title)
-        print("  1: Ask a chess question")
-        print("  2: Tell me a chess joke")
-        print("  3: Tell me some chess news")
-        print("  m) Return to previous menu")
+        print(f"  {WHITE}1:{ENDC} {CYAN}Ask a chess question{ENDC}")
+        print(f"  {WHITE}2:{ENDC} {CYAN}Tell me a chess joke{ENDC}")
+        print(f"  {WHITE}3:{ENDC} {CYAN}Tell me some chess news{ENDC}")
+        print(f"  {WHITE}m:{ENDC} {CYAN}Return to previous menu{ENDC}")
         return self.get_user_input("Enter choice: ")
+
+    def get_human_quit_choice(self) -> str:
+        """Ask a human player how they want to quit: resign, save & quit, quit without saving, or cancel."""
+        title = self._color_title("--- Quit Options ---")
+        print(title)
+        print(f"  {WHITE}r:{ENDC} {CYAN}Resign the game{ENDC}")
+        print(f"  {WHITE}s:{ENDC} {CYAN}Save and quit{ENDC}")
+        print(f"  {WHITE}q:{ENDC} {CYAN}Quit without saving{ENDC}")
+        print(f"  {WHITE}c:{ENDC} {CYAN}Cancel and return to game{ENDC}")
+        return self.get_user_input("Enter your choice [r/s/q/c]: ").strip().lower()
+
+    def prompt_for_move(self, game) -> str:
+        """
+        Display a colored move prompt and return the user's input.
+        Sections (colored):
+          1) "Move X (Name as Side):"            -> WHITE
+          2) " Enter your move (e.g. e2e4),"     -> CYAN
+          3) " 'q' to quit, or 'm' for menu: "   -> YELLOW
+        """
+        board = game.board
+        player = game.get_current_player()
+        side = "White" if board.turn else "Black"
+        section1 = f"Move {board.fullmove_number} ({player.model_name} as {side}):"
+        section2 = " Enter your move (e.g. e2e4),"
+        section3 = " 'q' to quit, or 'm' for menu: "
+        prompt = f"{WHITE}{section1}{ENDC}{CYAN}{section2}{ENDC}{YELLOW}{section3}{ENDC}"
+        return self.get_user_input(prompt)
