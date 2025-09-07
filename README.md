@@ -137,3 +137,15 @@ All commands should be run from the root directory of the project. The `-s` flag
     # Test the 'gpt-4o' model on the 'Queen-King' puzzle
     pytest -s -k "gpt-4o and Queen-King"
     ```
+
+## Directory Structure
+
+Chess-ai-app/
+├── src/               # Application source code
+│   ├── main.py        # Entry point
+│   ├── ui_manager.py  # User interface handling
+│   └── game.py        # Chess game logic
+├── tests/             # Test suite
+│   └── test_integration_main_menu.py  # Integration tests
+├── logs/              # Game logs and saved games
+└── .venv/             # Virtual environment (not tracked in git)

@@ -9,18 +9,28 @@ import time
 # Command to run the application as a module
 PY_CMD = [sys.executable, "-u", "-m", "src.main"]
 
-def expect_with_debug(child, pattern, timeout=None, searchwindowsize=None):
-    """Helper function to expect a pattern with better debugging"""
+def expect_with_debug(child, pattern, timeout=None, searchwindowsize=None, verbose=False):
+    """Helper function to expect a pattern with better debugging
+    
+    Args:
+        child: The pexpect child process
+        pattern: The regex pattern to match
+        timeout: Timeout in seconds (None uses default)
+        searchwindowsize: Window size for searching
+        verbose: If True, prints detailed debug info
+    
+    Returns:
+        The result from child.expect
+    """
     try:
-        # Print the pattern we're looking for to help with debugging
-        print(f"\nLooking for pattern: {pattern}")
+        if verbose:
+            print(f"\nLooking for pattern: {pattern}")
+            print(f"Current buffer before matching:\n{child.before}")
         
-        # Dump current buffer to see what we have so far
-        print(f"Current buffer before matching:\n{child.before}")
-        
-        # Try to match the pattern
         result = child.expect(pattern, timeout=timeout, searchwindowsize=searchwindowsize)
-        print(f"Successfully matched pattern: {pattern}")
+        
+        if verbose:
+            print(f"Successfully matched pattern: {pattern}")
         return result
     except pexpect.TIMEOUT:
         print(f"\nTIMEOUT after {timeout}s waiting for: {pattern}")
