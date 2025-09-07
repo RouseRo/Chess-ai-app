@@ -41,6 +41,7 @@
   },
   {
     "name": "Mate in 2 (Two Rooks)",
-    "fen": "8/k7/8/8/8/8/R7/R5K1 w - - 0 1"
+    "fen": "8/k7/8/8/8/8/R7/R5K1 w - - 0 1",
+    "mate_in": 2
   }
 ]
