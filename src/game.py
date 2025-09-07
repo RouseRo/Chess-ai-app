@@ -1,5 +1,6 @@
 import chess
 import logging
+import re  # Add this import for regular expressions
 from src.ai_player import AIPlayer
 from src.stockfish_player import StockfishPlayer
 from src.human_player import HumanPlayer
@@ -47,9 +48,9 @@ class Game:
         """Sets an opening strategy message for the given player color."""
         if color in self.strategies:
             self.strategies[color] = strategy_message
-            print(f"Opening strategy for {'White' if color == chess.WHITE else 'Black'} set to: {strategy_message}")
+            print(f"Opening strategy for {'White' if color == chess.WHITE else 'Black'} set to: {strategy_message}", flush=True)
         else:
-            print("Invalid color specified for strategy.")
+            print("Invalid color specified for strategy.", flush=True)
 
     def display_board(self):
         """Prints a text representation of the board, highlighting the last move."""
@@ -57,9 +58,9 @@ class Game:
         if self.board.move_stack:
             last_move = self.board.move_stack[-1]
 
-        print()
-        print("  a b c d e f g h")
-        print(" -----------------")
+        print(flush=True)
+        print("  a b c d e f g h", flush=True)
+        print(" -----------------", flush=True)
         for rank in range(7, -1, -1):
             line = f"{rank + 1}|"
             for file in range(8):
@@ -73,9 +74,9 @@ class Game:
                     line += f"{BLUE}{symbol}{ENDC} "
                 else:
                     line += f"{symbol} "
-            print(line + f"|{rank + 1}")
-        print(" -----------------")
-        print("  a b c d e f g h")
+            print(line + f"|{rank + 1}", flush=True)
+        print(" -----------------", flush=True)
+        print("  a b c d e f g h", flush=True)
 
     def play_turn(self):
         """
@@ -177,7 +178,7 @@ class Game:
             logging.info(f"Board position loaded from FEN: {fen_string}")
             return True
         except ValueError:
-            print("Invalid FEN string provided.")
+            print("Invalid FEN string provided.", flush=True)
             return False
 
     def is_game_over(self):
