@@ -1,5 +1,5 @@
 import chess
-from game import BLUE, CYAN, GREEN, YELLOW, RED, ENDC
+from game import BLUE, CYAN, GREEN, YELLOW, RED, WHITE, ENDC
 
 class UIManager:
     """Simple console UI helper. Menu titles and option text are shown in color."""
@@ -33,25 +33,25 @@ class UIManager:
     def display_main_menu(self) -> str:
         title = self._color_title("--- Main Menu ---")
         print(title)
-        # menu options in cyan
-        print(f"{CYAN}  1: Play a New Game{ENDC}")
-        print(f"{CYAN}  2: Load a Saved Game{ENDC}")
-        print(f"{CYAN}  3: Load a Practice Position{ENDC}")
-        print(f"{CYAN}  4: View Player Stats{ENDC}")
-        print(f"{CYAN}  5: Fun Chess Fact from the Chessmaster{ENDC}")
-        print(f"{CYAN}  ?: Ask a Chess Expert{ENDC}")
-        print(f"{CYAN}  q: Quit{ENDC}")
+        # selection number/letter in white, option text in cyan
+        print(f"  {WHITE}1:{ENDC} {CYAN}Play a New Game{ENDC}")
+        print(f"  {WHITE}2:{ENDC} {CYAN}Load a Saved Game{ENDC}")
+        print(f"  {WHITE}3:{ENDC} {CYAN}Load a Practice Position{ENDC}")
+        print(f"  {WHITE}4:{ENDC} {CYAN}View Player Stats{ENDC}")
+        print(f"  {WHITE}5:{ENDC} {CYAN}Fun Chess Fact from the Chessmaster{ENDC}")
+        print(f"  {WHITE}?:{ENDC} {CYAN}Ask a Chess Expert{ENDC}")
+        print(f"  {WHITE}q:{ENDC} {CYAN}Quit{ENDC}")
         return self.get_user_input("Enter your choice: ")
 
     def display_in_game_menu(self) -> str:
         title = self._color_title("--- In-Game Menu ---")
         print(title)
-        print(f"{CYAN}  l: Load Saved Game{ENDC}")
-        print(f"{CYAN}  p: Load Practice Position{ENDC}")
-        print(f"{CYAN}  s: Save Game{ENDC}")
-        print(f"{CYAN}  r: Return to Game{ENDC}")
-        print(f"{CYAN}  q: Quit Application{ENDC}")
-        print(f"{CYAN}  ?<question>: Ask Chess Expert (prefix with '?'){ENDC}")
+        print(f"  {WHITE}l:{ENDC} {CYAN}Load Saved Game{ENDC}")
+        print(f"  {WHITE}p:{ENDC} {CYAN}Load Practice Position{ENDC}")
+        print(f"  {WHITE}s:{ENDC} {CYAN}Save Game{ENDC}")
+        print(f"  {WHITE}r:{ENDC} {CYAN}Return to Game{ENDC}")
+        print(f"  {WHITE}q:{ENDC} {CYAN}Quit Application{ENDC}")
+        print(f"  {WHITE}?:{ENDC} {CYAN}?<question>: Ask Chess Expert (prefix with '?'){ENDC}")
         return self.get_user_input("Enter choice: ")
 
     def display_saved_games_and_get_choice(self, summaries):
@@ -62,14 +62,13 @@ class UIManager:
             return 'm'
         for i, s in enumerate(summaries, start=1):
             # caller expects to receive the selected summary object back
-            display = None
             if isinstance(s, dict):
                 display = s.get('display') or s.get('summary') or s.get('title') or s.get('name') or s.get('filename') or str(s)
             else:
                 display = str(s)
-            print(f"{CYAN}  {i}: {display}{ENDC}")
-        print(f"{CYAN}  m: Return to Main Menu{ENDC}")
-        print(f"{CYAN}  q: Quit Application{ENDC}")
+            print(f"  {WHITE}{i}:{ENDC} {CYAN}{display}{ENDC}")
+        print(f"  {WHITE}m:{ENDC} {CYAN}Return to Main Menu{ENDC}")
+        print(f"  {WHITE}q:{ENDC} {CYAN}Quit Application{ENDC}")
         choice = self.get_user_input("Enter the number of the game to load, or a letter for other options: ")
         if choice.lower() in ['m', 'q']:
             return choice.lower()
@@ -85,10 +84,10 @@ class UIManager:
         title = self._color_title("--- Practice Positions ---")
         print(title)
         for i, p in enumerate(positions, start=1):
-            print(f"{CYAN}  {i}: {p.get('name','Unknown')}  ({p.get('fen','')}){ENDC}")
-        print(f"{CYAN}  m: Return to Main Menu{ENDC}")
-        print(f"{CYAN}  q: Quit Application{ENDC}")
-        print(f"{CYAN}  ?<question>: Ask Chess Expert{ENDC}")
+            print(f"  {WHITE}{i}:{ENDC} {CYAN}{p.get('name','Unknown')}  ({p.get('fen','')}){ENDC}")
+        print(f"  {WHITE}m:{ENDC} {CYAN}Return to Main Menu{ENDC}")
+        print(f"  {WHITE}q:{ENDC} {CYAN}Quit Application{ENDC}")
+        print(f"  {WHITE}?:{ENDC} {CYAN}?<question>: Ask Chess Expert{ENDC}")
         choice = self.get_user_input("Enter the number of the position to load, or a letter for other options: ")
         if choice.lower().startswith('?'):
             return choice
@@ -107,11 +106,11 @@ class UIManager:
         print(title)
         print(f"{CYAN}Available AI models:{ENDC}")
         for k, v in ai_models.items():
-            print(f"{CYAN}  {k}: {v}{ENDC}")
+            print(f"  {WHITE}{k}:{ENDC} {CYAN}{v}{ENDC}")
         print(f"{CYAN}Available Stockfish configs:{ENDC}")
         for k, v in stockfish_configs.items():
-            print(f"{CYAN}  {k}: Stockfish - {v.get('name')}{ENDC}")
-        print(f"{CYAN}  hu: Human Player{ENDC}")
+            print(f"  {WHITE}{k}:{ENDC} {CYAN}Stockfish - {v.get('name')}{ENDC}")
+        print(f"  {WHITE}hu:{ENDC} {CYAN}Human Player{ENDC}")
         choice = self.get_user_input("Enter choice for White and Black players (e.g., 'm1s2'): ")
         parts = choice.replace(" ", "")
         if len(parts) >= 4:
@@ -123,11 +122,11 @@ class UIManager:
         print(title)
         print(f"{CYAN}Choose white opening (enter key or leave blank for default):{ENDC}")
         for k, v in white_openings.items():
-            print(f"{CYAN}  {k}: {v}{ENDC}")
+            print(f"  {WHITE}{k}:{ENDC} {CYAN}{v}{ENDC}")
         white_opening = self.get_user_input("White opening key: ") or (list(white_openings.keys())[0] if white_openings else "")
         print(f"{CYAN}Choose black defense (enter key or leave blank for default):{ENDC}")
         for k, v in black_defenses.items():
-            print(f"{CYAN}  {k}: {v}{ENDC}")
+            print(f"  {WHITE}{k}:{ENDC} {CYAN}{v}{ENDC}")
         black_defense = self.get_user_input("Black defense key: ") or (list(black_defenses.keys())[0] if black_defenses else "")
         white_key, black_key = self.display_model_menu_and_get_choice(ai_models, stockfish_configs)
         if not white_key or not black_key:
@@ -191,18 +190,18 @@ class UIManager:
         """Show the Ask the Chessmaster menu with a colored title and return the user's choice."""
         title = self._color_title("--- Ask the Chessmaster ---")
         print(title)
-        print("  1: Ask a chess question")
-        print("  2: Tell me a chess joke")
-        print("  3: Tell me some chess news")
-        print("  m: Return to previous menu")
+        print(f"  {WHITE}1:{ENDC} {CYAN}Ask a chess question{ENDC}")
+        print(f"  {WHITE}2:{ENDC} {CYAN}Tell me a chess joke{ENDC}")
+        print(f"  {WHITE}3:{ENDC} {CYAN}Tell me some chess news{ENDC}")
+        print(f"  {WHITE}m:{ENDC} {CYAN}Return to previous menu{ENDC}")
         return self.get_user_input("Enter choice: ")
 
     def get_human_quit_choice(self) -> str:
         """Ask a human player how they want to quit: resign, save & quit, quit without saving, or cancel."""
         title = self._color_title("--- Quit Options ---")
         print(title)
-        print(f"{CYAN}  r: Resign the game{ENDC}")
-        print(f"{CYAN}  s: Save and quit{ENDC}")
-        print(f"{CYAN}  q: Quit without saving{ENDC}")
-        print(f"{CYAN}  c: Cancel and return to game{ENDC}")
+        print(f"  {WHITE}r:{ENDC} {CYAN}Resign the game{ENDC}")
+        print(f"  {WHITE}s:{ENDC} {CYAN}Save and quit{ENDC}")
+        print(f"  {WHITE}q:{ENDC} {CYAN}Quit without saving{ENDC}")
+        print(f"  {WHITE}c:{ENDC} {CYAN}Cancel and return to game{ENDC}")
         return self.get_user_input("Enter your choice [r/s/q/c]: ").strip().lower()

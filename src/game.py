@@ -1,7 +1,6 @@
 import chess
 import logging
 from datetime import datetime
-import re
 
 # ANSI escape codes for colors
 BLUE = '\033[94m'
@@ -9,6 +8,7 @@ CYAN = '\033[96m'
 GREEN = '\033[92m'
 YELLOW = '\033[93m'
 RED = '\033[91m'
+WHITE = '\033[97m'
 ENDC = '\033[0m'
 
 class Game:
