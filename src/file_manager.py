@@ -4,8 +4,9 @@ import shutil
 import json
 import re
 import logging
-from datetime import datetime
-from game import RED, ENDC
+from datetime import datetime, timezone
+
+from src.game import RED, ENDC
 
 PLAYER_STATS_FILE = 'logs/player_stats.json'
 
