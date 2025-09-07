@@ -111,7 +111,10 @@ class UIManager:
         for k, v in stockfish_configs.items():
             print(f"  {WHITE}{k}:{ENDC} {CYAN}Stockfish - {v.get('name')}{ENDC}")
         print(f"  {WHITE}hu:{ENDC} {CYAN}Human Player{ENDC}")
-        choice = self.get_user_input("Enter choice for White and Black players (e.g., 'm1s2'): ")
+        choice = self.get_user_input("Enter choice for White and Black players (e.g., 'm1s2'), or press Enter to return: ")
+        if choice == "":
+            # treat Enter (empty input) as "return to main menu" by returning two None values
+            return None, None
         parts = choice.replace(" ", "")
         if len(parts) >= 4:
             return parts[:2], parts[2:4]

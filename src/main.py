@@ -67,23 +67,26 @@ class ChessApp:
         
         raise ValueError(f"Unknown player key: {player_key}")
 
-    def _create_player_with_name_prompt(self, player_key, color_str):
-        """Creates a player, prompting for a name if the player is human."""        
-        if player_key == 'hu':
-            name = self.ui.get_human_player_name(color_str)
-            # Combine name and key for a unique identifier
-            return HumanPlayer(name=f"{name} ({player_key})")
+    def _create_player_with_name_prompt(self, model_key, color_label):
+        """Safely create a player; gracefully handle None (user cancelled)."""
+        if model_key is None:
+            return None  # caller must handle cancel
         
-        if player_key.startswith('m'):
-            model_name = self.ai_models.get(player_key)
+        if model_key == 'hu':
+            name = self.ui.get_human_player_name(color_label)
+            # Combine name and key for a unique identifier
+            return HumanPlayer(name=f"{name} ({model_key})")
+        
+        if model_key.startswith('m'):
+            model_name = self.ai_models.get(model_key)
             if model_name:
                 return AIPlayer(model_name=model_name)
-        elif player_key.startswith('s'):
-            config = self.stockfish_configs.get(player_key)
+        elif model_key.startswith('s'):
+            config = self.stockfish_configs.get(model_key)
             if config:
                 return StockfishPlayer(self.stockfish_path, parameters=config['parameters'])
         
-        raise ValueError(f"Unknown player key: {player_key}")
+        raise ValueError(f"Unknown player key: {model_key}")
 
     def _ask_expert(self, question=None):
         """Handles the logic for asking the chess expert a question.
@@ -602,13 +605,15 @@ class ChessApp:
                 # --- Main Menu ---
                 choice = self.ui.display_main_menu()
                 try:
-                    if choice == '1': # New Game
+                    if choice == '1':  # New Game
                         self._initialize_new_game_log()
                         game = self.setup_new_game()
-                        if game:
-                            self.ui.display_game_start_message(game)
+                        if not game:
+                            self.ui.display_message("New game cancelled.")
+                            continue
+                        self.ui.display_game_start_message(game)
 
-                    elif choice == '2': # Load Saved Game
+                    elif choice == '2':  # Load Saved Game
                         game_summaries = self.file_manager.get_saved_game_summaries()
                         if not game_summaries:
                             self.ui.display_message("No saved games found.")
@@ -617,19 +622,26 @@ class ChessApp:
                         if chosen_summary and chosen_summary not in ['m', 'q']:
                             game = self.load_game_from_log(chosen_summary['filename'])
 
-                    elif choice == '3': # Load Practice Position
+                    elif choice == '3':  # Load Practice Position
                         with open('src/puzzles.json', 'r') as f:
                             positions = json.load(f)
                         position = self.ui.display_practice_positions_and_get_choice(positions)
-                        if position and position not in ['m', 'q']:
-                            self._initialize_new_game_log()
-                            white_player_key, black_player_key = self.ui.display_model_menu_and_get_choice(self.ai_models, self.stockfish_configs)
-                            player1 = self._create_player_with_name_prompt(white_player_key, "White")
-                            player2 = self._create_player_with_name_prompt(black_player_key, "Black")
-                            game = Game(player1, player2, white_player_key=white_player_key, black_player_key=black_player_key)
-                            game.set_board_from_fen(position['fen'])
-                            game.initialize_game()
-                            self.ui.display_game_start_message(game)
+                        if not position or position in ['m', 'q']:
+                            continue
+                        self._initialize_new_game_log()
+                        white_key, black_key = self.ui.display_model_menu_and_get_choice(self.ai_models, self.stockfish_configs)
+                        if white_key is None or black_key is None:
+                            self.ui.display_message("Model selection cancelled. Returning to main menu.")
+                            continue
+                        player1 = self._create_player_with_name_prompt(white_key, "White")
+                        player2 = self._create_player_with_name_prompt(black_key, "Black")
+                        if player1 is None or player2 is None:
+                            self.ui.display_message("Player creation cancelled. Returning to main menu.")
+                            continue
+                        game = Game(player1, player2, white_player_key=white_key, black_player_key=black_key)
+                        game.set_board_from_fen(position['fen'])
+                        game.initialize_game()
+                        self.ui.display_game_start_message(game)
 
                     elif choice == '4': # View Player Stats
                         self._view_player_stats()
@@ -649,6 +661,64 @@ class ChessApp:
                     self.ui.display_message(f"\n{RED}An unexpected error occurred: {e}{ENDC}")
                     logging.error(f"An unexpected error occurred: {e}", exc_info=True)
                     self.ui.get_user_input("Press Enter to acknowledge and return to the main menu.")
+    
+    def setup_new_game(self):
+        """Create and return a new Game from UI choices. Returns None if the user cancels."""
+        # Ask UI for setup choices (handles model selection and optional opening/defense)
+        choices = self.ui.display_setup_menu_and_get_choices(
+            getattr(self, "white_openings", {}),
+            getattr(self, "black_defenses", {}),
+            getattr(self, "ai_models", {}),
+            getattr(self, "stockfish_configs", {})
+        )
+        if not choices:
+            return None
+
+        white_opening, black_defense, white_key, black_key = choices
+
+        # Helper to create a player object for a given key
+        def _make_player(key, color_name):
+            if not key: # Gracefully handle None key
+                return None
+            if key == "hu":
+                name = self.ui.get_human_player_name(color_name)
+                return HumanPlayer(name)
+            # Stockfish config keys typically start with 's'
+            if isinstance(key, str) and key.startswith("s"):
+                cfg = getattr(self, "stockfish_configs", {}).get(key, {})
+                # StockfishPlayer constructors vary; try common signatures
+                try:
+                    return StockfishPlayer(config=cfg)
+                except TypeError:
+                    try:
+                        return StockfishPlayer(skill=cfg.get("skill"))
+                    except Exception:
+                        return StockfishPlayer(key)
+            # AI model keys (m1, m2, ...) -> map to model name
+            model_name = getattr(self, "ai_models", {}).get(key, key)
+            return AIPlayer(model_name=model_name)
+
+        # Prefer any existing helper if present
+        if hasattr(self, "_create_player_with_name_prompt"):
+            white_player = self._create_player_with_name_prompt(white_key, "White")
+            black_player = self._create_player_with_name_prompt(black_key, "Black")
+        else:
+            white_player = _make_player(white_key, "White")
+            black_player = _make_player(black_key, "Black")
+
+        game = Game(white_player, black_player, white_player_key=white_key, black_player_key=black_key)
+        # apply optional opening/defense if the game API supports it
+        try:
+            if white_opening:
+                game.set_opening(white_opening)
+            if black_defense:
+                game.set_defense(black_defense)
+        except Exception:
+            # ignore if not supported by current Game implementation
+            pass
+
+        game.initialize_game()
+        return game
 #--- Entry Point ---
 if __name__ == "__main__":
     logging.basicConfig(
