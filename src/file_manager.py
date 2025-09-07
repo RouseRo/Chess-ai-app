@@ -1,82 +1,108 @@
 import os
-import glob
-import shutil
 import json
-import re
 import logging
-from datetime import datetime
-from game import RED, ENDC
+import re
+import shutil
+from datetime import datetime, timezone
 
-PLAYER_STATS_FILE = 'logs/player_stats.json'
+from src.game import RED, ENDC
 
 class FileManager:
-    """Handles all file operations: saving/loading games and player stats."""
+    """Handles file operations like saving/loading games and stats."""
 
-    def __init__(self, ui_manager):
-        self.ui = ui_manager
+    def __init__(self, ui):
+        self.ui = ui
+        self.logs_dir = "logs"
+        self.games_dir = os.path.join(self.logs_dir, "games")
+        os.makedirs(self.games_dir, exist_ok=True)
 
     def get_saved_game_summaries(self):
-        """Parses all saved game logs to create a list of summaries."""
+        """
+        Scans the saved games directory and returns a list of summaries.
+        Each summary is a dictionary containing filename and header info.
+        """
         summaries = []
-        saved_games = sorted(glob.glob('chess_game_*.log'), reverse=True)
-
-        for log_file in saved_games:
-            summary = {'filename': log_file, 'white': 'N/A', 'black': 'N/A', 'date': 'N/A', 'status': 'In Progress'}
-            try:
-                with open(log_file, 'r') as f:
-                    lines = f.readlines()
-                
-                match = re.search(r'(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})', log_file)
-                if match:
-                    summary['date'] = f"{match.group(1)}-{match.group(2)}-{match.group(3)} {match.group(4)}:{match.group(5)}"
-
-                move_count = 0
-                status = "In Progress"
-                for line in lines:
-                    if "White:" in line:
-                        summary['white'] = line.split("White:", 1)[1].strip()
-                    elif "Black:" in line:
-                        summary['black'] = line.split("Black:", 1)[1].strip()
-                    elif "Game Over" in line or "resigned" in line:
-                        status = 'Finished'
+        for filename in os.listdir(self.games_dir):
+            if filename.endswith(".log"):
+                filepath = os.path.join(self.games_dir, filename)
+                header_info = self._parse_log_header_for_summary(filepath)
+                if header_info:
+                    header_info['filename'] = filepath
                     
-                    if "Move:" in line:
-                        move_count += 1
-                
-                summary['status'] = f"{status} ({move_count})"
-                summaries.append(summary)
-            except Exception as e:
-                self.ui.display_message(f"\n{RED}Warning: Could not parse '{log_file}'. Error: {e}{ENDC}")
-                continue
+                    # Extract date and time from the filename
+                    match = re.search(r"chess_game_(\d{8}_\d{6})\.log", filename)
+                    if match:
+                        timestamp_str = match.group(1)
+                        try:
+                            # Parse the timestamp and format it for display
+                            dt_obj = datetime.strptime(timestamp_str, "%Y%m%d_%H%M%S")
+                            header_info['file_date'] = dt_obj.strftime("%Y-%m-%d %H:%M:%S")
+                        except ValueError:
+                            pass  # Ignore if the filename format is unexpected
+
+                    summaries.append(header_info)
+        
+        # Sort by the file date, which is more reliable. Fallback to header date.
+        summaries.sort(key=lambda x: x.get('file_date', x.get('date', '0')), reverse=True)
         return summaries
 
+    def _parse_log_header_for_summary(self, filepath):
+        """
+        A flexible parser to extract key info from a log file header.
+        It handles two formats:
+        1. PGN-style: [TagName "Value"]
+        2. Simple: TagName: Value
+        """
+        header_data = {}
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                for _ in range(15): # Read the first few lines
+                    line = f.readline()
+                    if not line:
+                        break
+
+                    # Try PGN-style format first: [White "Player"]
+                    match = re.search(r"\[(\w+)\s+\"(.+?)\"\]", line)
+                    if match:
+                        key, value = match.groups()
+                        header_data[key.lower()] = value
+                        continue
+
+                    # If not PGN, try simple format: White: Player
+                    match = re.search(r"(\w+):\s+(.+)", line)
+                    if match:
+                        key, value = match.groups()
+                        # Standardize keys to lowercase (e.g., "White Player Key" -> "white_player_key")
+                        key = key.replace(' ', '_').lower()
+                        header_data[key] = value
+
+        except Exception:
+            return None
+        
+        # Standardize player names from different possible keys
+        if 'white' not in header_data and 'white_player' in header_data:
+            header_data['white'] = header_data['white_player']
+        if 'black' not in header_data and 'black_player' in header_data:
+            header_data['black'] = header_data['black_player']
+
+        if 'white' in header_data and 'black' in header_data:
+            return header_data
+        return None
+
     def save_game_log(self):
-        """Saves the current game log to a timestamped file."""
+        """Saves the current game log to a timestamped file in the games directory."""
+        if not os.path.exists('chess_game.log'):
+            self.ui.display_message("No active game log to save.")
+            return
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        dest_filename = f"chess_game_{timestamp}.log"
+        dest_path = os.path.join(self.games_dir, dest_filename)
+
         try:
-            for handler in logging.getLogger().handlers:
-                handler.flush()
-            
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            save_path = f'chess_game_{timestamp}.log'
-            shutil.copy('chess_game.log', save_path)
-            self.ui.display_message(f"\nGame saved as {save_path}")
-        except FileNotFoundError:
-            self.ui.display_message("Log file not found, could not save.")
+            # Ensure all buffered log messages are written to the file before copying
+            logging.getLogger().handlers[0].flush()
+            shutil.copy('chess_game.log', dest_path)
+            self.ui.display_message(f"Game saved as {dest_path}")
         except Exception as e:
-            self.ui.display_message(f"An error occurred while saving: {e}")
-
-    def load_player_stats(self):
-        """Loads player statistics from the JSON file."""
-        if not os.path.exists(PLAYER_STATS_FILE):
-            return {}
-        try:
-            with open(PLAYER_STATS_FILE, 'r') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, FileNotFoundError):
-            return {}
-
-    def save_player_stats(self, stats):
-        """Saves player statistics to the JSON file."""
-        os.makedirs(os.path.dirname(PLAYER_STATS_FILE), exist_ok=True)
-        with open(PLAYER_STATS_FILE, 'w') as f:
-            json.dump(stats, f, indent=2)
+            self.ui.display_message(f"{RED}Failed to save game: {e}{ENDC}")

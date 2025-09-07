@@ -1,6 +1,6 @@
-from ai_player import AIPlayer
-from stockfish_player import StockfishPlayer
-from human_player import HumanPlayer
+from src.ai_player import AIPlayer
+from src.stockfish_player import StockfishPlayer
+from src.human_player import HumanPlayer
 
 class PlayerFactory:
     """A factory for creating different types of chess players."""

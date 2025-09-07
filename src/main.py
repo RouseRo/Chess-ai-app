@@ -11,15 +11,15 @@ from typing import Optional
 
 import chess
 
-from game import Game, RED, ENDC
-from ai_player import AIPlayer
-from stockfish_player import StockfishPlayer
-from human_player import HumanPlayer
-from ui_manager import UIManager
-from file_manager import FileManager
-from expert_service import ExpertService
-from player_factory import PlayerFactory
-from data_models import PlayerStats, GameHeader, stats_to_dict, GameLoopAction
+from src.game import Game, RED, ENDC
+from src.ai_player import AIPlayer
+from src.stockfish_player import StockfishPlayer
+from src.human_player import HumanPlayer
+from src.ui_manager import UIManager
+from src.file_manager import FileManager
+from src.expert_service import ExpertService
+from src.player_factory import PlayerFactory
+from src.data_models import PlayerStats, GameHeader, stats_to_dict, GameLoopAction
 
 
 # --- Constants ---
@@ -508,13 +508,6 @@ class ChessApp:
         return game
 #--- Entry Point ---
 if __name__ == "__main__":
-    logging.basicConfig(
-        filename=LOG_FILE,
-        level=logging.INFO,
-        format='%(asctime)s - %(message)s',
-        filemode='w'
-    )
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    
+    # To run the application now, use: python -m src.main
     app = ChessApp()
     app.run()

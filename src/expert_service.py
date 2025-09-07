@@ -1,8 +1,8 @@
 import os
 import re
 from datetime import datetime, timezone
-from ai_player import AIPlayer
-from game import RED, ENDC
+from src.ai_player import AIPlayer
+from src.game import RED, ENDC
 
 class ExpertService:
     """Handles expert Q&A, fun facts, and jokes storage."""

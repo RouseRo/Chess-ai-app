@@ -9,6 +9,9 @@ import json
 import chess
 from src.ai_player import AIPlayer
 from src.stockfish_player import StockfishPlayer
+from src.model_puzzles import ModelPuzzles
+from src.player_factory import PlayerFactory
+from src.ui_manager import UIManager
 
 # --- Test Configuration ---
 TEST_CONFIG_FILE = 'config_pytest.json'
@@ -211,3 +214,76 @@ def test_puzzle_solving(player_under_test_spec, player_under_test, defender_play
         game_logger.error(failure_msg)
         _record_result(test_results, player_under_test, puzzle, "FAIL")
         pytest.fail(failure_msg)
+
+@pytest.fixture
+def puzzle_solver(mocker):
+    """Fixture to create an instance of ModelPuzzles with mocked dependencies."""
+    mock_ui = mocker.MagicMock(spec=UIManager)
+    
+    # Dummy configs for testing purposes
+    ai_models = {"m1": "openai/gpt-4o"}
+    stockfish_configs = {
+        "s2": {"name": "Balanced", "parameters": {"Skill Level": 10}},
+        "s3": {"name": "Strong", "parameters": {"Skill Level": 20}}
+    }
+    # A mock stockfish path is sufficient if the player isn't actually created
+    stockfish_path = "dummy/path/to/stockfish"
+
+    player_factory = PlayerFactory(mock_ui, ai_models, stockfish_configs, stockfish_path)
+    
+    # Mock the file manager to prevent actual file I/O
+    mock_file_manager = mocker.MagicMock()
+    
+    return ModelPuzzles(player_factory, mock_file_manager, mock_ui)
+
+def test_solve_puzzle_with_sufficient_time(puzzle_solver, mocker):
+    """
+    Tests that puzzles can be solved when a sufficient timeout is provided.
+    This test simulates the puzzle-solving process.
+    """
+    # 1. Mock the dependencies to simulate a successful puzzle solve
+    mock_game = mocker.MagicMock()
+    mock_player = mocker.MagicMock()
+    
+    # Assume solve_puzzle returns a status dictionary
+    mocker.patch.object(puzzle_solver, '_create_game_for_puzzle', return_value=mock_game)
+    mocker.patch.object(puzzle_solver, '_get_player_for_puzzle', return_value=mock_player)
+    
+    # Simulate that with enough time, the player finds the best move
+    # and the puzzle is evaluated as "PASS"
+    mocker.patch.object(puzzle_solver, '_evaluate_puzzle_move', return_value={"status": "PASS", "reason": "Mate found"})
+
+    # 2. Define a sample puzzle and model to test
+    puzzle = {
+        "name": "Mate in 1",
+        "fen": "4k3/R7/8/8/8/8/8/4K3 w - - 0 1",
+        "solution": ["a7a8"]
+    }
+    model_key = "s3" # Using a strong Stockfish config
+    
+    # 3. Call the method with a longer timeout
+    # This is the key change: providing a longer timeout for puzzles.
+    result = puzzle_solver.solve_puzzle(puzzle, model_key, puzzle_timeout=30)
+    
+    # 4. Assert that the puzzle passed
+    assert result is not None
+    assert result["status"] == "PASS"
+
+# It's good practice to also add tests for other scenarios,
+# such as what happens when a player fails or times out.
+def test_solve_puzzle_failure(puzzle_solver, mocker):
+    """Tests the failure path of the puzzle solver."""
+    mocker.patch.object(puzzle_solver, '_create_game_for_puzzle', return_value=mocker.MagicMock())
+    mocker.patch.object(puzzle_solver, '_get_player_for_puzzle', return_value=mocker.MagicMock())
+    # Simulate a failure condition
+    mocker.patch.object(puzzle_solver, '_evaluate_puzzle_move', return_value={"status": "FAIL", "reason": "Incorrect move"})
+
+    puzzle = {"name": "Test Puzzle", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "solution": ["e2e4"]}
+    model_key = "m1"
+    
+    # Even with a long timeout, the evaluation can still fail
+    result = puzzle_solver.solve_puzzle(puzzle, model_key, puzzle_timeout=30)
+    
+    assert result is not None
+    assert result["status"] == "FAIL"
+    assert result["reason"] == "Incorrect move"

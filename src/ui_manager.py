@@ -1,5 +1,5 @@
 import chess
-from game import BLUE, CYAN, GREEN, YELLOW, RED, WHITE, ENDC
+from src.game import BLUE, CYAN, GREEN, YELLOW, RED, WHITE, ENDC
 
 class UIManager:
     """Simple console UI helper. Menu titles and option text are shown in color."""
@@ -54,31 +54,45 @@ class UIManager:
         print(f"  {WHITE}?:{ENDC} {CYAN}?<question>: Ask Chess Expert (prefix with '?'){ENDC}")
         return self.get_user_input("Enter choice: ")
 
-    def display_saved_games_and_get_choice(self, summaries):
-        title = self._color_title("--- Saved Games ---")
+    def display_saved_games_and_get_choice(self, game_summaries):
+        """Displays a formatted list of saved games and prompts the user for a choice."""
+        title = self._color_title("--- Load a Saved Game ---")
         print(title)
-        if not summaries:
-            print(f"{CYAN}  (none){ENDC}")
-            return 'm'
-        for i, s in enumerate(summaries, start=1):
-            # caller expects to receive the selected summary object back
-            if isinstance(s, dict):
-                display = s.get('display') or s.get('summary') or s.get('title') or s.get('name') or s.get('filename') or str(s)
-            else:
-                display = str(s)
-            print(f"  {WHITE}{i}:{ENDC} {CYAN}{display}{ENDC}")
-        print(f"  {WHITE}m:{ENDC} {CYAN}Return to Main Menu{ENDC}")
-        print(f"  {WHITE}q:{ENDC} {CYAN}Quit Application{ENDC}")
-        choice = self.get_user_input("Enter the number of the game to load, or a letter for other options: ")
-        if choice.lower() in ['m', 'q']:
-            return choice.lower()
-        try:
-            idx = int(choice) - 1
-            if 0 <= idx < len(summaries):
-                return summaries[idx]
-        except Exception:
-            pass
-        return None
+        if not game_summaries:
+            print("No saved games found.")
+            self.get_user_input("Press Enter to return to the main menu.")
+            return None
+
+        for i, summary in enumerate(game_summaries):
+            white = summary.get('white', 'N/A')
+            black = summary.get('black', 'N/A')
+            result = summary.get('result', '*') # Use '*' for in-progress games
+            
+            # Prioritize the date from the filename, fallback to the date in the log content
+            date = summary.get('file_date', summary.get('date', 'Unknown Date'))
+
+            # Truncate long names to keep the display clean
+            white_name = (white[:20] + '..') if len(white) > 22 else white
+            black_name = (black[:20] + '..') if len(black) > 22 else black
+
+            print(f"  {WHITE}{i+1}:{ENDC} {CYAN}{white_name}{ENDC} vs {CYAN}{black_name}{ENDC}")
+            print(f"     {YELLOW}Result: {result}, Date: {date}{ENDC}")
+
+        print(f"\n  {WHITE}m:{ENDC} Return to Main Menu")
+        
+        while True:
+            choice = self.get_user_input("Enter the number of the game to load, or 'm' to return: ")
+            if choice.lower() == 'm':
+                return 'm'
+            
+            try:
+                choice_idx = int(choice) - 1
+                if 0 <= choice_idx < len(game_summaries):
+                    return game_summaries[choice_idx] # Return the whole summary dict
+                else:
+                    print(f"{RED}Invalid number. Please enter a number between 1 and {len(game_summaries)}.{ENDC}")
+            except ValueError:
+                print(f"{RED}Invalid input. Please enter a number or 'm'.{ENDC}")
 
     def display_practice_positions_and_get_choice(self, positions):
         title = self._color_title("--- Practice Positions ---")
