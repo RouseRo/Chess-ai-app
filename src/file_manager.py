@@ -14,7 +14,9 @@ class FileManager:
         self.ui = ui
         self.logs_dir = "logs"
         self.games_dir = os.path.join(self.logs_dir, "games")
+        self.stats_dir = os.path.join(self.logs_dir, "stats")  # Add stats directory
         os.makedirs(self.games_dir, exist_ok=True)
+        os.makedirs(self.stats_dir, exist_ok=True)  # Create stats directory
 
     def get_saved_game_summaries(self):
         """
@@ -106,3 +108,64 @@ class FileManager:
             self.ui.display_message(f"Game saved as {dest_path}")
         except Exception as e:
             self.ui.display_message(f"{RED}Failed to save game: {e}{ENDC}")
+
+    def load_player_stats(self):
+        """
+        Loads player statistics from a file.
+        Returns a dictionary with player statistics organized by player name.
+        """
+        try:
+            stats_file = os.path.join(self.stats_dir, "player_stats.json")
+            
+            if os.path.exists(stats_file):
+                with open(stats_file, 'r') as f:
+                    stats = json.load(f)
+                return stats
+            else:
+                # Return default stats with a default player
+                # Structure matches what UI expects: player name -> stats dictionary
+                return {
+                    "Human Player": {
+                        "wins": 0,
+                        "losses": 0,
+                        "draws": 0,
+                        "games_played": 0,
+                        "average_moves": 0,
+                        "favorite_opening": "None played yet",
+                        "last_game_date": "Never"
+                    }
+                }
+        except Exception as e:
+            logging.error(f"Error loading player stats: {e}")
+            # Return empty stats on error with correct structure
+            return {
+                "Human Player": {
+                    "wins": 0, 
+                    "losses": 0, 
+                    "draws": 0,
+                    "error": str(e)
+                }
+            }
+
+    def save_player_stats(self, stats):
+        """
+        Saves player statistics to a file.
+        
+        Args:
+            stats (dict): Dictionary containing player statistics by player name
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            stats_file = os.path.join(self.stats_dir, "player_stats.json")
+            
+            # Ensure directory exists
+            os.makedirs(self.stats_dir, exist_ok=True)
+            
+            with open(stats_file, 'w') as f:
+                json.dump(stats, f, indent=4)
+            return True
+        except Exception as e:
+            logging.error(f"Error saving player stats: {e}")
+            return False
