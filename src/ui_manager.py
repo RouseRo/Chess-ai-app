@@ -136,17 +136,35 @@ class UIManager:
     def display_setup_menu_and_get_choices(self, white_openings, black_defenses, ai_models, stockfish_configs):
         title = self._color_title("--- Setup New Game ---")
         print(title)
-        print(f"{CYAN}Choose white opening (enter key or leave blank for default):{ENDC}")
-        for k, v in white_openings.items():
-            print(f"  {WHITE}{k}:{ENDC} {CYAN}{v}{ENDC}")
-        white_opening = self.get_user_input("White opening key: ") or (list(white_openings.keys())[0] if white_openings else "")
-        print(f"{CYAN}Choose black defense (enter key or leave blank for default):{ENDC}")
-        for k, v in black_defenses.items():
-            print(f"  {WHITE}{k}:{ENDC} {CYAN}{v}{ENDC}")
-        black_defense = self.get_user_input("Black defense key: ") or (list(black_defenses.keys())[0] if black_defenses else "")
+        
+        # First, select AI models for White and Black
+        print(f"{CYAN}Choose player models for White and Black:{ENDC}")
         white_key, black_key = self.display_model_menu_and_get_choice(ai_models, stockfish_configs)
         if not white_key or not black_key:
             return None
+        
+        # Default values for openings/defenses - empty string means "No Classic opening or defense"
+        white_opening = ""
+        black_defense = ""
+        
+        # Only prompt for opening strategy if White is an AI player (not human)
+        if white_key != "hu":
+            print(f"{CYAN}Choose white opening (enter key or leave blank for default):{ENDC}")
+            for k, v in white_openings.items():
+                print(f"  {WHITE}{k}:{ENDC} {CYAN}{v}{ENDC}")
+            white_opening = self.get_user_input("White opening key: ") or (list(white_openings.keys())[0] if white_openings else "")
+        else:
+            print(f"{WHITE}Human player selected for White - no opening strategy will be used.{ENDC}")
+        
+        # Only prompt for defense strategy if Black is an AI player (not human)
+        if black_key != "hu":
+            print(f"{CYAN}Choose black defense (enter key or leave blank for default):{ENDC}")
+            for k, v in black_defenses.items():
+                print(f"  {WHITE}{k}:{ENDC} {CYAN}{v}{ENDC}")
+            black_defense = self.get_user_input("Black defense key: ") or (list(black_defenses.keys())[0] if black_defenses else "")
+        else:
+            print(f"{WHITE}Human player selected for Black - no defense strategy will be used.{ENDC}")
+        
         return white_opening, black_defense, white_key, black_key
 
     def display_player_stats(self, stats):
