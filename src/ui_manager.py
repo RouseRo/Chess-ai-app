@@ -229,3 +229,20 @@ class UIManager:
         print(f"  {WHITE}q:{ENDC} {CYAN}Quit without saving{ENDC}")
         print(f"  {WHITE}c:{ENDC} {CYAN}Cancel and return to game{ENDC}")
         return self.get_user_input("Enter your choice [r/s/q/c]: ").strip().lower()
+
+    def prompt_for_move(self, game) -> str:
+        """
+        Display a colored move prompt and return the user's input.
+        Sections (colored):
+          1) "Move X (Name as Side):"            -> WHITE
+          2) " Enter your move (e.g. e2e4),"     -> CYAN
+          3) " 'q' to quit, or 'm' for menu: "   -> YELLOW
+        """
+        board = game.board
+        player = game.get_current_player()
+        side = "White" if board.turn else "Black"
+        section1 = f"Move {board.fullmove_number} ({player.model_name} as {side}):"
+        section2 = " Enter your move (e.g. e2e4),"
+        section3 = " 'q' to quit, or 'm' for menu: "
+        prompt = f"{WHITE}{section1}{ENDC}{CYAN}{section2}{ENDC}{YELLOW}{section3}{ENDC}"
+        return self.get_user_input(prompt)

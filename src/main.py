@@ -536,7 +536,7 @@ class ChessApp:
                 turn_color = "White" if game.board.turn else "Black"
                 move_number = game.board.fullmove_number
                 prompt = f"Move {move_number} ({current_player.model_name} as {turn_color}): Enter your move (e.g. e2e4), 'q' to quit, or 'm' for menu: "
-                user_input = self.ui.get_user_input(prompt)
+                user_input = self.ui.prompt_for_move(game)
 
                 if user_input.lower() == 'q':
                     return game, 'quit'
