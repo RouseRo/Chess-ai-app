@@ -7,6 +7,7 @@ import logging
 import re
 from datetime import datetime, timezone
 from dataclasses import asdict
+from typing import Optional
 
 import chess
 
