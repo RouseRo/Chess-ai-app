@@ -460,9 +460,6 @@ class ChessApp:
                     elif choice == '4': # View Player Stats
                         self._view_player_stats()
 
-                    elif choice == '5': # Fun Fact
-                        self.expert_service.get_fun_fact()
-
                     elif choice.startswith('?'):
                         question = choice[1:].strip()
                         self.expert_service.ask_expert(question)
@@ -506,6 +503,50 @@ class ChessApp:
 
         game.initialize_game()
         return game
+
+    def _display_main_menu(self):
+        """Displays the main menu options."""
+        print("\n--- Main Menu ---", flush=True)
+        print("  1: Play a New Game", flush=True)
+        print("  2: Load a Saved Game", flush=True)
+        print("  3: Load a Practice Position", flush=True)
+        print("  4: View Player Stats", flush=True)
+        # Option 5 (Fun Chess Fact) is removed
+        print("  ?: Ask a Chess Expert", flush=True)
+        print("  q: Quit", flush=True)
+        print("Enter your choice: ", end="", flush=True)
+
+    def _display_chess_expert_menu(self):
+        """Displays the chess expert menu options."""
+        print("\n--- Ask the Chessmaster ---", flush=True)
+        print("  1: Analyze a position", flush=True)
+        print("  2: Ask for opening advice", flush=True)
+        print("  3: Get a tactical puzzle", flush=True)
+        print("  4: Tell me a fun chess fact", flush=True)  # New option
+        print("  b: Back to main menu", flush=True)
+        print("Enter your choice: ", end="", flush=True)
+
+    def _handle_chess_expert_menu(self):
+        """Handles the chess expert menu options."""
+        self._display_chess_expert_menu()
+        choice = input().strip().lower()
+        
+        if choice == '1':
+            # Handle position analysis
+            pass
+        elif choice == '2':
+            # Handle opening advice
+            pass
+        elif choice == '3':
+            # Handle tactical puzzle
+            pass
+        elif choice == '4':
+            # Fun fact option - reuse existing fun fact functionality
+            self._show_fun_chess_fact()
+        elif choice == 'b':
+            return
+        else:
+            print(f"{RED}Invalid choice. Please try again.{ENDC}", flush=True)
 #--- Entry Point ---
 if __name__ == "__main__":
     # To run the application now, use: python -m src.main

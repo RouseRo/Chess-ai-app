@@ -61,23 +61,26 @@ def test_main_menu_loads_and_quits():
             child.proc.terminate()
 
 @pytest.mark.integration
-def test_main_menu_fun_fact_flow():
+def test_main_menu_player_stats_flow():
     """
-    Tests the flow of selecting the 'Fun Chess Fact' option and returning to the menu.
+    Tests the flow of selecting 'View Player Stats' and returning to the menu.
     """
-    child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=20)  # Longer timeout for API call
+    child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=15)  # Increased timeout
 
     try:
         # Wait for the main menu
         expect_with_debug(child, r"--- Main Menu ---")
         expect_with_debug(child, r"Enter your choice")
         
-        # Select option '5' for a fun fact
-        child.sendline('5')
+        # Select option '4' for player stats
+        child.sendline('4')
         
-        # Wait for the fun fact screen to appear
-        expect_with_debug(child, r"--- Fun Chess Fact ---")
-        expect_with_debug(child, r"Press Enter to return to the main menu")
+        # Wait for the stats screen to appear
+        expect_with_debug(child, r"--- Player Statistics ---")
+        expect_with_debug(child, r"Player\s+\|\s+Wins\s+\|\s+Losses\s+\|\s+Draws")  # Added child parameter
+        expect_with_debug(child, r"-+")  # Added child parameter
+        expect_with_debug(child, r"Human Player")  # Added child parameter
+        expect_with_debug(child, r"Press Enter to return to the main menu")  # Added child parameter
         
         # Press Enter to go back
         child.sendline('')
@@ -95,26 +98,25 @@ def test_main_menu_fun_fact_flow():
             child.proc.terminate()
 
 @pytest.mark.integration
-def test_main_menu_player_stats_flow():
+def test_main_menu_chess_expert_flow():
     """
-    Tests the flow of selecting 'View Player Stats' and returning to the menu.
+    Tests the flow of selecting 'Ask a Chess Expert' and verifying the submenu appears.
     """
-    child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=15)  # Increased timeout
+    child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=15)
 
     try:
         # Wait for the main menu
         expect_with_debug(child, r"--- Main Menu ---")
         expect_with_debug(child, r"Enter your choice")
         
-        # Select option '4' for player stats
-        child.sendline('4')
+        # Select option '?' for Ask a Chess Expert
+        child.sendline('?')
         
-        # Wait for the stats screen to appear - use a more flexible pattern
-        expect_with_debug(child, r"Player Statistics")  # Removed dashes for flexibility
-        expect_with_debug(child, r"Press Enter")        # More flexible pattern
+        # Verify that the Chessmaster menu appears
+        expect_with_debug(child, r"--- Ask the Chessmaster ---")
         
-        # Press Enter to go back
-        child.sendline('')
+        # Go back to the main menu
+        child.sendline('b')
         
         # Expect to be back at the main menu
         expect_with_debug(child, r"--- Main Menu ---")
