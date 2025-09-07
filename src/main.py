@@ -19,7 +19,7 @@ from ui_manager import UIManager
 from file_manager import FileManager
 from expert_service import ExpertService
 from player_factory import PlayerFactory
-from data_models import PlayerStats, GameHeader, stats_to_dict
+from data_models import PlayerStats, GameHeader, stats_to_dict, GameLoopAction
 
 
 # --- Constants ---
@@ -176,12 +176,12 @@ class ChessApp:
         game_summaries = self.file_manager.get_saved_game_summaries()
         if not game_summaries:
             self.ui.display_message("No saved games found.")
-            return game, 'continue'
+            return game, GameLoopAction.CONTINUE
 
         chosen_summary = self.ui.display_saved_games_and_get_choice(game_summaries)
         
         if chosen_summary == 'm':
-            return game, 'quit_to_menu'
+            return game, GameLoopAction.RETURN_TO_MENU
         elif chosen_summary == 'q':
             self.ui.display_message("Exiting application.")
             sys.exit()
@@ -194,8 +194,8 @@ class ChessApp:
                 logging.basicConfig(filename='chess_game.log', level=logging.INFO, format='%(asctime)s - %(message)s', filemode='a')
                 logging.getLogger("httpx").setLevel(logging.WARNING)
                 self.ui.display_message(f"Successfully loaded game from {chosen_file}.")
-                return loaded_game, 'skip_turn'
-        return game, 'continue'
+                return loaded_game, GameLoopAction.SKIP_TURN
+        return game, GameLoopAction.CONTINUE
 
     def handle_practice_load_in_menu(self, game):
         """Handles the 'load practice position' option from the in-game menu."""
@@ -215,17 +215,17 @@ class ChessApp:
             new_game.initialize_game()
             
             self.ui.display_message(f"Loaded practice position: {position['name']}")
-            return new_game, 'skip_turn'
+            return new_game, GameLoopAction.SKIP_TURN
         elif position and position.startswith('?'):
             question = position[1:].strip()
             self.expert_service.ask_expert(question)
         elif position == 'm':
-            return game, 'quit_to_menu'
+            return game, GameLoopAction.RETURN_TO_MENU
         elif position == 'q':
             self.ui.display_message("Exiting application.")
             sys.exit()
             
-        return game, 'continue'
+        return game, GameLoopAction.CONTINUE
 
     def _update_player_stats(self, white_player, black_player, result):
         """Updates, saves, and displays the win/loss/draw stats for players in the last game."""
@@ -328,17 +328,17 @@ class ChessApp:
             return self.handle_practice_load_in_menu(game)
         elif menu_choice == 's': # Save
             self.file_manager.save_game_log()
-            return game, 'continue'
+            return game, GameLoopAction.CONTINUE
         elif menu_choice.startswith('?'): # Ask Expert
             question = menu_choice[1:].strip()
             self.expert_service.ask_expert(question)
-            return game, 'continue'
+            return game, GameLoopAction.CONTINUE
         elif menu_choice == 'r': # Return to Game
-            return game, 'continue'
+            return game, GameLoopAction.CONTINUE
         elif menu_choice == 'q': # Quit
-            return game, 'quit'
+            return game, GameLoopAction.QUIT_APPLICATION
         
-        return game, 'continue'
+        return game, GameLoopAction.CONTINUE
 
     def play_turn(self, game):
         """Plays a single turn of the game, returning the game object and an action."""
@@ -353,7 +353,7 @@ class ChessApp:
                 user_input = self.ui.prompt_for_move(game)
 
                 if user_input.lower() == 'q':
-                    return game, 'quit'
+                    return game, GameLoopAction.QUIT_APPLICATION
                 elif user_input.lower() == 'm':
                     return self.handle_in_game_menu(game)
                 else:
@@ -364,7 +364,7 @@ class ChessApp:
         except ValueError as e:
             self.ui.display_message(f"{RED}Invalid move: {e}{ENDC}")
 
-        return game, 'continue'
+        return game, GameLoopAction.CONTINUE
 
     def _determine_game_result(self, game):
         """Return canonical result string ('1-0', '0-1', '1/2-1/2') based on board state."""
@@ -404,16 +404,16 @@ class ChessApp:
                 new_game, action = self.play_turn(game)
                 game = new_game # Always update the game object
 
-                if action == 'quit':
+                if action == GameLoopAction.QUIT_APPLICATION:
                     if self._handle_quit_request(game):
                         continue # User cancelled quit
                     else:
                         game = None # Quit was handled, return to menu
                         continue
-                elif action == 'quit_to_menu':
+                elif action == GameLoopAction.RETURN_TO_MENU:
                     game = None
                     continue
-                elif action in ['continue', 'skip_turn']:
+                elif action in [GameLoopAction.CONTINUE, GameLoopAction.SKIP_TURN]:
                     continue
             else:
                 # --- Main Menu ---

@@ -1,5 +1,6 @@
 from dataclasses import dataclass, asdict
 from typing import Optional
+from enum import Enum, auto
 
 @dataclass
 class PlayerStats:
@@ -24,3 +25,10 @@ class GameHeader:
 def stats_to_dict(stats_data):
     """Converts a dictionary of PlayerStats objects to a JSON-serializable dictionary."""
     return {name: asdict(stats) for name, stats in stats_data.items()}
+
+class GameLoopAction(Enum):
+    """Defines the set of possible actions to control the main game loop."""
+    CONTINUE = auto()
+    QUIT_APPLICATION = auto()
+    RETURN_TO_MENU = auto()
+    SKIP_TURN = auto()
