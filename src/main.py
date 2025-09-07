@@ -6,6 +6,8 @@ import shutil
 import logging
 import re
 from datetime import datetime, timezone
+from dataclasses import asdict
+
 import chess
 
 from game import Game, RED, ENDC
@@ -16,6 +18,8 @@ from ui_manager import UIManager
 from file_manager import FileManager
 from expert_service import ExpertService
 from player_factory import PlayerFactory
+from data_models import PlayerStats, GameHeader, stats_to_dict
+
 
 # --- Constants ---
 LOG_FILE = 'chess_game.log'
@@ -70,6 +74,71 @@ class ChessApp:
         )
         logging.getLogger("httpx").setLevel(logging.WARNING)
 
+    def _load_player_stats(self):
+        """Loads player statistics from a JSON file into PlayerStats objects."""
+        try:
+            with open(PLAYER_STATS_FILE, 'r') as f:
+                stats_data = json.load(f)
+                # Convert dicts to PlayerStats objects
+                self.player_stats = {name: PlayerStats(**data) for name, data in stats_data.items()}
+        except (FileNotFoundError, json.JSONDecodeError):
+            self.player_stats = {}
+
+    def _save_player_stats(self):
+        """Saves player statistics to a JSON file."""
+        with open(PLAYER_STATS_FILE, 'w') as f:
+            # Convert PlayerStats objects to dicts for JSON serialization
+            json.dump(stats_to_dict(self.player_stats), f, indent=4)
+
+    def _update_player_stats(self, game):
+        """Updates player stats based on the game result."""
+        result = game.board.result()
+        white_name = game.players[chess.WHITE].model_name
+        black_name = game.players[chess.BLACK].model_name
+
+        # Ensure players are in stats, creating new PlayerStats objects if not
+        self.player_stats.setdefault(white_name, PlayerStats())
+        self.player_stats.setdefault(black_name, PlayerStats())
+
+        if result == "1-0":  # White wins
+            self.player_stats[white_name].wins += 1
+            self.player_stats[black_name].losses += 1
+        elif result == "0-1":  # Black wins
+            self.player_stats[black_name].wins += 1
+            self.player_stats[white_name].losses += 1
+        else:  # Draw
+            self.player_stats[white_name].draws += 1
+            self.player_stats[black_name].draws += 1
+        self._save_player_stats()
+
+    def parse_log_header(self, lines, all_player_keys) -> tuple[Optional[GameHeader], Optional[str]]:
+        """Parses the header of a log file and returns a GameHeader object."""
+        header_data = {}
+        for line in lines[:10]:  # Check first 10 lines
+            match = re.match(r"\[(\w+)\s+\"(.+?)\"\]", line)
+            if match:
+                key, value = match.groups()
+                header_data[key.lower()] = value
+
+        required_keys = ['white', 'black', 'white_key', 'black_key']
+        if not all(k in header_data for k in required_keys):
+            return None, "Header is missing required tags (White, Black, White_Key, Black_Key)."
+
+        if header_data['white_key'] not in all_player_keys or header_data['black_key'] not in all_player_keys:
+            return None, "Player key in log is not in current config."
+
+        return GameHeader(
+            white_name=header_data['white'],
+            black_name=header_data['black'],
+            white_key=header_data['white_key'],
+            black_key=header_data['black_key'],
+            white_strategy=header_data.get('whitestrategy'),
+            black_strategy=header_data.get('blackstrategy'),
+            result=header_data.get('result'),
+            termination=header_data.get('termination'),
+            date=header_data.get('date')
+        ), None
+
     def load_game_from_log(self, log_file):
         """Loads a game state from a log file."""
         try:
@@ -82,12 +151,13 @@ class ChessApp:
                 self.ui.display_message(f"Failed to load game: {error_reason}")
                 return None
 
-            player1 = self.player_factory.create_player(header['white_key'], name_override=header.get('white_name'))
-            player2 = self.player_factory.create_player(header['black_key'], name_override=header.get('black_name'))
+            player1 = self.player_factory.create_player(header.white_key, name_override=header.white_name)
+            player2 = self.player_factory.create_player(header.black_key, name_override=header.black_name)
             
-            game = Game(player1, player2, white_strategy=header['white_strategy'], black_strategy=header['black_strategy'], white_player_key=header['white_key'], black_player_key=header['black_key'])
+            game = Game(player1, player2, white_strategy=header.white_strategy, black_strategy=header.black_strategy, white_player_key=header.white_key, black_player_key=header.black_key)
             
-            last_fen = header['initial_fen']
+            # Find last FEN
+            last_fen = header.initial_fen
             for line in lines:
                 if "FEN:" in line:
                     last_fen = line.split("FEN:")[1].strip()
@@ -97,59 +167,6 @@ class ChessApp:
         except Exception as e:
             self.ui.display_message(f"Error loading log file: {e}")
             return None
-
-    @staticmethod
-    def parse_log_header(lines, all_keys):
-        """Parses the header of a log file to extract game setup information."""
-        header = {}
-
-        for line in lines:
-            if "Move:" in line:
-                break # End of header
-
-            # Modern format (explicit keys)
-            if "White Player Key:" in line:
-                header["white_key"] = line.split(":", 1)[1].strip()
-            elif "Black Player Key:" in line:
-                header["black_key"] = line.split(":", 1)[1].strip()
-            
-            # Fallback for older logs (infer keys)
-            elif "White:" in line and "white_key" not in header:
-                player_name = line.split(":", 1)[1].strip()
-                header["white_name"] = player_name # Store the full name
-                for key in all_keys:
-                    if f"({key})" in player_name:
-                        header["white_key"] = key
-                        break
-            elif "Black:" in line and "black_key" not in header:
-                player_name = line.split(":", 1)[1].strip()
-                header["black_name"] = player_name # Store the full name
-                for key in all_keys:
-                    if f"({key})" in player_name:
-                        header["black_key"] = key
-                        break
-
-            # Common fields
-            elif "White Strategy:" in line:
-                header["white_strategy"] = line.split(":", 1)[1].strip()
-            elif "Black Strategy:" in line:
-                header["black_strategy"] = line.split(":", 1)[1].strip()
-            elif "Initial FEN:" in line:
-                header["initial_fen"] = line.split(":", 1)[1].strip()
-
-        # Validation
-        required_fields = ["white_key", "black_key", "initial_fen"]
-        missing_fields = [field for field in required_fields if field not in header]
-        
-        # Set default for optional strategy fields
-        header.setdefault('white_strategy', 'No Classic Chess Opening')
-        header.setdefault('black_strategy', 'No Classic Chess Opening')
-
-        if not missing_fields:
-            return header, None
-        else:
-            reason = f"Could not find required fields in log header: {', '.join(missing_fields)}."
-            return None, reason
 
     # --- In-Game Menu Handlers ---
 
