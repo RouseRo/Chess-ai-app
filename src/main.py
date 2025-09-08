@@ -112,29 +112,106 @@ class ChessApp:
             self.player_stats[black_name].draws += 1
         self._save_player_stats()
 
-    def parse_log_header(self, lines, all_player_keys) -> tuple[Optional[GameHeader], Optional[str]]:
-        """Parses the header of a log file and returns a GameHeader object."""
+    def parse_log_header(self, lines, all_player_keys, debug=False) -> tuple[Optional[GameHeader], Optional[str]]:
+        """
+        Parses the header of a log file and returns a GameHeader object.
+        
+        Args:
+            lines: Lines from the log file
+            all_player_keys: List of valid player keys
+            debug: If True, prints detailed diagnostic information
+        """
+        if debug:
+            print("\n==== DIAGNOSTICS: PARSING LOG HEADER ====", flush=True)
+            print(f"Processing {len(lines)} lines, looking at first 10", flush=True)
+            print(f"Available player keys: {all_player_keys}", flush=True)
+        
         header_data = {}
-        for line in lines[:10]:  # Check first 10 lines
+        
+        # Display the first few lines for inspection
+        if debug:
+            print("\n--- FIRST 10 LINES OF FILE ---", flush=True)
+            for i, line in enumerate(lines[:10]):
+                print(f"LINE {i+1}: {line.strip()}", flush=True)
+        
+        # Process with existing regex pattern
+        if debug:
+            print("\n--- REGEX MATCHING RESULTS ---", flush=True)
+        
+        for i, line in enumerate(lines[:10]):
+            if debug:
+                print(f"Processing line {i+1}: {line.strip()}", flush=True)
+            
             match = re.match(r"\[(\w+)\s+\"(.+?)\"\]", line)
             if match:
                 key, value = match.groups()
                 header_data[key.lower()] = value
-
-        required_keys = ['white', 'black', 'white_key', 'black_key']
+                if debug:
+                    print(f"  ✓ MATCHED: key='{key.lower()}', value='{value}'", flush=True)
+            else:
+                # Try alternative pattern based on actual log format
+                alt_match = re.search(r'.*- ([^:]+):\s*(.+)', line)
+                if alt_match:
+                    key, value = alt_match.groups()
+                    clean_key = key.lower().replace(' ', '_')
+                    header_data[clean_key] = value
+                    if debug:
+                        print(f"  ✓ ALT MATCHED: key='{clean_key}', value='{value}'", flush=True)
+        
+        if debug:
+            print("\n--- PARSED HEADER DATA ---", flush=True)
+            for k, v in header_data.items():
+                print(f"  {k}: {v}", flush=True)
+        
+        # Check required keys - FIXED: Use the actual keys found in the log
+        required_keys = ['white', 'black', 'white_player_key', 'black_player_key']
+        
+        if debug:
+            print("\n--- REQUIRED KEYS CHECK ---", flush=True)
+            for k in required_keys:
+                if k in header_data:
+                    print(f"  ✓ Found required key: {k} = {header_data[k]}", flush=True)
+                else:
+                    print(f"  ✗ Missing required key: {k}", flush=True)
+                    # Try to find similar keys that might match
+                    possible_matches = [hk for hk in header_data.keys() if k in hk]
+                    if possible_matches:
+                        print(f"    Possible matches: {possible_matches}", flush=True)
+        
         if not all(k in header_data for k in required_keys):
-            return None, "Header is missing required tags (White, Black, White_Key, Black_Key)."
+            missing = [k for k in required_keys if k not in header_data]
+            error_msg = f"Header is missing required tags ({', '.join(missing)})."
+            if debug:
+                print(f"\n❌ ERROR: {error_msg}", flush=True)
+            return None, error_msg
 
-        if header_data['white_key'] not in all_player_keys or header_data['black_key'] not in all_player_keys:
-            return None, "Player key in log is not in current config."
+        # Check if keys are in config
+        if debug:
+            print("\n--- PLAYER KEY VALIDATION ---", flush=True)
+            for k, player_key_field in [('white_player_key', 'white_key'), ('black_player_key', 'black_key')]:
+                if header_data[k] in all_player_keys:
+                    print(f"  ✓ Valid player key: {k} = {header_data[k]}", flush=True)
+                else:
+                    print(f"  ✗ Invalid player key: {k} = {header_data[k]}", flush=True)
+                    print(f"    Available keys: {all_player_keys}", flush=True)
+        
+        if header_data['white_player_key'] not in all_player_keys or header_data['black_player_key'] not in all_player_keys:
+            error_msg = "Player key in log is not in current config."
+            if debug:
+                print(f"\n❌ ERROR: {error_msg}", flush=True)
+            return None, error_msg
 
+        if debug:
+            print("\n✅ HEADER PARSING SUCCESSFUL", flush=True)
+        
+        # Create GameHeader object - FIXED: Use the correct key names
         return GameHeader(
             white_name=header_data['white'],
             black_name=header_data['black'],
-            white_key=header_data['white_key'],
-            black_key=header_data['black_key'],
-            white_strategy=header_data.get('whitestrategy'),
-            black_strategy=header_data.get('blackstrategy'),
+            white_key=header_data['white_player_key'],  # Changed from 'white_key'
+            black_key=header_data['black_player_key'],  # Changed from 'black_key'
+            white_strategy=header_data.get('white_strategy'),
+            black_strategy=header_data.get('black_strategy'),
             result=header_data.get('result'),
             termination=header_data.get('termination'),
             date=header_data.get('date')
@@ -155,15 +232,36 @@ class ChessApp:
             player1 = self.player_factory.create_player(header.white_key, name_override=header.white_name)
             player2 = self.player_factory.create_player(header.black_key, name_override=header.black_name)
             
-            game = Game(player1, player2, white_strategy=header.white_strategy, black_strategy=header.black_strategy, white_player_key=header.white_key, black_player_key=header.black_key)
+            game = Game(player1, player2, white_strategy=header.white_strategy, 
+                   black_strategy=header.black_strategy, 
+                   white_player_key=header.white_key, 
+                   black_player_key=header.black_key)
             
-            # Find last FEN
-            last_fen = header.initial_fen
+            # Extract FEN information directly from log file instead of using header
+            initial_fen = None
             for line in lines:
-                if "FEN:" in line:
-                    last_fen = line.split("FEN:")[1].strip()
+                if "Initial FEN:" in line:
+                    initial_fen = line.split("Initial FEN:")[1].strip()
+                    break
             
-            game.set_board_from_fen(last_fen)
+            # Find last FEN (start with initial, then update with any move FENs)
+            last_fen = initial_fen
+            for line in lines:
+                if "FEN:" in line and "Initial FEN:" not in line:
+                    fen_part = line.split("FEN:")[1].strip()
+                    # Handle potential trailing commas or other text
+                    if ' ' in fen_part:
+                        # Only take the FEN part up to any comment or trailing text
+                        last_fen = fen_part.split(',')[0].strip()
+                    else:
+                        last_fen = fen_part
+            
+            if last_fen:
+                game.set_board_from_fen(last_fen)
+                print(f"Set board position from FEN", flush=True)
+            else:
+                print("Warning: No FEN found in log file", flush=True)
+            
             return game
         except Exception as e:
             self.ui.display_message(f"Error loading log file: {e}")

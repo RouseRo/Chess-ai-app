@@ -1,14 +1,26 @@
 {
-  "Stockfish (Skill: 10)": {
+  "openai/gpt-4o": {
     "summary": {
-      "pass": 1,
-      "fail": 1
+      "pass": 0,
+      "fail": 2
     },
     "puzzles": {
       "Mate in 3 (Queen-King)": {
-        "status": "PASS",
-        "moves_taken": 3,
-        "moves_expected": 3
+        "status": "FAIL"
+      },
+      "Mate in 3 (Rook-King)": {
+        "status": "FAIL"
+      }
+    }
+  },
+  "Stockfish (Skill: 10)": {
+    "summary": {
+      "pass": 0,
+      "fail": 2
+    },
+    "puzzles": {
+      "Mate in 3 (Queen-King)": {
+        "status": "FAIL"
       },
       "Mate in 3 (Rook-King)": {
         "status": "FAIL"
@@ -17,19 +29,15 @@
   },
   "Stockfish (Skill: 20)": {
     "summary": {
-      "pass": 2,
-      "fail": 0
+      "pass": 0,
+      "fail": 2
     },
     "puzzles": {
       "Mate in 3 (Queen-King)": {
-        "status": "PASS",
-        "moves_taken": 2,
-        "moves_expected": 3
+        "status": "FAIL"
       },
       "Mate in 3 (Rook-King)": {
-        "status": "PASS",
-        "moves_taken": 2,
-        "moves_expected": 3
+        "status": "FAIL"
       }
     }
   }
