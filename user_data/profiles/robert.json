@@ -1,0 +1,10 @@
+{
+    "username": "Robert",
+    "email": "robert.k.rouse@gmail.com",
+    "password_hash": "5458de6a9db7b522d3020ec8e29b4f0d268bd1c625e1406d7db9b863107e03d5",
+    "password_salt": "0256223462d3d2ed9ca80a0a048a7686",
+    "verified": true,
+    "created_at": "2025-09-08T12:52:28.121331",
+    "last_login": "2025-09-08T12:56:21.555123",
+    "games": []
+}
