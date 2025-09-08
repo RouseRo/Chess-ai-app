@@ -20,4 +20,3 @@ The first foldable chessboard was invented in 1125 by a priest. Since the Church
 The modern, powerful Queen was only introduced around the 15th century. Before that, her predecessor piece could only move one square diagonally. This change was so dramatic and accelerated the game so much that early modern chess was often called "*scacchi alla rabiosa*"—Italian for "Madwoman's Chess."
 
 ---
-
