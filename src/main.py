@@ -20,6 +20,8 @@ from src.file_manager import FileManager
 from src.expert_service import ExpertService
 from src.player_factory import PlayerFactory
 from src.data_models import PlayerStats, GameHeader, stats_to_dict, GameLoopAction
+from src.user_manager import UserManager
+from src.auth_ui import AuthUI
 
 
 # --- Constants ---
@@ -28,6 +30,7 @@ PLAYER_STATS_FILE = 'logs/player_stats.json'
 
 class ChessApp:
     """The main application class that orchestrates the game."""
+    
     def __init__(self):
         """Initializes the application, loading configurations."""
         self.ui = UIManager()
@@ -38,12 +41,22 @@ class ChessApp:
         self.stockfish_path = None
         self.stockfish_configs = {}
         self.chess_expert_model = ""
+        
+        # Add user management components
+        self.user_manager = UserManager(data_dir="user_data", dev_mode=True)  # Set dev_mode=True
+        self.auth_ui = AuthUI()
+        self.session_token = None
+        self.current_user = None
+        
         self._load_config()
         # Initialize services and factories after config is loaded
         self.expert_service = ExpertService(self.ui, self.chess_expert_model)
         self.player_factory = PlayerFactory(
             self.ui, self.ai_models, self.stockfish_configs, self.stockfish_path
         )
+
+        # Try to load session from file if it exists
+        self._load_session()
 
     def _load_config(self):
         """Loads configuration from config.json."""
@@ -484,6 +497,11 @@ class ChessApp:
 
     def run(self):
         """Main function to run the chess application."""
+        # First, handle authentication
+        if not self._handle_authentication():
+            print("Exiting application.")
+            return
+        
         game = None
         while True:
             if game:
@@ -645,6 +663,87 @@ class ChessApp:
             return
         else:
             print(f"{RED}Invalid choice. Please try again.{ENDC}", flush=True)
+
+    def _load_session(self):
+        """Attempt to load a saved session if it exists."""
+        session_file = os.path.join("user_data", "current_session.txt")
+        if os.path.exists(session_file):
+            try:
+                with open(session_file, 'r') as f:
+                    saved_token = f.read().strip()
+                    
+                # Validate the token
+                user_data = self.user_manager.get_current_user(saved_token)
+                if user_data:
+                    self.session_token = saved_token
+                    self.current_user = user_data
+                    print(f"Welcome back, {user_data['username']}!")
+            except Exception as e:
+                print(f"Error loading saved session: {e}")
+
+    def _handle_authentication(self):
+        """Handle user authentication flow. Return True if authenticated."""
+        # If already authenticated, return True immediately
+        if self.current_user:
+            return True
+            
+        while not self.current_user:
+            choice = self.auth_ui.display_auth_menu()
+            
+            if choice == '1':  # Login
+                username_or_email, password = self.auth_ui.get_login_credentials()
+                success, message, token = self.user_manager.login(username_or_email, password)
+                
+                self.auth_ui.display_message(message)
+                if success:
+                    self.session_token = token
+                    self.current_user = self.user_manager.get_current_user(token)
+                    self._save_session()
+                    return True
+    
+            elif choice == '2':  # Register
+                registration_info = self.auth_ui.get_registration_info()
+                if registration_info:
+                    username, email, password = registration_info
+                    success, message = self.user_manager.register_user(username, email, password)
+                    
+                    self.auth_ui.display_message(message)
+                    if success:
+                        if self.user_manager.dev_mode:
+                            # In dev mode, show a special message about verification
+                            print("In development mode, verification tokens are displayed in the console.")
+                            print("You can use the token shown above to verify your account.")
+                        
+                        # Ask for verification token
+                        verify_now = input("Would you like to enter your verification code now? (y/n): ").lower() == 'y'
+                        if verify_now:
+                            token = self.auth_ui.get_verification_token()
+                            success, msg = self.user_manager.verify_email(token)
+                            self.auth_ui.display_message(msg)
+                            
+                            # If verification was successful, try to auto-login
+                            if success:
+                                print("Attempting automatic login after verification...")
+                                success, message, token = self.user_manager.login(username, password)
+                                if success:
+                                    self.session_token = token
+                                    self.current_user = self.user_manager.get_current_user(token)
+                                    self._save_session()
+                                    return True
+    
+            elif choice == 'q':  # Quit
+                return False
+
+        return True  # Already authenticated
+
+    def _save_session(self):
+        """Save the current session token to a file."""
+        if self.session_token:
+            os.makedirs("user_data", exist_ok=True)
+            session_file = os.path.join("user_data", "current_session.txt")
+            
+            with open(session_file, 'w') as f:
+                f.write(self.session_token)
 #--- Entry Point ---
 if __name__ == "__main__":
     # To run the application now, use: python -m src.main
