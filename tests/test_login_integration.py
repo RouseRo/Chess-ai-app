@@ -52,11 +52,15 @@ def extract_verification_token(console_output):
 
 def spawn_test_process():
     """Create a process with proper environment settings for automated testing"""
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
+    # Use the current value of CHESS_APP_TEST_MODE
+    env["CHESS_APP_TEST_MODE"] = os.environ.get("CHESS_APP_TEST_MODE", "1")
     return PopenSpawn(
         PY_CMD,
         encoding='utf-8',
         timeout=TIMEOUT,
-        env=TEST_ENV
+        env=env
     )
 
 def expect_with_debug(child, pattern, timeout=None):
@@ -104,6 +108,9 @@ def setup_test_environment():
 def test_registration_and_login(setup_test_environment):
     """Test the complete authentication flow: registration, verification, and login."""
     print(f"Testing with unique username: {TEST_USERNAME}")
+    
+    # Set test mode OFF for this test
+    os.environ["CHESS_APP_TEST_MODE"] = "0"
     
     # Part 1: User Registration
     verification_token = None
@@ -322,3 +329,6 @@ def test_registration_and_login(setup_test_environment):
         # Clean up the process
         if child.proc.poll() is None:
             child.proc.terminate()
+    
+    # At the end of the test, restore test mode ON
+    os.environ["CHESS_APP_TEST_MODE"] = "1"
