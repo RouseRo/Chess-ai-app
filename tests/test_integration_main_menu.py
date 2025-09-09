@@ -4,6 +4,7 @@ import pexpect
 from pexpect.popen_spawn import PopenSpawn
 import re
 import time
+import os
 
 # Command to run the application as a module, with unbuffered output (-u)
 PY_CMD = [sys.executable, "-u", "-m", "src.main"]
@@ -15,14 +16,13 @@ def clean_output(text: str) -> str:
     """Removes ANSI color codes from a string."""
     return ANSI_ESCAPE_RE.sub('', text)
 
-def expect_with_debug(child, pattern, timeout=None):
+def expect_with_debug(child, pattern, timeout=15):
     """Helper function to expect a pattern with debug output on failure"""
     try:
         return child.expect(pattern, timeout=timeout)
-    except pexpect.TIMEOUT:
-        # Print the actual buffer content to help debug what's being received
-        print(f"\nTIMEOUT waiting for: {pattern}")
-        print(f"Current buffer content:\n{child.before}")
+    except Exception as e:
+        print(f"Error waiting for pattern: {pattern}")
+        print(child.before)
         raise
 
 def _read_buffered_output(child, size=1000, timeout=2):
@@ -50,13 +50,17 @@ def _terminate_process(child):
             if child.proc.poll() is None:
                 child.proc.kill()
 
+# Set up test environment
+TEST_ENV = os.environ.copy()
+TEST_ENV["CHESS_APP_TEST_MODE"] = "1"
+
 @pytest.mark.integration
 def test_main_menu_loads_and_quits():
     """
     Tests if the application starts, displays the main menu, and quits successfully.
     """
     # On Windows, use PopenSpawn which is more reliable
-    child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=15)  # Increased timeout
+    child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=15, env=TEST_ENV)  # Increased timeout
 
     try:
         # Wait for the main menu to appear - this pattern is more lenient
@@ -90,7 +94,7 @@ def test_main_menu_player_stats_flow():
     """
     Tests the flow of selecting 'View Player Stats' and returning to the menu.
     """
-    child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=15)  # Increased timeout
+    child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=15, env=TEST_ENV)  # Increased timeout
 
     try:
         # Wait for the main menu
@@ -127,7 +131,7 @@ def test_main_menu_chess_expert_flow():
     """
     Tests the flow of selecting 'Ask a Chess Expert' and verifying the submenu appears.
     """
-    child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=15)
+    child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=15, env=TEST_ENV)
 
     try:
         # Wait for the main menu
@@ -167,7 +171,7 @@ def test_main_menu_new_game_flow():
     5. Player can quit the game
     """
     # On Windows, use PopenSpawn which is more reliable
-    child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=30)
+    child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=30, env=TEST_ENV)
     child.delayafterread = 0.1
     
     try:
