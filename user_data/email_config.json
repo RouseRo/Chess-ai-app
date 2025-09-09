@@ -1,0 +1,7 @@
+{
+    "smtp_server": "smtp.mail.yahoo.com",
+    "smtp_port": "587",
+    "smtp_username": "robert.k.rouse@gmail.com",
+    "smtp_password": "",
+    "from_email": "chess-app@yourdomain.com"
+}
