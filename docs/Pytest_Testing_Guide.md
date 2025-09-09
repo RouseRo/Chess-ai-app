@@ -122,3 +122,20 @@ def expect_with_debug(child, pattern, timeout=None):
         print(f"Current buffer content:\n{child.before}")
         raise
 ```
+
+# Automated Testing of CLI Applications with Password Inputs
+
+## Challenge
+Testing CLI applications that require password input can be challenging because:
+1. Password inputs typically use `getpass.getpass()` which bypasses normal input mechanisms
+2. This can cause tests to hang waiting for user input
+3. Terminal interactions can be difficult to automate
+
+## Solution
+We use a combination of techniques to automate password input:
+
+1. **Environment variables for test detection**:
+   ```python
+   # In tests
+   TEST_ENV = os.environ.copy()
+   TEST_ENV["CHESS_APP_TEST_MODE"] = "1"

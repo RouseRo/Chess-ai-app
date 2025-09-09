@@ -12,13 +12,64 @@ TIMEOUT = 20  # seconds
 
 # Generate unique test credentials for each test run
 TEST_USERNAME = f"ChessTester_{uuid.uuid4().hex[:8]}"
-TEST_PASSWORD = "TestPassword123"
+TEST_PASSWORD = "TestPassword123"  # Fixed password for testing
 TEST_EMAIL = f"{TEST_USERNAME.lower()}@example.com"
+
+# Add environment variables to disable interactive prompts
+TEST_ENV = os.environ.copy()
+TEST_ENV["PYTHONIOENCODING"] = "utf-8"
+TEST_ENV["CHESS_APP_TEST_MODE"] = "1"  # Add this to your app to detect test mode
 
 def strip_ansi_codes(text):
     """Remove ANSI color codes from text output"""
     ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
     return ansi_escape.sub('', text)
+
+def extract_verification_token(console_output):
+    """Extract verification token from console output in dev mode."""
+    # Try standard pattern (improved)
+    match = re.search(r"verification token is: ([a-zA-Z0-9_-]+)", console_output)
+    if match:
+        return match.group(1)
+    
+    # Look for token at beginning of line
+    lines = console_output.split('\n')
+    for line in lines:
+        if re.match(r'^[a-zA-Z0-9_\-]{30,}$', line.strip()):
+            return line.strip()
+    
+    # Try a more flexible pattern as backup
+    match = re.search(r"token is: ([^\r\n]+)", console_output)
+    if match:
+        return match.group(1).strip()
+    
+    # Handle potential duplication in token string
+    match = re.search(r"verification token is:verification token is: ([a-zA-Z0-9_\-]+)", console_output)
+    if match:
+        return match.group(1)
+    
+    return None
+
+def spawn_test_process():
+    """Create a process with proper environment settings for automated testing"""
+    return PopenSpawn(
+        PY_CMD,
+        encoding='utf-8',
+        timeout=TIMEOUT,
+        env=TEST_ENV
+    )
+
+def expect_with_debug(child, pattern, timeout=None):
+    """Helper to expect a pattern with debug output on failure"""
+    if timeout is None:
+        timeout = TIMEOUT
+        
+    try:
+        return child.expect(pattern, timeout=timeout)
+    except Exception as e:
+        print(f"\nERROR waiting for pattern: {pattern}")
+        print(f"Output received before timeout:\n{'-'*50}\n{child.before}\n{'-'*50}")
+        raise
 
 @pytest.fixture(scope="module")
 def setup_test_environment():
@@ -47,52 +98,16 @@ def setup_test_environment():
     # Restore original session if it existed
     if session_existed and os.path.exists(f"{session_file}.bak"):
         shutil.move(f"{session_file}.bak", session_file)
-        
-def expect_with_debug(child, pattern, timeout=None):
-    """Helper to expect a pattern with debug output on failure"""
-    if timeout is None:
-        timeout = TIMEOUT
-        
-    try:
-        return child.expect(pattern, timeout=timeout)
-    except Exception as e:
-        print(f"\nERROR waiting for pattern: {pattern}")
-        print(f"Output received before timeout:\n{'-'*50}\n{child.before}\n{'-'*50}")
-        raise
-
-def extract_verification_token(console_output):
-    """Extract verification token from console output in dev mode."""
-    # Try standard pattern (improved)
-    match = re.search(r"verification token is: ([a-zA-Z0-9_\-]+)", console_output)
-    if match:
-        return match.group(1)
-    
-    # Look for token at beginning of line
-    lines = console_output.split('\n')
-    for line in lines:
-        if re.match(r'^[a-zA-Z0-9_\-]{30,}$', line.strip()):
-            return line.strip()
-    
-    # Try a more flexible pattern as backup
-    match = re.search(r"token is: ([^\r\n]+)", console_output)
-    if match:
-        return match.group(1).strip()
-    
-    # Handle potential duplication in token string
-    match = re.search(r"verification token is:verification token is: ([a-zA-Z0-9_\-]+)", console_output)
-    if match:
-        return match.group(1)
-    
-    return None
 
 @pytest.mark.integration
+@pytest.mark.auth
 def test_registration_and_login(setup_test_environment):
     """Test the complete authentication flow: registration, verification, and login."""
     print(f"Testing with unique username: {TEST_USERNAME}")
     
     # Part 1: User Registration
     verification_token = None
-    child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=TIMEOUT)
+    child = spawn_test_process()
     
     try:
         # Wait for authentication menu
@@ -187,7 +202,7 @@ def test_registration_and_login(setup_test_environment):
             else:
                 # If not, wait for either prompt format
                 index = child.expect([
-                    "Would you like to enter your verification code now", 
+                    "Would you like to enter your verification code now",
                     "\\? \\(y/n\\):"
                 ], timeout=TIMEOUT)
                 child.sendline("y")
@@ -227,7 +242,7 @@ def test_registration_and_login(setup_test_environment):
             child.proc.terminate()
     
     # Part 2: User Login (in a separate session)
-    child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=TIMEOUT)
+    child = spawn_test_process()
     
     try:
         # Wait for authentication menu

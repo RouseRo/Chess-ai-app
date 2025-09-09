@@ -744,6 +744,18 @@ class ChessApp:
             
             with open(session_file, 'w') as f:
                 f.write(self.session_token)
+
+    def get_password(prompt="Password: "):
+        """Get password with or without masking based on environment"""
+        # Check if we're in test mode
+        if os.environ.get("CHESS_APP_TEST_MODE") == "1":
+            # In test mode, accept password input directly without masking
+            return input(prompt)
+        else:
+            # In normal mode, use getpass for secure password input
+            import getpass
+            return getpass.getpass(prompt)
+
 #--- Entry Point ---
 if __name__ == "__main__":
     # To run the application now, use: python -m src.main

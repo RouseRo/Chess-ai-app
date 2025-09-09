@@ -1,6 +1,7 @@
 import getpass
 import re
 from typing import Optional, Tuple
+from src.utils.input_handler import get_password
 
 class AuthUI:
     """User interface for authentication and registration."""
@@ -22,7 +23,7 @@ class AuthUI:
         """Get username/email and password for login."""
         print("\n--- Login ---")
         username_or_email = input("Username or Email: ").strip()
-        password = getpass.getpass("Password: ")
+        password = get_password("Password: ")
         return username_or_email, password
     
     def get_registration_info(self) -> Optional[Tuple[str, str, str]]:
@@ -45,9 +46,9 @@ class AuthUI:
         
         # Get password
         while True:
-            password = getpass.getpass("Password (minimum 8 characters): ")
+            password = get_password("Password (minimum 8 characters): ")
             if len(password) >= 8:
-                confirm_password = getpass.getpass("Confirm password: ")
+                confirm_password = get_password("Confirm password: ")
                 if password == confirm_password:
                     break
                 print("Passwords don't match. Please try again.")
