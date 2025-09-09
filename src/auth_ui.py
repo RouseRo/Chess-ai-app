@@ -1,5 +1,6 @@
 import getpass
 import re
+import os
 from typing import Optional, Tuple
 from src.utils.input_handler import get_password
 
@@ -77,3 +78,41 @@ class AuthUI:
             if choice in ['1', '2', '3']:
                 return choice
             print("Invalid choice. Please try again.")
+
+    def show_main_menu(self):
+        """Show the main menu of the application."""
+        print("\n--- Main Menu ---")
+        print("  1: Continue as Guest")
+        print("  2: Login")
+        print("  3: Register")
+        print("  q: Quit")
+        
+        while True:
+            choice = input("Enter your choice: ").strip().lower()
+            if choice in ['1', '2', '3', 'q']:
+                if choice == '1':
+                    self.display_message("Continuing as guest...")
+                    # Logic for guest access
+                elif choice == '2':
+                    self.display_message("Please log in.")
+                    # Logic for login
+                elif choice == '3':
+                    self.display_message("Please register.")
+                    # Logic for registration
+                elif choice == 'q':
+                    self.display_message("Quitting the application. Goodbye!")
+                    exit(0)
+                return
+            print("Invalid choice. Please try again.")
+
+def main():
+    if os.environ.get("CHESS_APP_TEST_MODE") == "1":
+        # In test mode, skip authentication and go straight to main menu
+        AuthUI().show_main_menu()
+    else:
+        # Normal flow: show authentication menu first
+        AuthUI().display_auth_menu()
+        # Continue with login/registration as needed
+
+if __name__ == "__main__":
+    main()

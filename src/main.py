@@ -757,7 +757,15 @@ class ChessApp:
             return getpass.getpass(prompt)
 
 #--- Entry Point ---
+def main():
+    if os.environ.get("CHESS_APP_TEST_MODE") == "1":
+        # In test mode, skip authentication and go straight to main menu loop
+        app = ChessApp()
+        app.current_user = {"username": "TestUser"}  # Simulate a logged-in user
+        app.run()
+    else:
+        app = ChessApp()
+        app.run()
+
 if __name__ == "__main__":
-    # To run the application now, use: python -m src.main
-    app = ChessApp()
-    app.run()
+    main()
