@@ -2,3 +2,4 @@ openai
 requests
 numpy
 python-chess
+pytest
