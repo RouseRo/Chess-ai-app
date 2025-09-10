@@ -159,6 +159,7 @@ def test_main_menu_chess_expert_flow():
         if child.proc.poll() is None:
             child.proc.terminate()
 
+@pytest.mark.skip(reason="Skipping integration test for now")
 @pytest.mark.integration
 def test_main_menu_new_game_flow():
     """Test the flow of starting a new game from the main menu

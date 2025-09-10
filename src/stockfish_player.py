@@ -10,6 +10,7 @@ class StockfishPlayer:
         :param path: Path to the Stockfish executable.
         :param parameters: A dictionary of Stockfish UCI parameters.
         """
+    
         self.stockfish = Stockfish(path=path, parameters=parameters or {})
 
         skill_level = self.stockfish.get_parameters().get("Skill Level", "N/A")
