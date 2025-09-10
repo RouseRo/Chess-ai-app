@@ -19,6 +19,7 @@ from src.game_manager import GameManager
 from src.in_game_menu_handlers import InGameMenuHandlers
 from src.chess_expert_menu import ChessExpertMenu
 from src.menu_handlers import MenuHandlers
+from src.data_models import GameLoopAction
 
 
 LOG_FILE = 'chess_game.log'
