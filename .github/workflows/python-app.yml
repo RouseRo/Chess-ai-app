@@ -22,6 +22,8 @@ jobs:
       run: sudo apt-get update && sudo apt-get install -y stockfish
     - name: Set Stockfish path for Linux
       run: echo "STOCKFISH_EXECUTABLE=/usr/games/stockfish" >> $GITHUB_ENV
+    - name: Set dummy OpenAI API key for tests
+      run: echo "OPENAI_API_KEY=dummy" >> $GITHUB_ENV
     - name: Run pytest (passwordless test mode)
       run: |
         export CHESS_APP_TEST_MODE=1

@@ -76,4 +76,7 @@ On every pull request to `master`, the pipeline will:
 
 See `.github/workflows/python-app.yml` for details.
 
----
+### CI/CD Notes
+
+- The CI pipeline sets a dummy `OPENAI_API_KEY` for tests that require OpenAI client instantiation.
+- If your tests do not need to call the real OpenAI API, use `pytest-mock` to mock
