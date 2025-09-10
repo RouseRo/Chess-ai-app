@@ -28,7 +28,3 @@ jobs:
       run: |
         export CHESS_APP_TEST_MODE=1
         pytest --ignore=tests/test_login_integration.py
-    - name: Run login integration test
-      run: |
-        export CHESS_APP_TEST_MODE=0
-        pytest

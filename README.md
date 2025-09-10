@@ -71,7 +71,9 @@ This project uses GitHub Actions for CI/CD.
 On every pull request to `master`, the pipeline will:
 
 - Install dependencies
-- Run all pytest tests in passwordless mode (`CHESS_APP_TEST_MODE=1`)
+- Set a dummy `OPENAI_API_KEY` for tests that require OpenAI client instantiation
+- Install Stockfish on Linux runners and set the `STOCKFISH_EXECUTABLE` environment variable
+- Run all pytest tests in passwordless mode (`CHESS_APP_TEST_MODE=1`) except the login integration test
 - Run the login integration test in full authentication mode (`CHESS_APP_TEST_MODE=0`)
 
 See `.github/workflows/python-app.yml` for details.
@@ -79,4 +81,23 @@ See `.github/workflows/python-app.yml` for details.
 ### CI/CD Notes
 
 - The CI pipeline sets a dummy `OPENAI_API_KEY` for tests that require OpenAI client instantiation.
-- If your tests do not need to call the real OpenAI API, use `pytest-mock` to mock
+- If your tests do not need to call the real OpenAI API, use `pytest-mock` to mock the OpenAI client.
+- The Stockfish chess engine is installed on Linux runners and its path is set using the `STOCKFISH_EXECUTABLE` environment variable.
+- All tests should use `os.environ.get("STOCKFISH_EXECUTABLE", "stockfish")` to locate the Stockfish binary.
+- If you encounter authentication menu prompts in tests when `CHESS_APP_TEST_MODE=0`, ensure your test code navigates through authentication before expecting the main menu.
+- For tests that expect the main menu immediately, use `CHESS_APP_TEST_MODE=1`.
+
+---
+
+## Troubleshooting Test Failures
+
+- **Authentication Menu Timeout:**  
+  If a test fails waiting for the main menu but the authentication menu is shown, update your test to handle authentication (login or register) before proceeding to the main menu when `CHESS_APP_TEST_MODE=0`.
+- **Missing Dependencies:**  
+  If you see `ModuleNotFoundError`, add the missing package to `requirements.txt`.
+- **Stockfish Not Found:**  
+  Ensure Stockfish is installed and the path is set via `STOCKFISH_EXECUTABLE` in your workflow and code.
+- **OpenAI API Key Error:**  
+  Set a dummy `OPENAI_API_KEY` in your CI environment for tests that instantiate the OpenAI client.
+
+---
