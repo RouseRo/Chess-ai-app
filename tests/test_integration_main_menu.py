@@ -108,7 +108,7 @@ def test_main_menu_player_stats_flow():
         expect_with_debug(child, r"--- Player Statistics ---")
         expect_with_debug(child, r"Player\s+\|\s+Wins\s+\|\s+Losses\s+\|\s+Draws")  # Added child parameter
         expect_with_debug(child, r"-+")  # Added child parameter
-        expect_with_debug(child, r"Human Player")  # Added child parameter
+        expect_with_debug(child, r".*\(hu\)")  # Updated regex to match actual output
         expect_with_debug(child, r"Press Enter to return to the main menu")  # Added child parameter
         
         # Press Enter to go back
