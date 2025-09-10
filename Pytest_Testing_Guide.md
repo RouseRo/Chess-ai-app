@@ -70,6 +70,19 @@ child.expect("Exiting application.")
 
 ---
 
+## CI/CD Integration
+
+Automated tests are run on every pull request to `master` using GitHub Actions.  
+The workflow:
+
+- Installs dependencies
+- Runs all tests except login integration in passwordless mode (`CHESS_APP_TEST_MODE=1`)
+- Runs the login integration test in normal mode (`CHESS_APP_TEST_MODE=0`)
+
+See `.github/workflows/python-app.yml` for more details.
+
+---
+
 ## Additional Resources
 
 - [pytest documentation](https://docs.pytest.org/)

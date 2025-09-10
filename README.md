@@ -65,4 +65,15 @@ tests/
 2. Create a feature branch
 3. Submit a pull request
 
+## Continuous Integration
+
+This project uses GitHub Actions for CI/CD.  
+On every pull request to `master`, the pipeline will:
+
+- Install dependencies
+- Run all pytest tests in passwordless mode (`CHESS_APP_TEST_MODE=1`)
+- Run the login integration test in full authentication mode (`CHESS_APP_TEST_MODE=0`)
+
+See `.github/workflows/python-app.yml` for details.
+
 ---
