@@ -18,6 +18,10 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+    - name: Install Stockfish
+      run: sudo apt-get update && sudo apt-get install -y stockfish
+    - name: Set Stockfish path for Linux
+      run: echo "STOCKFISH_EXECUTABLE=/usr/games/stockfish" >> $GITHUB_ENV
     - name: Run pytest (passwordless test mode)
       run: |
         export CHESS_APP_TEST_MODE=1
