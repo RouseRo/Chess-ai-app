@@ -6,3 +6,4 @@ python-dotenv
 pexpect
 pytest
 stockfish
+pytest-mock

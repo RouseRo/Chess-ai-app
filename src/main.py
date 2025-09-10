@@ -66,7 +66,8 @@ class ChessApp:
                 self.white_openings = config.get("white_openings", {})
                 self.black_defenses = config.get("black_defenses", {})
                 self.ai_models = config.get("ai_models", {})
-                self.stockfish_path = config.get("stockfish_path")
+                # Use environment variable if set, else config value, else default "stockfish"
+                self.stockfish_path = os.environ.get("STOCKFISH_EXECUTABLE", config.get("stockfish_path", "stockfish"))
                 self.stockfish_configs = config.get("stockfish_configs", {})
                 self.chess_expert_model = config.get('chess_expert_model', 'google/gemini-2.5-pro')
         except (FileNotFoundError, json.JSONDecodeError) as e:
