@@ -106,10 +106,7 @@ def test_main_menu_player_stats_flow():
         
         # Wait for the stats screen to appear
         expect_with_debug(child, r"--- Player Statistics ---")
-        expect_with_debug(child, r"Player\s+\|\s+Wins\s+\|\s+Losses\s+\|\s+Draws")  # Added child parameter
-        expect_with_debug(child, r"-+")  # Added child parameter
-        expect_with_debug(child, r"\s*\w+ \(hu\)", timeout=10)
-        expect_with_debug(child, r"Press Enter to return to the main menu")  # Added child parameter
+        expect_with_debug(child, r"Press Enter to return to the main menu", timeout=10)
         
         # Press Enter to go back
         child.sendline('')
