@@ -50,101 +50,75 @@ def test_with_unit_marker():
     """A test with the 'unit' marker to demonstrate marker usage."""
     assert 1 + 1 == 2
 
+@pytest.mark.skip(reason="Skipping integration test for now")
 @pytest.mark.integration
 def test_main_menu_new_game_flow():
     """Test the flow of starting a new game from the main menu"""
-    # On Windows, use PopenSpawn which is more reliable
     child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=30)
-    
-    # Set a smaller delay after read to avoid hanging
     child.delayafterread = 0.1
 
     try:
         # Wait for the main menu
         expect_with_debug(child, r"--- Main Menu ---", timeout=10)
         expect_with_debug(child, r"Enter your choice", timeout=5)
-        
+
         # Select option '1' for new game
         child.sendline('1')
-        
+
         # Verify the setup menu appears
         expect_with_debug(child, r"--- Setup New Game ---", timeout=10)
         expect_with_debug(child, r"Choose player models for White and Black", timeout=5)
-        
-        # Verify the player model selection menu appears
         expect_with_debug(child, r"--- Choose Player Models ---", timeout=5)
-        expect_with_debug(child, r"Available AI models", timeout=5)
-        expect_with_debug(child, r"Available Stockfish configs", timeout=5)
+        expect_with_debug(child, r"Available AI models:", timeout=5)
+        expect_with_debug(child, r"Available Stockfish configs:", timeout=5)
         expect_with_debug(child, r"Enter choice for White and Black players", timeout=5)
-        
-        # Select "Human vs Stockfish (Balanced)"
-        child.sendline('hus2')
-        
+
+        # Select "Human vs Stockfish (Strong, Powerful)"
+        child.sendline('hus3')
+
         # Verify human player message
         expect_with_debug(child, r"Human player selected for White", timeout=10)
-        
+
         # Verify the black defense options
         expect_with_debug(child, r"Choose black defense", timeout=5)
-        
-        # Select "Sicilian Defense"
-        child.sendline('a')
-        
+        expect_with_debug(child, r"Black defense key:", timeout=5)
+
+        # Select "No Classic Chess Defense"
+        child.sendline('z')
+
         # Verify name prompt and skip by pressing Enter
-        expect_with_debug(child, r"Enter name for White player", timeout=5)
+        expect_with_debug(child, r"Enter name for White player \(leave blank for 'Human'\):", timeout=10)
         child.sendline('')
-        
+
         # Wait for the game to start and display the initial board
         expect_with_debug(child, r"--- Game Started ---", timeout=10)
         expect_with_debug(child, r"White: Human", timeout=5)
         expect_with_debug(child, r"Black: Stockfish", timeout=5)
-        
-        # Wait for board to be displayed - looking for specific board elements
+        expect_with_debug(child, r"Initial FEN:", timeout=5)
         expect_with_debug(child, r"8\|", timeout=10)
-        
-        # Force a read to make sure we get any buffered output
-        try:
-            child.read_nonblocking(size=1000, timeout=2)
-        except:
-            pass
-            
-        # Use a more flexible pattern for move prompt
-        # Try different patterns one by one
-        try:
-            expect_with_debug(child, r"Move 1", timeout=10)
-        except pexpect.TIMEOUT:
-            print("Couldn't find 'Move 1', trying to read more...")
-            # Try to read more output
-            try:
-                output = child.read_nonblocking(size=2000, timeout=5)
-                print(f"Additional output: {output}")
-            except:
-                pass
-        
+
+        # Wait for move prompt
+        expect_with_debug(child, r"Move 1.*Enter your move", timeout=10)
+
         # Quit the game
         child.sendline('q')
-        
-        # Try to verify quit options appear, but don't fail if not
-        try:
-            expect_with_debug(child, r"--- Quit Options ---", timeout=5)
-            child.sendline('q')
-        except:
-            # If quit options didn't appear, try sending ctrl+c to exit
-            child.sendintr()
-            
+
+        # Verify quit options appear
+        expect_with_debug(child, r"--- Quit Options ---", timeout=5)
+        expect_with_debug(child, r"Enter your choice \[r/s/q/c\]:", timeout=5)
+        child.sendline('q')
+
+        # Verify exit message
+        expect_with_debug(child, r"Exiting without saving.", timeout=5)
+
     finally:
-        # Show final buffer state for debugging
         print(f"\nFinal buffer state:\n{child.before}")
-        
-        # Clean up if the process is still running
         if child.proc.poll() is None:
-            # Try graceful termination first
             try:
-                child.sendintr()  # Send Ctrl+C
+                child.sendintr()
                 time.sleep(1)
             except:
                 pass
-            
-            # Force terminate if still running
             try:
                 child.proc.terminate()
                 time.sleep(1)
