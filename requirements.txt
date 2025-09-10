@@ -2,6 +2,7 @@ openai
 requests
 numpy
 python-chess
-pytest
-pexpect
 python-dotenv
+pexpect
+pytest
+stockfish
