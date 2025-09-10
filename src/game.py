@@ -4,6 +4,7 @@ import re  # Add this import for regular expressions
 from src.ai_player import AIPlayer
 from src.stockfish_player import StockfishPlayer
 from src.human_player import HumanPlayer
+from enum import Enum
 
 # ANSI escape codes for colors
 BLUE = '\033[94m'
@@ -13,6 +14,12 @@ YELLOW = '\033[93m'
 RED = '\033[91m'
 WHITE = '\033[97m'
 ENDC = '\033[0m'
+
+class GameLoopAction(Enum):
+    CONTINUE = 1
+    QUIT_APPLICATION = 2
+    RETURN_TO_MENU = 3
+    SKIP_TURN = 4
 
 class Game:
     """Represents a single game of chess, including board state and players."""
