@@ -1,6 +1,13 @@
 import chess
 from src.game import BLUE, CYAN, GREEN, YELLOW, RED, WHITE, ENDC
 
+RED = "\033[91m"
+GREEN = "\033[92m"
+YELLOW = "\033[93m"
+CYAN = "\033[96m"
+ENDC = "\033[0m"
+BOLD = "\033[1m"
+
 class UIManager:
     """Simple console UI helper. Menu titles and option text are shown in color."""
 
@@ -168,15 +175,18 @@ class UIManager:
         return white_opening, black_defense, white_key, black_key
 
     def display_player_stats(self, stats):
-        title = self._color_title("--- Player Statistics ---")
-        print(title)
-        print(f"{'Player':30} | {'Wins':>4} | {'Losses':>6} | {'Draws':>5}")
-        print("-" * 57)
+        print(f"\n{CYAN}{BOLD}--- Player Statistics ---{ENDC}", flush=True)
+        # Table header with colors, Player column widened, Losses column width fixed for alignment
+        print(f"{BOLD}{'Player':<33} | {GREEN}Wins{ENDC:^6} | {RED}Losses{ENDC:^6} | {YELLOW}Draws{ENDC:^7}{ENDC}", flush=True)
+        print(f"{'-'*33} | {'-'*6} | {'-'*6} | {'-'*7}", flush=True)
+        # Table rows
         for name, v in sorted(stats.items(), key=lambda x: (-x[1].get('wins',0), x[0])):
-            wins = v.get('wins', 0)
-            losses = v.get('losses', 0)
-            draws = v.get('draws', 0)
-            print(f"{name:30} | {wins:4} | {losses:6} | {draws:5}")
+            player_display = f"{CYAN}{name:<33}{ENDC}"
+            wins_display = f"{GREEN}{v.get('wins',0):^6}{ENDC}"
+            losses_display = f"{RED}{v.get('losses',0):^6}{ENDC}"
+            draws_display = f"{YELLOW}{v.get('draws',0):^7}{ENDC}"
+            print(f"{player_display} | {wins_display} | {losses_display} | {draws_display}", flush=True)
+        print(f"{YELLOW}Press Enter to return to the main menu.{ENDC}", flush=True)
 
     def display_game_start_message(self, game):
         title = self._color_title("--- Game Started ---")
