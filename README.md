@@ -101,3 +101,12 @@ See `.github/workflows/python-app.yml` for details.
   Set a dummy `OPENAI_API_KEY` in your CI environment for tests that instantiate the OpenAI client.
 
 ---
+
+## Integration Testing
+
+Integration tests are located in `tests/test_integration_main_menu.py` and use `pexpect` to interact with the CLI application.
+
+- Set `CHESS_APP_TEST_MODE=1` in your environment before running tests for deterministic behavior.
+- The player stats test only checks for the presence of the statistics header and return prompt, not specific player names.
+- All tests clean up child processes after execution.
+- Some flows (e.g., new game) may be skipped; see the test file for details.

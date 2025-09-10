@@ -1,3 +1,21 @@
+"""
+Integration tests for main menu flows in the Chess AI application.
+
+Tested flows:
+- Loading and quitting from the main menu
+- Viewing player statistics and returning to the menu
+- Accessing the Chess Expert submenu and returning
+- (Skipped) Starting a new game and quitting
+
+Test utilities:
+- Uses pexpect to interact with the CLI application.
+- Uses regex matching for output verification.
+- Cleans up child processes after each test.
+
+Environment:
+- Sets CHESS_APP_TEST_MODE=1 for deterministic test behavior.
+"""
+
 import sys
 import pytest
 import pexpect
