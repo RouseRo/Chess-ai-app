@@ -45,7 +45,14 @@ class InGameMenuHandlers:
             positions = json.load(f)
         position = self.ui.display_practice_positions_and_get_choice(positions)
         if position and position not in ['?', 'm', 'q']:
-            white_player_key, black_player_key = self.ui.display_model_menu_and_get_choice(self.ai_models, self.stockfish_configs)
+            result = self.ui.display_model_menu_and_get_choice(self.ai_models, self.stockfish_configs)
+            if not result or result in ['', None]:
+                # User cancelled or pressed Enter/q
+                return game, GameLoopAction.RETURN_TO_MENU
+            white_player_key, black_player_key = result
+            if not white_player_key or not black_player_key:
+                # Defensive: if either key is None, return to menu
+                return game, GameLoopAction.RETURN_TO_MENU
             player1 = self.player_factory.create_player(white_player_key, color_label="White")
             player2 = self.player_factory.create_player(black_player_key, color_label="Black")
             new_game = Game(player1, player2, white_player_key=white_player_key, black_player_key=black_player_key)
