@@ -41,33 +41,48 @@ class InGameMenuHandlers:
         return game, GameLoopAction.CONTINUE
 
     def handle_practice_load_in_menu(self, game):
-        with open('src/puzzles.json', 'r') as f:
-            positions = json.load(f)
-        position = self.ui.display_practice_positions_and_get_choice(positions)
-        if position and position not in ['?', 'm', 'q']:
-            result = self.ui.display_model_menu_and_get_choice(self.ai_models, self.stockfish_configs)
-            if not result or result in ['', None]:
-                # User cancelled or pressed Enter/q
+        while True:
+            with open('src/puzzles.json', 'r') as f:
+                positions = json.load(f)
+            position = self.ui.display_practice_positions_and_get_choice(positions)
+            if position and position not in ['?', 'm', 'q']:
+                # Display the board and description before player selection
+                if 'fen' in position:
+                    self.ui.display_board_from_fen(position['fen'])
+                if 'description' in position:
+                    self.ui.display_message(f"\n{position['description']}")
+                # Now ask for player choices
+                result = self.ui.display_model_menu_and_get_choice(self.ai_models, self.stockfish_configs)
+                # Handle menu and quit choices BEFORE creating players
+                if not result or result in ['', None]:
+                    # Loop back to practice positions menu
+                    continue
+                white_player_key, black_player_key = result
+                if white_player_key == "m" or black_player_key == "m":
+                    return game, GameLoopAction.RETURN_TO_MENU
+                if white_player_key == "q" or black_player_key == "q":
+                    self.ui.display_message("Exiting application.")
+                    sys.exit()
+                if not white_player_key or not black_player_key:
+                    continue
+                player1 = self.player_factory.create_player(white_player_key, color_label="White")
+                player2 = self.player_factory.create_player(black_player_key, color_label="Black")
+                new_game = Game(player1, player2, white_player_key=white_player_key, black_player_key=black_player_key)
+                new_game.set_board_from_fen(position['fen'])
+                new_game.initialize_game()
+                self.ui.display_message(f"Loaded practice position: {position['name']}")
+                return new_game, GameLoopAction.SKIP_TURN
+            elif position and position.startswith('?'):
+                question = position[1:].strip()
+                self.expert_service.ask_expert(question)
+            elif position == 'm':
                 return game, GameLoopAction.RETURN_TO_MENU
-            white_player_key, black_player_key = result
-            if not white_player_key or not black_player_key:
-                # Defensive: if either key is None, return to menu
-                return game, GameLoopAction.RETURN_TO_MENU
-            player1 = self.player_factory.create_player(white_player_key, color_label="White")
-            player2 = self.player_factory.create_player(black_player_key, color_label="Black")
-            new_game = Game(player1, player2, white_player_key=white_player_key, black_player_key=black_player_key)
-            new_game.set_board_from_fen(position['fen'])
-            new_game.initialize_game()
-            self.ui.display_message(f"Loaded practice position: {position['name']}")
-            return new_game, GameLoopAction.SKIP_TURN
-        elif position and position.startswith('?'):
-            question = position[1:].strip()
-            self.expert_service.ask_expert(question)
-        elif position == 'm':
-            return game, GameLoopAction.RETURN_TO_MENU
-        elif position == 'q':
-            self.ui.display_message("Exiting application.")
-            sys.exit()
+            elif position == 'q':
+                self.ui.display_message("Exiting application.")
+                sys.exit()
+            else:
+                # If invalid input, loop back to practice positions
+                continue
         return game, GameLoopAction.CONTINUE
 
     def handle_in_game_menu(self, game):
