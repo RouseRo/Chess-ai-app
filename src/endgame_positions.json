@@ -31,16 +31,19 @@
   },
   {
     "name": "Mate in 1 (Queen - King)",
+    "description": "White to move and deliver checkmate in one move using the queen. The black king is on the edge and cannot escape.",
     "fen": "6k1/8/6K1/8/8/8/8/5Q2 w - - 0 1",
     "mate_in": 1
   },
   {
     "name": "Mate in 1 (Rook - King)",
+    "description": "White to move and deliver checkmate in one move using the rook. The black king is on the edge and cannot escape.",
     "fen": "6k1/8/6K1/8/8/8/8/7R w - - 0 1",
     "mate_in": 1
   },
   {
     "name": "Mate in 2 (Two Rooks)",
+    "description": "White has two rooks and must deliver checkmate in two moves. Use the rooks together to restrict the black king's movement and finish with a coordinated mate.",
     "fen": "8/k7/8/8/8/8/R7/R5K1 w - - 0 1",
     "mate_in": 2
   }
