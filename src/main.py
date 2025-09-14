@@ -272,7 +272,7 @@ def main():
         else:
             app = ChessApp()
             app.run()
-    except (KeyboardInterrupt, SystemExit):
+    except (KeyboardInterrupt):
         print("\n[INFO] Application interrupted or exited. Exiting gracefully.")
         sys.exit(0)
 

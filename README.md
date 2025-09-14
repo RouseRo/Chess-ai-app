@@ -5,10 +5,23 @@ Chess AI App is a Python-based chess application supporting user authentication,
 
 ## Features
 - User registration, login, and email verification
-- Play, load, and practice chess games
+- Play, load, and practice chess games (including classic endgames and mate puzzles)
 - View player stats and ask a chess expert
-- Automated tests with pytest
+- Multiple AI models: GPT-4o, DeepSeek, Gemini, Claude, Llama, Stockfish (with skill levels)
+- Automated tests with pytest and pexpect
 - **Test Mode:** Set `CHESS_APP_TEST_MODE=1` to bypass authentication and password prompts for automated testing
+
+## Main Menu Options
+
+```
+--- Main Menu ---
+  1: Play a New Game
+  2: Load a Saved Game
+  3: Load a Practice Position
+  4: View Player Stats
+  ?: Ask a Chess Expert
+  q: Quit
+```
 
 ## Running the Application
 
@@ -59,6 +72,15 @@ tests/
   ...
 ```
 
+## Integration Testing
+
+Integration tests are located in `tests/test_integration_main_menu.py` and use `pexpect` to interact with the CLI application.
+
+- Set `CHESS_APP_TEST_MODE=1` in your environment before running tests for deterministic behavior.
+- The player stats test only checks for the presence of the statistics header and return prompt, not specific player names.
+- All tests clean up child processes after execution.
+- Some flows (e.g., new game) may be skipped; see the test file for details.
+
 ## Contributing
 
 1. Fork the repo
@@ -102,11 +124,10 @@ See `.github/workflows/python-app.yml` for details.
 
 ---
 
-## Integration Testing
+## License
 
-Integration tests are located in `tests/test_integration_main_menu.py` and use `pexpect` to interact with the CLI application.
+MIT
 
-- Set `CHESS_APP_TEST_MODE=1` in your environment before running tests for deterministic behavior.
-- The player stats test only checks for the presence of the statistics header and return prompt, not specific player names.
-- All tests clean up child processes after execution.
-- Some flows (e.g., new game) may be skipped; see the test file for details.
+---
+
+For more details, see the code and tests in the `src/` and `tests/` directories.
