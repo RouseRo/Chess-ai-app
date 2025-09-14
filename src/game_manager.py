@@ -53,7 +53,21 @@ class GameManager:
                 move = self.ui.get_user_input(prompt)
                 
                 if move == 'q':
-                    return game, GameLoopAction.QUIT_APPLICATION
+                    quit_choice = self.ui.get_human_quit_choice()
+                    if quit_choice == 'r':
+                        game.resign_current_player()
+                        self.ui.display_game_over_message(game)
+                        return game, GameLoopAction.RETURN_TO_MENU
+                    elif quit_choice == 's':
+                        game.save_game()
+                        self.ui.display_message("Game saved. Exiting to main menu.")
+                        return game, GameLoopAction.RETURN_TO_MENU
+                    elif quit_choice == 'q':
+                        self.ui.display_message("Exiting game without saving.")
+                        return game, GameLoopAction.RETURN_TO_MENU
+                    elif quit_choice == 'c':
+                        # Cancel quit, return to game
+                        return game, GameLoopAction.CONTINUE
                 elif move == 'm':
                     return game, GameLoopAction.IN_GAME_MENU
                 else:
