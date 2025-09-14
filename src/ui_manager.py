@@ -301,3 +301,17 @@ class UIManager:
         """Display a chess board for a given FEN string."""
         board = chess.Board(fen)
         self.display_board(board)
+
+    def display_board_with_description(self, fen, description):
+        board = chess.Board(fen)
+        board_lines = str(board).split('\n')
+        desc_lines = description.split('\n')
+        max_lines = max(len(board_lines), len(desc_lines))
+        board_pad = 22  # Adjust for your board width
+
+        print()
+        for i in range(max_lines):
+            board_part = board_lines[i] if i < len(board_lines) else ' ' * board_pad
+            desc_part = desc_lines[i] if i < len(desc_lines) else ''
+            print(f"{board_part:<{board_pad}}   {desc_part}")
+        print()

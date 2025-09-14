@@ -46,16 +46,20 @@ class InGameMenuHandlers:
                 positions = json.load(f)
             position = self.ui.display_practice_positions_and_get_choice(positions)
             if position and position not in ['?', 'm', 'q']:
-                # Display the board and description before player selection
+                # Display the board
                 if 'fen' in position:
                     self.ui.display_board_from_fen(position['fen'])
-                if 'description' in position:
-                    self.ui.display_message(f"\n{position['description']}")
+                # Diagnostic: print the position dict
+                print(f"[DEBUG] Selected position: {position}")
+                # Display the number and description before player selection
+                number = position.get('number', '')
+                description = position.get('description', '')
+                print(f"[DEBUG] Number: {number}, Description: {description}")
+                if number or description:
+                    self.ui.display_message(f"\nPosition {number}: {description}\n")
                 # Now ask for player choices
                 result = self.ui.display_model_menu_and_get_choice(self.ai_models, self.stockfish_configs)
-                # Handle menu and quit choices BEFORE creating players
                 if not result or result in ['', None]:
-                    # Loop back to practice positions menu
                     continue
                 white_player_key, black_player_key = result
                 if white_player_key == "m" or black_player_key == "m":
@@ -81,7 +85,6 @@ class InGameMenuHandlers:
                 self.ui.display_message("Exiting application.")
                 sys.exit()
             else:
-                # If invalid input, loop back to practice positions
                 continue
         return game, GameLoopAction.CONTINUE
 
