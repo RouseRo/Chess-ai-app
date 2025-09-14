@@ -20,6 +20,7 @@ class GameLoopAction(Enum):
     QUIT_APPLICATION = 2
     RETURN_TO_MENU = 3
     SKIP_TURN = 4
+    IN_GAME_MENU = 5  # <-- This must exist!
 
 class Game:
     """Represents a single game of chess, including board state and players."""

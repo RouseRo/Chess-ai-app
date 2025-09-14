@@ -26,9 +26,9 @@ def stats_to_dict(stats_data):
     """Converts a dictionary of PlayerStats objects to a JSON-serializable dictionary."""
     return {name: asdict(stats) for name, stats in stats_data.items()}
 
-class GameLoopAction(Enum):
-    """Defines the set of possible actions to control the main game loop."""
-    CONTINUE = auto()
-    QUIT_APPLICATION = auto()
-    RETURN_TO_MENU = auto()
-    SKIP_TURN = auto()
+class GameLoopAction:
+    CONTINUE = "continue"
+    SKIP_TURN = "skip_turn"
+    QUIT_APPLICATION = "quit_application"
+    RETURN_TO_MENU = "return_to_menu"
+    IN_GAME_MENU = "in_game_menu"

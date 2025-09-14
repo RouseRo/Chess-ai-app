@@ -25,11 +25,8 @@ class UIManager:
 
     @staticmethod
     def get_user_input(prompt: str = "") -> str:
-        try:
-            # prompt in yellow to draw attention
-            return input(f"{YELLOW}{prompt}{ENDC}").strip()
-        except (KeyboardInterrupt, EOFError):
-            return ""
+        result = input(f"{YELLOW}{prompt}{ENDC}").strip()
+        return result
 
     def get_human_player_name(self, color_str: str = "Human") -> str:
         """Prompt for a human player's name. Returns a non-empty name (defaults to 'Human')."""
@@ -295,7 +292,14 @@ class UIManager:
         section2 = " Enter your move (e.g. e2e4),"
         section3 = " 'q' to quit, or 'm' for menu: "
         prompt = f"{WHITE}{section1}{ENDC}{CYAN}{section2}{ENDC}{YELLOW}{section3}{ENDC}"
-        return self.get_user_input(prompt)
+        move = self.get_user_input(prompt)
+
+        # Handle special commands 'q' and 'm'
+        if move.lower() == 'q':
+            return 'q'
+        if move.lower() == 'm':
+            return 'm'
+        return move
 
     def display_board_from_fen(self, fen):
         """Display a chess board for a given FEN string."""

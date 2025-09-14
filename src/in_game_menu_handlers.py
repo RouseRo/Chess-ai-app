@@ -3,7 +3,7 @@ import json
 import shutil
 import logging
 import chess
-from src.data_models import GameLoopAction
+from src.game import GameLoopAction
 from src.game import Game
 from src.human_player import HumanPlayer
 
