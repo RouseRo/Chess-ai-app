@@ -25,11 +25,8 @@ class UIManager:
 
     @staticmethod
     def get_user_input(prompt: str = "") -> str:
-        try:
-            # prompt in yellow to draw attention
-            return input(f"{YELLOW}{prompt}{ENDC}").strip()
-        except (KeyboardInterrupt, EOFError):
-            return ""
+        result = input(f"{YELLOW}{prompt}{ENDC}").strip()
+        return result
 
     def get_human_player_name(self, color_str: str = "Human") -> str:
         """Prompt for a human player's name. Returns a non-empty name (defaults to 'Human')."""
@@ -131,10 +128,19 @@ class UIManager:
         for k, v in stockfish_configs.items():
             print(f"  {WHITE}{k}:{ENDC} {CYAN}Stockfish - {v.get('name')}{ENDC}")
         print(f"  {WHITE}hu:{ENDC} {CYAN}Human Player{ENDC}")
+        print(f"\n  {WHITE}q:{ENDC} {CYAN}Quit Application{ENDC}")
+        print(f"  {WHITE}m:{ENDC} {CYAN}Return to Main Menu{ENDC}")
+        print(f"  {WHITE}Enter:{ENDC} {CYAN}Return to Load a Practice Position{ENDC}")
         choice = self.get_user_input("Enter choice for White and Black players (e.g., 'm1s2'), or press Enter to return: ")
         if choice == "":
-            # treat Enter (empty input) as "return to main menu" by returning two None values
+            # treat Enter (empty input) as "return to Load a Practice Position" by returning two None values
             return None, None
+        if choice.lower() == "q":
+            # treat 'q' as quit application
+            return "q", "q"
+        if choice.lower() == "m":
+            # treat 'm' as return to main menu
+            return "m", "m"
         parts = choice.replace(" ", "")
         if len(parts) >= 4:
             return parts[:2], parts[2:4]
@@ -286,4 +292,30 @@ class UIManager:
         section2 = " Enter your move (e.g. e2e4),"
         section3 = " 'q' to quit, or 'm' for menu: "
         prompt = f"{WHITE}{section1}{ENDC}{CYAN}{section2}{ENDC}{YELLOW}{section3}{ENDC}"
-        return self.get_user_input(prompt)
+        move = self.get_user_input(prompt)
+
+        # Handle special commands 'q' and 'm'
+        if move.lower() == 'q':
+            return 'q'
+        if move.lower() == 'm':
+            return 'm'
+        return move
+
+    def display_board_from_fen(self, fen):
+        """Display a chess board for a given FEN string."""
+        board = chess.Board(fen)
+        self.display_board(board)
+
+    def display_board_with_description(self, fen, description):
+        board = chess.Board(fen)
+        board_lines = str(board).split('\n')
+        desc_lines = description.split('\n')
+        max_lines = max(len(board_lines), len(desc_lines))
+        board_pad = 22  # Adjust for your board width
+
+        print()
+        for i in range(max_lines):
+            board_part = board_lines[i] if i < len(board_lines) else ' ' * board_pad
+            desc_part = desc_lines[i] if i < len(desc_lines) else ''
+            print(f"{board_part:<{board_pad}}   {desc_part}")
+        print()

@@ -19,7 +19,7 @@ from src.game_manager import GameManager
 from src.in_game_menu_handlers import InGameMenuHandlers
 from src.chess_expert_menu import ChessExpertMenu
 from src.menu_handlers import MenuHandlers
-from src.data_models import GameLoopAction
+from src.game import GameLoopAction
 
 
 LOG_FILE = 'chess_game.log'
@@ -55,8 +55,13 @@ class ChessApp:
         self.player_stats_manager = PlayerStatsManager(self.ui, self.file_manager)
         self.game_manager = GameManager(self.ui, self.player_factory, self.ai_models, self.stockfish_configs)
         self.in_game_menu_handlers = InGameMenuHandlers(
-            self.ui, self.file_manager, self.player_factory,
-            self.ai_models, self.stockfish_configs, self.expert_service
+            self.ui,
+            self.file_manager,
+            self.player_factory,
+            self.ai_models,
+            self.stockfish_configs,
+            self.expert_service,
+            self  # <-- Pass self as game_runner, assuming ChessApp has run_game_loop
         )
         self.chess_expert_menu = ChessExpertMenu(self.ui, self.expert_service)
         self.menu_handlers = MenuHandlers(self.ui)
@@ -176,7 +181,7 @@ class ChessApp:
 
     def run(self):
         """Main function to run the chess application."""
-        # First, handle authentication
+        # Handle authentication first
         if not self._handle_authentication():
             print("Exiting application.")
             return
@@ -184,45 +189,53 @@ class ChessApp:
         game = None
         while True:
             if game:
+                # Handle game over
                 if game.board.is_game_over():
                     self.ui.display_game_over_message(game)
-                    # determine result from board state to avoid incorrect mappings
                     result = self.game_manager.determine_game_result(game)
                     self.player_stats_manager.update_player_stats(game)
                     save_choice = self.ui.get_user_input("\nSave final game log? (y/N): ").lower()
                     if save_choice == 'y':
                         self.file_manager.save_game_log()
                     self.ui.get_user_input("Press Enter to return to the main menu.")
-                    game = None # Game is over, return to main
+                    game = None
                     continue
 
-                new_game, action = self.game_manager.play_turn(game)
-                game = new_game # Always update the game object
-
+                # Play a turn and process the returned action
+                game, action = self.game_manager.play_turn(game)
                 if action == GameLoopAction.QUIT_APPLICATION:
-                    if self.in_game_menu_handlers.handle_quit_request(game):
-                        continue # User cancelled quit
-                    else:
-                        game = None # Quit was handled, return to menu
-                        continue
+                    sys.exit(0)
                 elif action == GameLoopAction.RETURN_TO_MENU:
                     game = None
                     continue
                 elif action in [GameLoopAction.CONTINUE, GameLoopAction.SKIP_TURN]:
                     continue
+                elif action == GameLoopAction.IN_GAME_MENU:
+                    logging.info(f"[DIAG] Handling IN_GAME_MENU")
+                    game, action = self.in_game_menu_handlers.handle_in_game_menu(game)
+                    logging.info(f"[DIAG] After in-game menu, action: {action}")
+                    if action == GameLoopAction.QUIT_APPLICATION:
+                        logging.info(f"[DIAG] Quitting application from in-game menu")
+                        sys.exit(0)
+                    elif action == GameLoopAction.RETURN_TO_MENU:
+                        logging.info(f"[DIAG] Returning to main menu from in-game menu")
+                        game = None
+                        continue
+                    continue
+                else:
+                    print("[DIAG] action did NOT match any known GameLoopAction", flush=True)
             else:
-                # --- Main Menu ---
+                # Main menu loop
                 choice = self.menu_handlers.display_main_menu()
                 try:
-                    if choice == '1':  # New Game
+                    if choice == '1':
                         self.game_log_manager.initialize_new_game_log()
                         game = self.game_manager.setup_new_game(self.white_openings, self.black_defenses)
                         if not game:
                             self.ui.display_message("New game cancelled.")
                             continue
                         self.ui.display_game_start_message(game)
-
-                    elif choice == '2':  # Load Saved Game
+                    elif choice == '2':
                         game_summaries = self.file_manager.get_saved_game_summaries()
                         if not game_summaries:
                             self.ui.display_message("No saved games found.")
@@ -230,20 +243,18 @@ class ChessApp:
                         chosen_summary = self.ui.display_saved_games_and_get_choice(game_summaries)
                         if chosen_summary and chosen_summary not in ['m', 'q']:
                             game = self.game_log_manager.load_game_from_log(chosen_summary['filename'])
-
-                    elif choice == '3':  # Load Practice Position
-                        self.in_game_menu_handlers.handle_practice_load_in_menu(game)
-
-                    elif choice == '4':  # View Player Stats
+                    elif choice == '3':
+                        new_game, action = self.in_game_menu_handlers.handle_practice_load_in_menu(game)
+                        if new_game:
+                            game = new_game
+                            self.ui.display_game_start_message(game)
+                    elif choice == '4':
                         self.player_stats_manager.view_player_stats()
-
                     elif choice.startswith('?'):
                         self.chess_expert_menu.handle_chess_expert_menu()
-
                     elif choice == 'q':
                         self.ui.display_message("Exiting application.")
-                        sys.exit()
-
+                        sys.exit(0)
                 except Exception as e:
                     self.ui.display_message(f"\n{RED}An unexpected error occurred: {e}{ENDC}")
                     logging.error(f"An unexpected error occurred: {e}", exc_info=True)
@@ -253,13 +264,17 @@ class ChessApp:
         return self.game_log_manager.parse_log_header(lines, all_player_keys, debug)
 
 def main():
-    if os.environ.get("CHESS_APP_TEST_MODE") == "1":
-        app = ChessApp()
-        app.current_user = {"username": "TestUser"}
-        app.run()
-    else:
-        app = ChessApp()
-        app.run()
+    try:
+        if os.environ.get("CHESS_APP_TEST_MODE") == "1":
+            app = ChessApp()
+            app.current_user = {"username": "TestUser"}
+            app.run()
+        else:
+            app = ChessApp()
+            app.run()
+    except (KeyboardInterrupt, SystemExit):
+        print("\n[INFO] Application interrupted or exited. Exiting gracefully.")
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()

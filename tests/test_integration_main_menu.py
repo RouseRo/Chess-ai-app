@@ -5,7 +5,8 @@ Tested flows:
 - Loading and quitting from the main menu
 - Viewing player statistics and returning to the menu
 - Accessing the Chess Expert submenu and returning
-- (Skipped) Starting a new game and quitting
+- Starting a new game and quitting
+- (New) Loading a practice position and quitting
 
 Test utilities:
 - Uses pexpect to interact with the CLI application.
@@ -23,6 +24,7 @@ from pexpect.popen_spawn import PopenSpawn
 import re
 import time
 import os
+import shutil  # Add this import
 
 # Command to run the application as a module, with unbuffered output (-u)
 PY_CMD = [sys.executable, "-u", "-m", "src.main"]
@@ -174,7 +176,6 @@ def test_main_menu_chess_expert_flow():
         if child.proc.poll() is None:
             child.proc.terminate()
 
-@pytest.mark.skip(reason="Skipping integration test for now")
 @pytest.mark.integration
 def test_main_menu_new_game_flow():
     """Test the flow of starting a new game from the main menu
@@ -186,6 +187,9 @@ def test_main_menu_new_game_flow():
     4. Board is displayed correctly
     5. Player can quit the game
     """
+    if shutil.which("stockfish") is None:
+        pytest.skip("Stockfish executable not found in PATH")
+    
     # On Windows, use PopenSpawn which is more reliable
     child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=30, env=TEST_ENV)
     child.delayafterread = 0.1
@@ -215,7 +219,15 @@ def test_main_menu_new_game_flow():
         child.sendline('')
         
         # 5. Verify game starts with initial board
-        expect_with_debug(child, r"--- Game Started ---", timeout=10)
+        try:
+            expect_with_debug(child, r"--- Game Started ---", timeout=10)
+        except pexpect.TIMEOUT:
+            # Check for error message
+            if "An unexpected error occurred" in child.before:
+                print("Unexpected error during game setup:")
+                print(child.before)
+            raise
+        
         expect_with_debug(child, r"White: Human", timeout=5)
         expect_with_debug(child, r"Black: Stockfish", timeout=5)
         expect_with_debug(child, r"8\|", timeout=10)
@@ -239,3 +251,45 @@ def test_main_menu_new_game_flow():
             child.sendintr()
     finally:
         _terminate_process(child)
+
+@pytest.mark.integration
+def test_load_practice_position_menu_sequence():
+    """
+    Integration test for the 'Load a Practice Position' menu sequence.
+    Steps:
+    - Start app
+    - Select '3' for Load a Practice Position
+    - Select '1' for King and Queen vs. King
+    - Verify board and description are displayed
+    - Quit from player model menu
+    """
+    child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=15, env=TEST_ENV)
+    try:
+        child.expect(r"--- Main Menu ---")
+        child.expect(r"Enter your choice")
+        child.sendline('3')
+
+        child.expect(r"--- Practice Positions ---")
+        child.expect(r"Enter the number of the position to load, or a letter for other options")
+        child.sendline('1')
+
+        # Expect board display
+        child.expect(r"a b c d e f g h")
+        child.expect(r"---------------------")
+        child.expect(r"1\| . . . . . . . Q \|1")
+        child.expect(r"---------------------")
+        child.expect(r"a b c d e f g h")
+
+        # Expect position number and description
+        child.expect(r"Position 1:.*fundamental checkmate.*queen.*box in.*king.*deliver the final mate")
+
+        # Expect player model menu
+        child.expect(r"--- Choose Player Models ---")
+        child.expect(r"Enter choice for White and Black players.*")
+        child.sendline('q')
+
+        # Expect exit message
+        child.expect(r"Exiting application.")
+    finally:
+        if child.proc.poll() is None:
+            child.proc.terminate()

@@ -3,18 +3,19 @@ import json
 import shutil
 import logging
 import chess
-from src.data_models import GameLoopAction
+from src.game import GameLoopAction
 from src.game import Game
 from src.human_player import HumanPlayer
 
 class InGameMenuHandlers:
-    def __init__(self, ui, file_manager, player_factory, ai_models, stockfish_configs, expert_service):
+    def __init__(self, ui, file_manager, player_factory, ai_models, stockfish_configs, expert_service, game_runner):
         self.ui = ui
         self.file_manager = file_manager
         self.player_factory = player_factory
         self.ai_models = ai_models
         self.stockfish_configs = stockfish_configs
         self.expert_service = expert_service
+        self.game_runner = game_runner  # <-- Add this line
 
     def handle_load_game_in_menu(self, game):
         game_summaries = self.file_manager.get_saved_game_summaries()
@@ -41,26 +42,62 @@ class InGameMenuHandlers:
         return game, GameLoopAction.CONTINUE
 
     def handle_practice_load_in_menu(self, game):
-        with open('src/puzzles.json', 'r') as f:
-            positions = json.load(f)
-        position = self.ui.display_practice_positions_and_get_choice(positions)
-        if position and position not in ['?', 'm', 'q']:
-            white_player_key, black_player_key = self.ui.display_model_menu_and_get_choice(self.ai_models, self.stockfish_configs)
-            player1 = self.player_factory.create_player(white_player_key, color_label="White")
-            player2 = self.player_factory.create_player(black_player_key, color_label="Black")
-            new_game = Game(player1, player2, white_player_key=white_player_key, black_player_key=black_player_key)
-            new_game.set_board_from_fen(position['fen'])
-            new_game.initialize_game()
-            self.ui.display_message(f"Loaded practice position: {position['name']}")
-            return new_game, GameLoopAction.SKIP_TURN
-        elif position and position.startswith('?'):
-            question = position[1:].strip()
-            self.expert_service.ask_expert(question)
-        elif position == 'm':
-            return game, GameLoopAction.RETURN_TO_MENU
-        elif position == 'q':
-            self.ui.display_message("Exiting application.")
-            sys.exit()
+        DEBUG = False  # Set to True to enable diagnostics
+        GREEN = "\033[92m"
+        ENDC = "\033[0m"
+        while True:
+            with open('src/puzzles.json', 'r') as f:
+                positions = json.load(f)
+            position = self.ui.display_practice_positions_and_get_choice(positions)
+            if position and position not in ['?', 'm', 'q']:
+                # Display the board
+                if 'fen' in position:
+                    self.ui.display_board_from_fen(position['fen'])
+                # Diagnostic: print the position dict
+                if DEBUG:
+                    print(f"[DEBUG] Selected position: {position}")
+                # Display the number and description before player selection
+                number = position.get('number', '')
+                description = position.get('description', '')
+                name = position.get('name', '')
+                # Show name if description is missing
+                if number or description or name:
+                    desc_text = f"Position {number}: {GREEN}{description}{ENDC}" if description else f"{name}"
+                    self.ui.display_message(f"{desc_text}\n")
+                # Now ask for player choices
+                result = self.ui.display_model_menu_and_get_choice(self.ai_models, self.stockfish_configs)
+                # Handle menu and quit choices BEFORE creating players
+                if not result or result in ['', None]:
+                    continue
+                white_player_key, black_player_key = result
+                if white_player_key == "m" or black_player_key == "m":
+                    return game, GameLoopAction.RETURN_TO_MENU
+                if white_player_key == "q" or black_player_key == "q":
+                    self.ui.display_message("Exiting application.")
+                    sys.exit()
+                if not white_player_key or not black_player_key:
+                    continue
+                player1 = self.player_factory.create_player(white_player_key, color_label="White")
+                player2 = self.player_factory.create_player(black_player_key, color_label="Black")
+                new_game = Game(player1, player2, white_player_key=white_player_key, black_player_key=black_player_key)
+                new_game.set_board_from_fen(position['fen'])
+                new_game.initialize_game()
+                self.ui.display_message(f"Loaded practice position: {position['name']}")
+                # Diagnostic: Log object details before returning
+                logging.info(f"[DIAG] Returning new_game: {new_game}")
+                logging.info(f"[DIAG] GameLoopAction.SKIP_TURN: {GameLoopAction.SKIP_TURN}")
+                # Do not call run_game_loop; just return the new_game to let the main loop handle it
+                return new_game, GameLoopAction.SKIP_TURN
+            elif position and position.startswith('?'):
+                question = position[1:].strip()
+                self.expert_service.ask_expert(question)
+            elif position == 'm':
+                return game, GameLoopAction.RETURN_TO_MENU
+            elif position == 'q':
+                self.ui.display_message("Exiting application.")
+                sys.exit()
+            else:
+                continue
         return game, GameLoopAction.CONTINUE
 
     def handle_in_game_menu(self, game):

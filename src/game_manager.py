@@ -1,6 +1,9 @@
 import chess
 from src.game import Game, GameLoopAction, RED, ENDC
 from src.human_player import HumanPlayer
+import logging  # Import logging module
+import inspect
+import sys
 
 class GameManager:
     def __init__(self, ui, player_factory, ai_models, stockfish_configs):
@@ -47,20 +50,21 @@ class GameManager:
                 turn_color = "White" if game.board.turn else "Black"
                 move_number = game.board.fullmove_number
                 prompt = f"Move {move_number} ({current_player.model_name} as {turn_color}): Enter your move (e.g. e2e4), 'q' to quit, or 'm' for menu: "
-                user_input = self.ui.prompt_for_move(game)
-
-                if user_input.lower() == 'q':
+                move = self.ui.get_user_input(prompt)
+                
+                if move == 'q':
                     return game, GameLoopAction.QUIT_APPLICATION
-                elif user_input.lower() == 'm':
-                    return self.ui.handle_in_game_menu(game)
+                elif move == 'm':
+                    return game, GameLoopAction.IN_GAME_MENU
                 else:
-                    game.make_manual_move(user_input)
+                    game.make_manual_move(move)
             else:
                 self.ui.display_turn_message(game)
                 game.play_turn()
         except ValueError as e:
             self.ui.display_message(f"{RED}Invalid move: {e}{ENDC}")
-
+        except Exception as e:
+            self.ui.display_message(f"{RED}Unexpected error: {e}{ENDC}")
         return game, GameLoopAction.CONTINUE
 
     def determine_game_result(self, game):
@@ -75,3 +79,26 @@ class GameManager:
             return board.result()
         except Exception:
             return "1/2-1/2"
+
+    def run(self):
+        """Main game loop, managing turns and game state."""
+        game = None
+
+        while True:
+            if game is None:
+                game = self.setup_new_game()
+                if game is None:
+                    break  # User canceled game setup
+
+            game, action = self.play_turn(game)  # <-- Unpack both values!
+            if action == GameLoopAction.QUIT_APPLICATION:
+                break  # Exit the loop and quit the application
+            elif action == GameLoopAction.IN_GAME_MENU:
+                self.ui.display_message("In-game menu is not yet implemented.")
+            elif action == GameLoopAction.CONTINUE:
+                result = self.determine_game_result(game)
+                if result:
+                    self.ui.display_message(f"Game over! Result: {result}")
+                    game = None  # Reset game after it ends
+            else:
+                self.ui.display_message(f"Unknown action: {action}")
