@@ -22,7 +22,7 @@ Tests are organized in the `tests/` directory, which keeps them separate from th
 
 ```
 tests/
-├── test_basic.py              # Basic tests and examples
+├── test_basic.py                  # Basic tests and examples
 ├── test_integration_main_menu.py  # Integration tests for menu flows
 └── ... other test files
 ```
@@ -139,3 +139,36 @@ We use a combination of techniques to automate password input:
    # In tests
    TEST_ENV = os.environ.copy()
    TEST_ENV["CHESS_APP_TEST_MODE"] = "1"
+   ```
+   When `CHESS_APP_TEST_MODE=1`, the application bypasses authentication and password prompts, allowing tests to interact directly with the main menu and game flows.
+
+2. **Test Mode for Integration Testing**:
+   - Set `CHESS_APP_TEST_MODE=1` before running integration tests to enable passwordless mode.
+   - This mode is used in CI/CD pipelines and local integration testing for reliability.
+
+3. **Handling Authentication in Full Mode**:
+   - For tests that require full authentication (e.g., login integration tests), set `CHESS_APP_TEST_MODE=0` or unset the variable.
+   - Your test code should handle authentication prompts before proceeding to main menu interactions.
+
+## Best Practices
+
+- Register all custom markers in `pytest.ini` to avoid warnings.
+- Use `pexpect` for robust CLI automation and output matching.
+- Use the provided `expect_with_debug` helper for easier debugging of test failures.
+- Always clean up child processes in your tests to avoid resource leaks.
+- Use environment variables to control test modes and application behavior.
+
+## Troubleshooting
+
+- **Authentication Menu Timeout:**  
+  If a test fails waiting for the main menu but the authentication menu is shown, update your test to handle authentication (login or register) before proceeding to the main menu when `CHESS_APP_TEST_MODE=0`.
+- **Missing Dependencies:**  
+  If you see `ModuleNotFoundError`, add the missing package to `requirements.txt`.
+- **Stockfish Not Found:**  
+  Ensure Stockfish is installed and the path is set via `STOCKFISH_EXECUTABLE` in your workflow and code.
+- **OpenAI API Key Error:**  
+  Set a dummy `OPENAI_API_KEY` in your CI environment for tests that instantiate the OpenAI client.
+
+---
+
+For more details, see the code and tests in the `src/` and `tests/` directories.
