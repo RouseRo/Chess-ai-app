@@ -55,8 +55,13 @@ class ChessApp:
         self.player_stats_manager = PlayerStatsManager(self.ui, self.file_manager)
         self.game_manager = GameManager(self.ui, self.player_factory, self.ai_models, self.stockfish_configs)
         self.in_game_menu_handlers = InGameMenuHandlers(
-            self.ui, self.file_manager, self.player_factory,
-            self.ai_models, self.stockfish_configs, self.expert_service
+            self.ui,
+            self.file_manager,
+            self.player_factory,
+            self.ai_models,
+            self.stockfish_configs,
+            self.expert_service,
+            self  # <-- Pass self as game_runner, assuming ChessApp has run_game_loop
         )
         self.chess_expert_menu = ChessExpertMenu(self.ui, self.expert_service)
         self.menu_handlers = MenuHandlers(self.ui)
@@ -232,7 +237,11 @@ class ChessApp:
                             game = self.game_log_manager.load_game_from_log(chosen_summary['filename'])
 
                     elif choice == '3':  # Load Practice Position
-                        self.in_game_menu_handlers.handle_practice_load_in_menu(game)
+                        new_game, action = self.in_game_menu_handlers.handle_practice_load_in_menu(game)
+                        if new_game:
+                            game = new_game
+                            self.ui.display_game_start_message(game)  # Optional: Display start message like for new games
+                        # No need to handle action here, as the main loop will manage the game
 
                     elif choice == '4':  # View Player Stats
                         self.player_stats_manager.view_player_stats()

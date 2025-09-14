@@ -8,13 +8,14 @@ from src.game import Game
 from src.human_player import HumanPlayer
 
 class InGameMenuHandlers:
-    def __init__(self, ui, file_manager, player_factory, ai_models, stockfish_configs, expert_service):
+    def __init__(self, ui, file_manager, player_factory, ai_models, stockfish_configs, expert_service, game_runner):
         self.ui = ui
         self.file_manager = file_manager
         self.player_factory = player_factory
         self.ai_models = ai_models
         self.stockfish_configs = stockfish_configs
         self.expert_service = expert_service
+        self.game_runner = game_runner  # <-- Add this line
 
     def handle_load_game_in_menu(self, game):
         game_summaries = self.file_manager.get_saved_game_summaries()
@@ -65,6 +66,7 @@ class InGameMenuHandlers:
                     self.ui.display_message(f"{desc_text}\n")
                 # Now ask for player choices
                 result = self.ui.display_model_menu_and_get_choice(self.ai_models, self.stockfish_configs)
+                # Handle menu and quit choices BEFORE creating players
                 if not result or result in ['', None]:
                     continue
                 white_player_key, black_player_key = result
@@ -81,6 +83,10 @@ class InGameMenuHandlers:
                 new_game.set_board_from_fen(position['fen'])
                 new_game.initialize_game()
                 self.ui.display_message(f"Loaded practice position: {position['name']}")
+                # Diagnostic: Log object details before returning
+                logging.info(f"[DIAG] Returning new_game: {new_game}")
+                logging.info(f"[DIAG] GameLoopAction.SKIP_TURN: {GameLoopAction.SKIP_TURN}")
+                # Do not call run_game_loop; just return the new_game to let the main loop handle it
                 return new_game, GameLoopAction.SKIP_TURN
             elif position and position.startswith('?'):
                 question = position[1:].strip()
