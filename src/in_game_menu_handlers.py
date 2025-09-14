@@ -41,6 +41,9 @@ class InGameMenuHandlers:
         return game, GameLoopAction.CONTINUE
 
     def handle_practice_load_in_menu(self, game):
+        DEBUG = False  # Set to True to enable diagnostics
+        GREEN = "\033[92m"
+        ENDC = "\033[0m"
         while True:
             with open('src/puzzles.json', 'r') as f:
                 positions = json.load(f)
@@ -50,13 +53,16 @@ class InGameMenuHandlers:
                 if 'fen' in position:
                     self.ui.display_board_from_fen(position['fen'])
                 # Diagnostic: print the position dict
-                print(f"[DEBUG] Selected position: {position}")
+                if DEBUG:
+                    print(f"[DEBUG] Selected position: {position}")
                 # Display the number and description before player selection
                 number = position.get('number', '')
                 description = position.get('description', '')
-                print(f"[DEBUG] Number: {number}, Description: {description}")
-                if number or description:
-                    self.ui.display_message(f"\nPosition {number}: {description}\n")
+                name = position.get('name', '')
+                # Show name if description is missing
+                if number or description or name:
+                    desc_text = f"Position {number}: {GREEN}{description}{ENDC}" if description else f"{name}"
+                    self.ui.display_message(f"{desc_text}\n")
                 # Now ask for player choices
                 result = self.ui.display_model_menu_and_get_choice(self.ai_models, self.stockfish_configs)
                 if not result or result in ['', None]:

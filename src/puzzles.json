@@ -1,40 +1,58 @@
 [
   {
+    "number": 1,
     "name": "King and Queen vs. King",
+    "description": "A fundamental checkmate. Use the queen to box in the enemy king and the king to deliver the final mate.",
     "fen": "8/k7/8/8/8/8/K7/7Q w - - 0 1"
   },
   {
+    "number": 2,
     "name": "King and Rook vs. King",
+    "description": "White to move and deliver checkmate using the rook and king. Use the rook to restrict the black king and the white king to help deliver mate.",
     "fen": "8/k7/8/8/8/8/K7/7R w - - 0 1"
   },
   {
+    "number": 3,
     "name": "Two Rooks vs. King (Lawnmower)",
+    "description": "White has two rooks and must deliver checkmate. Use the rooks together to restrict the black king's movement and finish with a coordinated mate.",
     "fen": "8/k7/8/8/8/8/R7/R5K1 w - - 0 1"
   },
   {
+    "number": 4,
     "name": "Back-Rank Mate Practice",
+    "description": "Practice delivering a back-rank mate. White to move and checkmate the black king on the back rank.",
     "fen": "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1"
   },
   {
+    "number": 5,
     "name": "Anastasia's Mate Practice",
+    "description": "Practice Anastasia's mate pattern. White to move and deliver checkmate using the knight and rook.",
     "fen": "8/6pk/8/8/4N3/8/8/R6K w - - 0 1"
   },
   {
+    "number": 6,
     "name": "Smothered Mate Practice",
+    "description": "Practice the smothered mate pattern. Black to move and deliver checkmate using the knight.",
     "fen": "r1b2rk1/pp1p1ppp/2n5/2b1q3/2B5/2N2N2/PP3PPP/R2Q1RK1 b - - 1 12"
   },
   {
+    "number": 7,
     "name": "Mate in 1 (Queen-King)",
+    "description": "White to move and deliver checkmate in one move using the queen. The black king is on the edge and cannot escape.",
     "fen": "6k1/8/6K1/8/8/8/8/5Q2 w - - 0 1",
     "mate_in": 1
   },
   {
+    "number": 8,
     "name": "Mate in 1 (Rook-King)",
+    "description": "White to move and deliver checkmate in one move using the rook. The black king is on the edge and cannot escape.",
     "fen": "6k1/8/6K1/8/8/8/8/7R w - - 0 1",
     "mate_in": 1
   },
   {
+    "number": 9,
     "name": "Mate in 2 (Two Rooks)",
+    "description": "White has two rooks and must deliver checkmate in two moves. Use the rooks together to restrict the black king's movement and finish with a coordinated mate.",
     "fen": "8/k7/8/8/8/8/R7/R5K1 w - - 0 1",
     "mate_in": 2
   }
