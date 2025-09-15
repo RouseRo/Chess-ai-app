@@ -137,6 +137,26 @@ class ExpertService:
             self.ui.display_message(f"{RED}Sorry, I couldn't get an answer. Error: {e}{ENDC}")
         self.ui.get_user_input("Press Enter to return to the menu.")
 
+    def get_latest_chess_news(self):
+        """
+        Fetch the latest chess news from the Chessmaster AI model and save it to CHESS_NEWS.md.
+        """
+        self.ui.display_message("\nFetching the latest chess news...")
+        try:
+            expert_player = AIPlayer(model_name=self.expert_model_name)
+            prompt = (
+                "Provide the latest news in the world of chess. "
+                "Include updates on tournaments, players, and other significant events."
+            )
+            news = expert_player.get_chess_fact_or_answer(prompt)
+            self.ui.display_message("\n--- Latest Chess News ---")
+            self.ui.display_message(news)
+            self.ui.display_message("--------------------------")
+            self._save_chess_news(news)
+        except Exception as e:
+            self.ui.display_message(f"{RED}Sorry, I couldn't fetch the news. Error: {e}{ENDC}")
+        self.ui.get_user_input("Press Enter to return to the menu.")
+
     # ---------- Internal persistence helpers ----------
 
     def _save_chess_joke(self, joke_text: str) -> bool:
@@ -221,4 +241,24 @@ class ExpertService:
                 f.write(block)
             return True
         except Exception:
+            return False
+
+    def _save_chess_news(self, news: str) -> bool:
+        """
+        Save the latest chess news to docs/CHESS_NEWS.md with a timestamp.
+        """
+        try:
+            docs_dir = os.path.join(os.getcwd(), "docs")
+            os.makedirs(docs_dir, exist_ok=True)
+            path = os.path.join(docs_dir, "CHESS_NEWS.md")
+            date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            block = (
+                f"### {date_str}\n"
+                f"{news}\n\n---\n\n"
+            )
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(block)
+            return True
+        except Exception as e:
+            self.ui.display_message(f"{RED}Failed to save news. Error: {e}{ENDC}")
             return False

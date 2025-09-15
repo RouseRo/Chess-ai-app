@@ -17,6 +17,7 @@ class ChessExpertMenu:
         print("  3: Get a tactical puzzle", flush=True)
         print("  4: Tell me a fun chess fact", flush=True)
         print("  5: Tell me a chess joke", flush=True)
+        print("  6: Tell the latest chess news", flush=True)
         print("  m: Back to main menu", flush=True)
         print("Enter your choice: ", end="", flush=True)
 
@@ -33,6 +34,7 @@ class ChessExpertMenu:
                 f"  {GREEN}3{ENDC}: Get a tactical puzzle\n"
                 f"  {YELLOW}4{ENDC}: Tell me a fun chess fact\n"
                 f"  {CYAN}5{ENDC}: Tell me a chess joke\n"
+                f"  {GREEN}6{ENDC}: Tell the latest chess news\n"
                 f"  {RED}m{ENDC}: Back to main menu"
             )
 
@@ -62,12 +64,12 @@ class ChessExpertMenu:
                     "If possible, give a joke that hasn't been told before."
                 )
                 self.expert_service.ask_expert(joke_prompt)
+            elif choice == '6':
+                self.expert_service.get_latest_chess_news()
             elif choice == 'm':
                 break
             else:
-                # Treat any other input as a chess question
-                self.expert_service.ask_chess_question(choice)
-                break
+                self.ui.display_message("Invalid choice. Please try again.")
 
     def show_fun_chess_fact(self):
         # Example implementation, replace with your actual logic
