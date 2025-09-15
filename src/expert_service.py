@@ -119,14 +119,12 @@ class ExpertService:
             self.ui.display_message(f"{RED}Sorry, opening advice failed. Error: {e}{ENDC}")
         self.ui.get_user_input("Press Enter to return to the menu.")
 
-    def ask_chess_question(self):
+    def ask_chess_question(self, question=None):
         """
         Prompt the user for a chess question, ask the chessmaster AI model, and save the answer.
         """
-        question = self.ui.get_user_input("Enter your chess question: ").strip()
         if not question:
-            self.ui.display_message("No question entered. Returning to menu.")
-            return
+            question = self.ui.get_user_input("Enter your chess question: ").strip()
         self.ui.display_message("\nAsking the Chessmaster your question...")
         try:
             expert_player = AIPlayer(model_name=self.expert_model_name)

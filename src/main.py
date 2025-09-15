@@ -64,7 +64,7 @@ class ChessApp:
             self  # <-- Pass self as game_runner, assuming ChessApp has run_game_loop
         )
         self.chess_expert_menu = ChessExpertMenu(self.ui, self.expert_service)
-        self.menu_handlers = MenuHandlers(self.ui)
+        self.menu_handlers = MenuHandlers(self.ui, self.chess_expert_menu)
 
         # Try to load session from file if it exists
         self._load_session()
@@ -227,38 +227,42 @@ class ChessApp:
             else:
                 # Main menu loop
                 choice = self.menu_handlers.display_main_menu()
-                try:
-                    if choice == '1':
-                        self.game_log_manager.initialize_new_game_log()
-                        game = self.game_manager.setup_new_game(self.white_openings, self.black_defenses)
-                        if not game:
-                            self.ui.display_message("New game cancelled.")
-                            continue
-                        self.ui.display_game_start_message(game)
-                    elif choice == '2':
-                        game_summaries = self.file_manager.get_saved_game_summaries()
-                        if not game_summaries:
-                            self.ui.display_message("No saved games found.")
-                            continue
-                        chosen_summary = self.ui.display_saved_games_and_get_choice(game_summaries)
-                        if chosen_summary and chosen_summary not in ['m', 'q']:
-                            game = self.game_log_manager.load_game_from_log(chosen_summary['filename'])
-                    elif choice == '3':
-                        new_game, action = self.in_game_menu_handlers.handle_practice_load_in_menu(game)
-                        if new_game:
-                            game = new_game
+                if choice is not None and choice.startswith('?'):
+                    question = choice[1:].strip()
+                    self.chess_expert_menu.handle_chess_expert_menu(direct_question=question)
+                else:
+                    try:
+                        if choice == '1':
+                            self.game_log_manager.initialize_new_game_log()
+                            game = self.game_manager.setup_new_game(self.white_openings, self.black_defenses)
+                            if not game:
+                                self.ui.display_message("New game cancelled.")
+                                continue
                             self.ui.display_game_start_message(game)
-                    elif choice == '4':
-                        self.player_stats_manager.view_player_stats()
-                    elif choice.startswith('?'):
-                        self.chess_expert_menu.handle_chess_expert_menu()
-                    elif choice == 'q':
-                        self.ui.display_message("Exiting application.")
-                        sys.exit(0)
-                except Exception as e:
-                    self.ui.display_message(f"\n{RED}An unexpected error occurred: {e}{ENDC}")
-                    logging.error(f"An unexpected error occurred: {e}", exc_info=True)
-                    self.ui.get_user_input("Press Enter to acknowledge and return to the main menu.")
+                        elif choice == '2':
+                            game_summaries = self.file_manager.get_saved_game_summaries()
+                            if not game_summaries:
+                                self.ui.display_message("No saved games found.")
+                                continue
+                            chosen_summary = self.ui.display_saved_games_and_get_choice(game_summaries)
+                            if chosen_summary and chosen_summary not in ['m', 'q']:
+                                game = self.game_log_manager.load_game_from_log(chosen_summary['filename'])
+                        elif choice == '3':
+                            new_game, action = self.in_game_menu_handlers.handle_practice_load_in_menu(game)
+                            if new_game:
+                                game = new_game
+                                self.ui.display_game_start_message(game)
+                        elif choice == '4':
+                            self.player_stats_manager.view_player_stats()
+                        elif choice.startswith('?'):
+                            self.chess_expert_menu.handle_chess_expert_menu()
+                        elif choice == 'q':
+                            self.ui.display_message("Exiting application.")
+                            sys.exit(0)
+                    except Exception as e:
+                        self.ui.display_message(f"\n{RED}An unexpected error occurred: {e}{ENDC}")
+                        logging.error(f"An unexpected error occurred: {e}", exc_info=True)
+                        self.ui.get_user_input("Press Enter to acknowledge and return to the main menu.")
 
     def parse_log_header(self, lines, all_player_keys, debug=False):
         return self.game_log_manager.parse_log_header(lines, all_player_keys, debug)
