@@ -1,0 +1,10 @@
+{
+    "username": "ChessTester_basic",
+    "email": "ChessTester_basic@example.com",
+    "password_hash": "580167b75f37e14ac46fac92108f0cd549e87189bad6685b1c921b78150811fe",
+    "password_salt": "90cd11e0d753a7c70302bc2701e42b1b",
+    "verified": false,
+    "created_at": "2025-09-09T12:38:53.984405",
+    "last_login": null,
+    "games": []
+}
