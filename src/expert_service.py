@@ -60,7 +60,13 @@ class ExpertService:
         self.ui.display_message("\nGetting a fun chess fact...")
         try:
             expert_player = AIPlayer(model_name=self.expert_model_name)
-            answer = expert_player.get_chess_fact_or_answer()
+            prompt = (
+                "Give me a unique chess fact or piece of trivia. "
+                "Do not repeat facts about the Queen's movement. "
+                "You may share a historical event, a famous player's achievement, a record, a rule, or something from recent chess news. "
+                "If possible, avoid repeating facts from previous answers."
+            )
+            answer = expert_player.get_chess_fact_or_answer(prompt)
             self.ui.display_message("\n--- Fun Chess Fact ---")
             self.ui.display_message(answer)
             self.ui.display_message("----------------------")
