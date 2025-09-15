@@ -1,4 +1,3 @@
 {
-    "sarif-viewer.connectToGithubCodeScanning": "off",
-    "terminal.integrated.defaultProfile.windows": "Command Prompt"
+    "sarif-viewer.connectToGithubCodeScanning": "off"
 }
