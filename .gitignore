@@ -16,3 +16,7 @@ env/
 env.bak/
 venv.bak/
 dist/
+venv/Lib
+
+# Chess game log
+chess_game*.log
