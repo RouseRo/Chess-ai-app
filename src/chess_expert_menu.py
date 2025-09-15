@@ -66,7 +66,7 @@ class ChessExpertMenu:
                 self.expert_service.ask_expert(joke_prompt)
             elif choice == '6':
                 self.expert_service.get_latest_chess_news()
-            elif choice == 'm':
+            elif choice == 'm':  # Changed back to 'm'
                 break
             else:
                 self.ui.display_message("Invalid choice. Please try again.")
