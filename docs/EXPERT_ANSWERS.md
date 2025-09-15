@@ -195,3 +195,14 @@ Looking further ahead, two other pivotal events are scheduled for later this yea
 
 ---
 
+#### Question 10
+**Asked:** 2025-09-15 20:39:01 UTC
+**Question:** When was Bobby Fisher champion?
+
+**Answer:**
+Bobby Fischer was the 11th World Chess Champion from **1972 to 1975**.
+
+He won the title by defeating Boris Spassky in their iconic 1972 "Match of the Century" in Reykjavík, Iceland. His reign ended in 1975 when he forfeited the title after disagreements with FIDE over match conditions for his planned defense against challenger Anatoly Karpov.
+
+---
+

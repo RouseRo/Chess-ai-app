@@ -227,7 +227,11 @@ class ChessApp:
             else:
                 # Main menu loop
                 choice = self.menu_handlers.display_main_menu()
-                if choice is not None and choice.startswith('?'):
+                if choice is None:
+                    # If choice is None, skip processing and return to the main menu
+                    continue
+
+                if choice.startswith('?'):
                     question = choice[1:].strip()
                     self.chess_expert_menu.handle_chess_expert_menu(direct_question=question)
                 else:
@@ -254,8 +258,6 @@ class ChessApp:
                                 self.ui.display_game_start_message(game)
                         elif choice == '4':
                             self.player_stats_manager.view_player_stats()
-                        elif choice.startswith('?'):
-                            self.chess_expert_menu.handle_chess_expert_menu()
                         elif choice == 'q':
                             self.ui.display_message("Exiting application.")
                             sys.exit(0)

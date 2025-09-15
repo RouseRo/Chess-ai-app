@@ -1,3 +1,10 @@
+# Define color variables
+RED = "\033[91m"
+GREEN = "\033[92m"
+YELLOW = "\033[93m"
+CYAN = "\033[96m"
+ENDC = "\033[0m"
+
 class ChessExpertMenu:
     def __init__(self, ui, expert_service):
         self.ui = ui
@@ -20,13 +27,13 @@ class ChessExpertMenu:
         """
         while True:
             self.ui.display_message(
-                "--- Ask the Chessmaster ---\n"
-                "  1: Analyze a position\n"
-                "  2: Ask a chess question\n"
-                "  3: Get a tactical puzzle\n"
-                "  4: Tell me a fun chess fact\n"
-                "  5: Tell me a chess joke\n"
-                "  m: Back to main menu"
+                f"{CYAN}--- Ask the Chessmaster ---{ENDC}\n"
+                f"  {GREEN}1{ENDC}: Analyze a position\n"
+                f"  {GREEN}2{ENDC}: Ask a chess question\n"
+                f"  {GREEN}3{ENDC}: Get a tactical puzzle\n"
+                f"  {YELLOW}4{ENDC}: Tell me a fun chess fact\n"
+                f"  {CYAN}5{ENDC}: Tell me a chess joke\n"
+                f"  {RED}m{ENDC}: Back to main menu"
             )
 
             # If a direct question was passed, treat it as a chess question (menu item 2)
