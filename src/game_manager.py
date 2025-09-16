@@ -4,13 +4,15 @@ from src.human_player import HumanPlayer
 import logging  # Import logging module
 import inspect
 import sys
+from src.game import WHITE, CYAN, YELLOW, GREEN, MAGENTA, ENDC
 
 class GameManager:
-    def __init__(self, ui, player_factory, ai_models, stockfish_configs):
+    def __init__(self, ui, player_factory, ai_models, stockfish_configs, file_manager):
         self.ui = ui
         self.player_factory = player_factory
         self.ai_models = ai_models
         self.stockfish_configs = stockfish_configs
+        self.file_manager = file_manager  # <-- Add this line
 
     def setup_new_game(self, white_openings, black_defenses):
         """Create and return a new Game from UI choices. Returns None if the user cancels."""
@@ -49,18 +51,8 @@ class GameManager:
         self.ui.display_board(game.board)
         current_player = game.get_current_player()
 
-        # Color codes (customize as desired)
-        WHITE = "\033[97m"
-        CYAN = "\033[96m"
-        YELLOW = "\033[93m"
-        GREEN = "\033[92m"
-        MAGENTA = "\033[95m"
-        ENDC = "\033[0m"
-
         turn_color = "White" if game.board.turn else "Black"
         move_number = game.board.fullmove_number
-
-        # Move number in white, player model in cyan, color in yellow, rest in green/magenta
         prompt = (
             f"{WHITE}Move {move_number}{ENDC} "
             f"{CYAN}({getattr(current_player, 'model_name', str(current_player))}{ENDC} "
@@ -71,7 +63,6 @@ class GameManager:
             f"{MAGENTA}'m'{ENDC} for menu: "
         )
 
-        # If observer_auto_moves > 0, skip prompt and auto-play
         if hasattr(self, "observer_auto_moves") and self.observer_auto_moves > 0:
             self.observer_auto_moves -= 1
             move = ""
@@ -79,8 +70,8 @@ class GameManager:
             move = self.ui.get_user_input(prompt)
 
         if move.isdigit():
-            self.observer_auto_moves = int(move) - 1  # -1 because this move will be auto-played now
-            move = ""  # Treat as auto-play for this turn
+            self.observer_auto_moves = int(move) - 1
+            move = ""
 
         if move == 'q':
             quit_choice = self.ui.get_human_quit_choice()
@@ -89,14 +80,13 @@ class GameManager:
                 self.ui.display_game_over_message(game)
                 return game, GameLoopAction.RETURN_TO_MENU
             elif quit_choice == 's':
-                game.save_game()
+                self.file_manager.save_game_log()
                 self.ui.display_message("Game saved. Exiting to main menu.")
-                return game, GameLoopAction.RETURN_TO_MENU
+                return game, GameLoopAction.QUIT_APPLICATION  # <-- Change this line
             elif quit_choice == 'q':
                 self.ui.display_message("Exiting game without saving.")
                 return game, GameLoopAction.QUIT_APPLICATION
             elif quit_choice == 'c':
-                # Cancel quit, return to game
                 return game, GameLoopAction.CONTINUE
         elif move == 'm':
             return game, GameLoopAction.IN_GAME_MENU

@@ -90,7 +90,7 @@ class GameLogManager:
                 self.ui.display_message(f"Failed to load game: {error_reason}")
                 return None
             player1 = self.player_factory.create_player(header.white_key, name_override=header.white_name)
-            player2 = self.player_factory.create_player(header.black_key, name_override=header.black_name)
+            player2 = self.player_factory.create_player(header.black_key, name_override=header.blackName)
             from src.game import Game
             game = Game(player1, player2, white_strategy=header.white_strategy, 
                    black_strategy=header.black_strategy, 
@@ -118,3 +118,18 @@ class GameLogManager:
         except Exception as e:
             self.ui.display_message(f"Error loading log file: {e}")
             return None
+
+    def log_new_game_header(self, game, white_opening_obj=None, black_defense_obj=None):
+        logging.info("New Game Started")
+        logging.info(f"White: {game.white_player}")
+        logging.info(f"Black: {game.black_player}")
+        logging.info(f"White Player Key: {getattr(game, 'white_player_key', '')}")
+        logging.info(f"Black Player Key: {getattr(game, 'black_player_key', '')}")
+        # Use the .name or .description attribute if available, else fallback
+        logging.info(
+            f"White Strategy: {getattr(white_opening_obj, 'name', None) or getattr(white_opening_obj, 'description', None) or 'No Classic Chess Opening'}"
+        )
+        logging.info(
+            f"Black Strategy: {getattr(black_defense_obj, 'name', None) or getattr(black_defense_obj, 'description', None) or 'No Classic Chess Defense'}"
+        )
+        logging.info(f"Initial FEN: {game.board.fen()}")

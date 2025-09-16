@@ -53,7 +53,8 @@ class ChessApp:
         )
         self.game_log_manager = GameLogManager(self.ui, self.player_factory, self.ai_models, self.stockfish_configs)
         self.player_stats_manager = PlayerStatsManager(self.ui, self.file_manager)
-        self.game_manager = GameManager(self.ui, self.player_factory, self.ai_models, self.stockfish_configs)
+        # Pass file_manager to GameManager here:
+        self.game_manager = GameManager(self.ui, self.player_factory, self.ai_models, self.stockfish_configs, self.file_manager)
         self.in_game_menu_handlers = InGameMenuHandlers(
             self.ui,
             self.file_manager,
