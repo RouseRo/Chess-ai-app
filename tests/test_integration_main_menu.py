@@ -151,23 +151,30 @@ def test_main_menu_chess_expert_flow():
     child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=15, env=TEST_ENV)
 
     try:
-        # Wait for the main menu
+        # 1. Wait for the main menu
         expect_with_debug(child, r"--- Main Menu ---")
         expect_with_debug(child, r"Enter your choice")
 
-        # Select option '?' for Ask a Chess Expert
+        # 2. Select option '?' for Ask a Chess Expert
         child.sendline('?')
 
-        # Verify that the Chessmaster menu appears
+        # 3. Verify that the Chessmaster menu appears
         expect_with_debug(child, r"--- Ask the Chessmaster ---")
+        expect_with_debug(child, r"Enter your choice")
 
-        # Go back to the main menu
-        child.sendline('m')  # Updated to match the application logic
+        # 4. Go back to the main menu by selecting 'm'
+        child.sendline('m')
 
-        # Expect to be back at the main menu
+        # 5. Verify that the main menu reappears
         expect_with_debug(child, r"--- Main Menu ---")
+        expect_with_debug(child, r"Enter your choice")
+
+        # 6. Quit the application
+        child.sendline('q')
+        expect_with_debug(child, r"Exiting application")
     finally:
-        child.terminate()
+        # Ensure the process is terminated
+        _terminate_process(child)
 
 @pytest.mark.integration
 def test_main_menu_new_game_flow():
