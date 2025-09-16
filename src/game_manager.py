@@ -45,11 +45,26 @@ class GameManager:
         self.ui.display_board(game.board)
         current_player = game.get_current_player()
 
+        # Color codes (customize as desired)
+        WHITE = "\033[97m"
+        CYAN = "\033[96m"
+        YELLOW = "\033[93m"
+        GREEN = "\033[92m"
+        MAGENTA = "\033[95m"
+        ENDC = "\033[0m"
+
         turn_color = "White" if game.board.turn else "Black"
         move_number = game.board.fullmove_number
+
+        # Move number in white, player model in cyan, color in yellow, rest in green/magenta
         prompt = (
-            f"Move {move_number} ({getattr(current_player, 'model_name', str(current_player))} as {turn_color}): "
-            f"'ENTER' to let player move, a # for auto-play, 'q' to quit, or 'm' for menu: "
+            f"{WHITE}Move {move_number}{ENDC} "
+            f"{CYAN}({getattr(current_player, 'model_name', str(current_player))}{ENDC} "
+            f"{YELLOW}as {turn_color}{ENDC}{CYAN}){ENDC}: "
+            f"{GREEN}'ENTER'{ENDC} to let player move, "
+            f"{WHITE}a{ENDC}{YELLOW} #{ENDC} for auto-play, "
+            f"{GREEN}'q'{ENDC} to quit, or "
+            f"{MAGENTA}'m'{ENDC} for menu: "
         )
 
         # If observer_auto_moves > 0, skip prompt and auto-play
@@ -75,7 +90,7 @@ class GameManager:
                 return game, GameLoopAction.RETURN_TO_MENU
             elif quit_choice == 'q':
                 self.ui.display_message("Exiting game without saving.")
-                return game, GameLoopAction.QUIT_APPLICATION  # <-- Fix: exit app
+                return game, GameLoopAction.QUIT_APPLICATION
             elif quit_choice == 'c':
                 # Cancel quit, return to game
                 return game, GameLoopAction.CONTINUE
