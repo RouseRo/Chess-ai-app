@@ -7,6 +7,7 @@ import sys
 
 class GameManager:
     def __init__(self, ui, player_factory, ai_models, stockfish_configs):
+        self.observer_auto_moves = 0
         self.ui = ui
         self.player_factory = player_factory
         self.ai_models = ai_models
@@ -46,8 +47,21 @@ class GameManager:
 
         turn_color = "White" if game.board.turn else "Black"
         move_number = game.board.fullmove_number
-        prompt = f"Move {move_number} ({getattr(current_player, 'model_name', str(current_player))} as {turn_color}): Enter your move (or press Enter to let the player move), 'q' to quit, or 'm' for menu: "
-        move = self.ui.get_user_input(prompt)
+        prompt = (
+            f"Move {move_number} ({getattr(current_player, 'model_name', str(current_player))} as {turn_color}): "
+            f"'ENTER' to let player move, a # for auto-play, 'q' to quit, or 'm' for menu: "
+        )
+
+        # If observer_auto_moves > 0, skip prompt and auto-play
+        if hasattr(self, "observer_auto_moves") and self.observer_auto_moves > 0:
+            self.observer_auto_moves -= 1
+            move = ""
+        else:
+            move = self.ui.get_user_input(prompt)
+
+        if move.isdigit():
+            self.observer_auto_moves = int(move) - 1  # -1 because this move will be auto-played now
+            move = ""  # Treat as auto-play for this turn
 
         if move == 'q':
             quit_choice = self.ui.get_human_quit_choice()
@@ -61,7 +75,7 @@ class GameManager:
                 return game, GameLoopAction.RETURN_TO_MENU
             elif quit_choice == 'q':
                 self.ui.display_message("Exiting game without saving.")
-                return game, GameLoopAction.RETURN_TO_MENU
+                return game, GameLoopAction.QUIT_APPLICATION  # <-- Fix: exit app
             elif quit_choice == 'c':
                 # Cancel quit, return to game
                 return game, GameLoopAction.CONTINUE
