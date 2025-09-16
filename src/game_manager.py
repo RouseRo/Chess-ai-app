@@ -41,44 +41,44 @@ class GameManager:
         return game
 
     def play_turn(self, game):
-        """Plays a single turn of the game, returning the game object and an action."""
         self.ui.display_board(game.board)
         current_player = game.get_current_player()
 
-        try:
-            if isinstance(current_player, HumanPlayer):
-                turn_color = "White" if game.board.turn else "Black"
-                move_number = game.board.fullmove_number
-                prompt = f"Move {move_number} ({current_player.model_name} as {turn_color}): Enter your move (e.g. e2e4), 'q' to quit, or 'm' for menu: "
-                move = self.ui.get_user_input(prompt)
-                
-                if move == 'q':
-                    quit_choice = self.ui.get_human_quit_choice()
-                    if quit_choice == 'r':
-                        game.resign_current_player()
-                        self.ui.display_game_over_message(game)
-                        return game, GameLoopAction.RETURN_TO_MENU
-                    elif quit_choice == 's':
-                        game.save_game()
-                        self.ui.display_message("Game saved. Exiting to main menu.")
-                        return game, GameLoopAction.RETURN_TO_MENU
-                    elif quit_choice == 'q':
-                        self.ui.display_message("Exiting game without saving.")
-                        return game, GameLoopAction.RETURN_TO_MENU
-                    elif quit_choice == 'c':
-                        # Cancel quit, return to game
-                        return game, GameLoopAction.CONTINUE
-                elif move == 'm':
-                    return game, GameLoopAction.IN_GAME_MENU
-                else:
-                    game.make_manual_move(move)
-            else:
-                self.ui.display_turn_message(game)
+        turn_color = "White" if game.board.turn else "Black"
+        move_number = game.board.fullmove_number
+        prompt = f"Move {move_number} ({getattr(current_player, 'model_name', str(current_player))} as {turn_color}): Enter your move (or press Enter to let the player move), 'q' to quit, or 'm' for menu: "
+        move = self.ui.get_user_input(prompt)
+
+        if move == 'q':
+            quit_choice = self.ui.get_human_quit_choice()
+            if quit_choice == 'r':
+                game.resign_current_player()
+                self.ui.display_game_over_message(game)
+                return game, GameLoopAction.RETURN_TO_MENU
+            elif quit_choice == 's':
+                game.save_game()
+                self.ui.display_message("Game saved. Exiting to main menu.")
+                return game, GameLoopAction.RETURN_TO_MENU
+            elif quit_choice == 'q':
+                self.ui.display_message("Exiting game without saving.")
+                return game, GameLoopAction.RETURN_TO_MENU
+            elif quit_choice == 'c':
+                # Cancel quit, return to game
+                return game, GameLoopAction.CONTINUE
+        elif move == 'm':
+            return game, GameLoopAction.IN_GAME_MENU
+        elif move.strip():
+            try:
+                game.make_manual_move(move)
+            except Exception as e:
+                self.ui.display_message(f"{RED}Invalid move: {e}{ENDC}")
+        else:
+            self.ui.display_turn_message(game)
+            try:
                 game.play_turn()
-        except ValueError as e:
-            self.ui.display_message(f"{RED}Invalid move: {e}{ENDC}")
-        except Exception as e:
-            self.ui.display_message(f"{RED}Unexpected error: {e}{ENDC}")
+            except Exception as e:
+                self.ui.display_message(f"{RED}AI move error: {e}{ENDC}")
+
         return game, GameLoopAction.CONTINUE
 
     def determine_game_result(self, game):
@@ -116,3 +116,34 @@ class GameManager:
                     game = None  # Reset game after it ends
             else:
                 self.ui.display_message(f"Unknown action: {action}")
+
+    def play_game(self, game):
+        move_number = 1
+        while not game.is_over():
+            self.ui.display_board(game.board)
+            current_player = game.current_player()
+            color = "White" if game.turn == "w" else "Black"
+            player_name = current_player.name
+            skill_str = f" (Skill: {current_player.skill})" if hasattr(current_player, "skill") and current_player.skill else ""
+            prompt = f"Move {move_number} ({color}): {player_name}{skill_str}"
+
+            self.ui.display_message(f"{prompt}")
+            move = self.ui.get_user_input("Enter your move (or press Enter to let the player move): ")
+
+            if move.strip():
+                try:
+                    game.make_manual_move(move)
+                except Exception as e:
+                    self.ui.display_message(f"{RED}Invalid move: {e}{ENDC}")
+            else:
+                self.ui.display_message(f"{prompt} is thinking...")
+                try:
+                    move = current_player.get_move(game)
+                    game.make_manual_move(move)
+                except Exception as e:
+                    self.ui.display_message(f"{RED}AI move error: {e}{ENDC}")
+
+            if game.turn == "b":
+                move_number += 1
+
+        # ...existing code...
