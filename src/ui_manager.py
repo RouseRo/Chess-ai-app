@@ -147,6 +147,13 @@ class UIManager:
         return None, None
 
     def display_setup_menu_and_get_choices(self, white_openings, black_defenses, ai_models, stockfish_configs):
+        WHITE = "\033[97m"
+        CYAN = "\033[96m"
+        YELLOW = "\033[93m"
+        GREEN = "\033[92m"
+        MAGENTA = "\033[95m"
+        ENDC = "\033[0m"
+
         title = self._color_title("--- Setup New Game ---")
         print(title)
         
@@ -160,24 +167,33 @@ class UIManager:
         white_opening = ""
         black_defense = ""
         
-        # Only prompt for opening strategy if White is an AI player (not human)
-        if white_key != "hu":
-            print(f"{CYAN}Choose white opening (enter key or leave blank for default):{ENDC}")
-            for k, v in white_openings.items():
-                print(f"  {WHITE}{k}:{ENDC} {CYAN}{v}{ENDC}")
-            white_opening = self.get_user_input("White opening key: ") or (list(white_openings.keys())[0] if white_openings else "")
+        # --- Prompt for opening/defense as a single input with color ---
+        opening_defense_prompt = (
+            f"{WHITE}White openings:{ENDC}\n"
+            f"{YELLOW}  0:{ENDC} No Classic Chess Opening\n"
+            f"{YELLOW}  1:{ENDC} Play the Ruy Lopez.\n"
+            f"{YELLOW}  2:{ENDC} Play the Italian Game.\n"
+            f"{YELLOW}  3:{ENDC} Play the Queen's Gambit.\n"
+            f"{YELLOW}  4:{ENDC} Play the London System.\n"
+            f"{YELLOW}  5:{ENDC} Play the King's Gambit.\n"
+            f"{WHITE}Black defenses:{ENDC}\n"
+            f"{MAGENTA}  a:{ENDC} Play the Sicilian Defense.\n"
+            f"{MAGENTA}  b:{ENDC} Play the French Defense.\n"
+            f"{MAGENTA}  c:{ENDC} Play the Caro-Kann Defense.\n"
+            f"{MAGENTA}  z:{ENDC} No Classic Chess Defense\n"
+            f"{CYAN}Enter white opening and black defense as a single input (e.g., '{YELLOW}1{ENDC}{MAGENTA}a{ENDC}'){CYAN},{ENDC}\n"
+            f"{GREEN}or press Enter to use defaults:{ENDC} "
+        )
+        opening_defense = self.get_user_input(opening_defense_prompt).strip().lower()
+
+        # Parse input like "1a"
+        if opening_defense and len(opening_defense) >= 2:
+            white_opening = opening_defense[0]
+            black_defense = opening_defense[1]
         else:
-            print(f"{WHITE}Human player selected for White - no opening strategy will be used.{ENDC}")
-        
-        # Only prompt for defense strategy if Black is an AI player (not human)
-        if black_key != "hu":
-            print(f"{CYAN}Choose black defense (enter key or leave blank for default):{ENDC}")
-            for k, v in black_defenses.items():
-                print(f"  {WHITE}{k}:{ENDC} {CYAN}{v}{ENDC}")
-            black_defense = self.get_user_input("Black defense key: ") or (list(black_defenses.keys())[0] if black_defenses else "")
-        else:
-            print(f"{WHITE}Human player selected for Black - no defense strategy will be used.{ENDC}")
-        
+            white_opening = ""
+            black_defense = ""
+
         return white_opening, black_defense, white_key, black_key
 
     def display_player_stats(self, stats):

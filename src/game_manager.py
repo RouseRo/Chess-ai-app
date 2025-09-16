@@ -7,7 +7,6 @@ import sys
 
 class GameManager:
     def __init__(self, ui, player_factory, ai_models, stockfish_configs):
-        self.observer_auto_moves = 0
         self.ui = ui
         self.player_factory = player_factory
         self.ai_models = ai_models
@@ -15,6 +14,7 @@ class GameManager:
 
     def setup_new_game(self, white_openings, black_defenses):
         """Create and return a new Game from UI choices. Returns None if the user cancels."""
+        # Only call the UI to get all choices, including opening/defense as a single input
         choices = self.ui.display_setup_menu_and_get_choices(
             white_openings,
             black_defenses,
@@ -29,12 +29,16 @@ class GameManager:
         white_player = self.player_factory.create_player(white_key, color_label="White")
         black_player = self.player_factory.create_player(black_key, color_label="Black")
 
+        # Map keys to actual opening/defense objects or strings
+        white_opening_obj = next((o for o in white_openings if getattr(o, "key", o) == white_opening), None)
+        black_defense_obj = next((d for d in black_defenses if getattr(d, "key", d) == black_defense), None)
+
         game = Game(white_player, black_player, white_player_key=white_key, black_player_key=black_key)
         try:
-            if white_opening:
-                game.set_opening(white_opening)
-            if black_defense:
-                game.set_defense(black_defense)
+            if white_opening_obj:
+                game.set_opening(white_opening_obj)
+            if black_defense_obj:
+                game.set_defense(black_defense_obj)
         except Exception:
             pass
 
