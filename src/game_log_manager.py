@@ -120,12 +120,12 @@ class GameLogManager:
             return None
 
     def log_new_game_header(self, game, white_opening_obj=None, black_defense_obj=None):
+        import chess
         logging.info("New Game Started")
-        logging.info(f"White: {game.white_player}")
-        logging.info(f"Black: {game.black_player}")
+        logging.info(f"White: {game.players[chess.WHITE].model_name}")
+        logging.info(f"Black: {game.players[chess.BLACK].model_name}")
         logging.info(f"White Player Key: {getattr(game, 'white_player_key', '')}")
         logging.info(f"Black Player Key: {getattr(game, 'black_player_key', '')}")
-        # Use the .name or .description attribute if available, else fallback
         logging.info(
             f"White Strategy: {getattr(white_opening_obj, 'name', None) or getattr(white_opening_obj, 'description', None) or 'No Classic Chess Opening'}"
         )

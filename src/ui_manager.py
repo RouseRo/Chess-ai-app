@@ -1,12 +1,5 @@
 import chess
-from src.game import BLUE, CYAN, GREEN, YELLOW, RED, WHITE, ENDC
-
-RED = "\033[91m"
-GREEN = "\033[92m"
-YELLOW = "\033[93m"
-CYAN = "\033[96m"
-ENDC = "\033[0m"
-BOLD = "\033[1m"
+from src.game import BLUE, CYAN, GREEN, YELLOW, RED, WHITE, ENDC, MAGENTA, BOLD
 
 class UIManager:
     """Simple console UI helper. Menu titles and option text are shown in color."""
@@ -147,13 +140,6 @@ class UIManager:
         return None, None
 
     def display_setup_menu_and_get_choices(self, white_openings, black_defenses, ai_models, stockfish_configs):
-        WHITE = "\033[97m"
-        CYAN = "\033[96m"
-        YELLOW = "\033[93m"
-        GREEN = "\033[92m"
-        MAGENTA = "\033[95m"
-        ENDC = "\033[0m"
-
         title = self._color_title("--- Setup New Game ---")
         print(title)
         
