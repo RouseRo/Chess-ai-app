@@ -121,15 +121,16 @@ class GameLogManager:
 
     def log_new_game_header(self, game, white_opening_obj=None, black_defense_obj=None):
         import chess
+
         logging.info("New Game Started")
         logging.info(f"White: {game.players[chess.WHITE].model_name}")
         logging.info(f"Black: {game.players[chess.BLACK].model_name}")
         logging.info(f"White Player Key: {getattr(game, 'white_player_key', '')}")
         logging.info(f"Black Player Key: {getattr(game, 'black_player_key', '')}")
         logging.info(
-            f"White Strategy: {getattr(white_opening_obj, 'name', None) or getattr(white_opening_obj, 'description', None) or 'No Classic Chess Opening'}"
+            f"White Strategy: {white_opening_obj or 'No Classic Chess Opening'}"
         )
         logging.info(
-            f"Black Strategy: {getattr(black_defense_obj, 'name', None) or getattr(black_defense_obj, 'description', None) or 'No Classic Chess Defense'}"
+            f"Black Strategy: {black_defense_obj or 'No Classic Chess Defense'}"
         )
         logging.info(f"Initial FEN: {game.board.fen()}")

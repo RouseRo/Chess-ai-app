@@ -31,20 +31,22 @@ class GameManager:
         white_player = self.player_factory.create_player(white_key, color_label="White")
         black_player = self.player_factory.create_player(black_key, color_label="Black")
 
-        # Map keys to actual opening/defense objects
-        white_opening_obj = next((o for o in white_openings if getattr(o, "key", o) == white_opening_key), None)
-        black_defense_obj = next((d for d in black_defenses if getattr(d, "key", d) == black_defense_key), None)
+        # Map keys to string values (since your dict maps keys to strings)
+        white_opening_obj = white_openings.get(white_opening_key)
+        black_defense_obj = black_defenses.get(black_defense_key)
 
         game = Game(
             white_player, black_player,
-            white_strategy=getattr(white_opening_obj, "name", None),
-            black_strategy=getattr(black_defense_obj, "name", None),
             white_player_key=white_key,
             black_player_key=black_key
         )
 
+        # Set the strategies on the game object
+        game.white_strategy = white_opening_obj
+        game.black_strategy = black_defense_obj
+
         game.initialize_game()
-        # Return the game and the selected opening/defense objects
+        # --- Return the actual objects, not the keys ---
         return game, white_opening_obj, black_defense_obj
 
     def play_turn(self, game):
