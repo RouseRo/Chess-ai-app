@@ -13,6 +13,8 @@ GREEN = '\033[92m'
 YELLOW = '\033[93m'
 RED = '\033[91m'
 WHITE = '\033[97m'
+MAGENTA = "\033[95m"
+BOLD = "\033[1m"
 ENDC = '\033[0m'
 
 class GameLoopAction(Enum):
@@ -39,18 +41,7 @@ class Game:
 
     def initialize_game(self):
         """Logs the initial game state and player info."""
-        logging.info("New Game Started")
-        logging.info(f"White: {self.players[chess.WHITE].model_name}")
-        logging.info(f"Black: {self.players[chess.BLACK].model_name}")
-        logging.info(f"White Player Key: {self.white_player_key}")
-        logging.info(f"Black Player Key: {self.black_player_key}")
-        
-        white_strat_msg = self.white_strategy if self.white_strategy else "No Classic Chess Opening"
-        black_strat_msg = self.black_strategy if self.black_strategy else "No Classic Chess Opening"
-        logging.info(f"White Strategy: {white_strat_msg}")
-        logging.info(f"Black Strategy: {black_strat_msg}")
-        
-        logging.info(f"Initial FEN: {self.board.fen()}")
+        pass  # REMOVE THIS METHOD CONTENTS
 
     def set_opening_strategy(self, color, strategy_message):
         """Sets an opening strategy message for the given player color."""

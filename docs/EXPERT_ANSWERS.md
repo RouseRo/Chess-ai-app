@@ -206,3 +206,14 @@ He won the title by defeating Boris Spassky in their iconic 1972 "Match of the C
 
 ---
 
+#### Question 11
+**Asked:** 2025-09-15 21:07:58 UTC
+**Question:** When is the next FIDE Chess Olympiad
+
+**Answer:**
+The 45th FIDE Chess Olympiad will be held in **Budapest, Hungary** from **September 10th to September 23rd, 2024**.
+
+This prestigious biennial team tournament brings together federations from all over the world to compete for the gold medal.
+
+---
+

@@ -53,7 +53,8 @@ class ChessApp:
         )
         self.game_log_manager = GameLogManager(self.ui, self.player_factory, self.ai_models, self.stockfish_configs)
         self.player_stats_manager = PlayerStatsManager(self.ui, self.file_manager)
-        self.game_manager = GameManager(self.ui, self.player_factory, self.ai_models, self.stockfish_configs)
+        # Pass file_manager to GameManager here:
+        self.game_manager = GameManager(self.ui, self.player_factory, self.ai_models, self.stockfish_configs, self.file_manager)
         self.in_game_menu_handlers = InGameMenuHandlers(
             self.ui,
             self.file_manager,
@@ -238,10 +239,11 @@ class ChessApp:
                     try:
                         if choice == '1':
                             self.game_log_manager.initialize_new_game_log()
-                            game = self.game_manager.setup_new_game(self.white_openings, self.black_defenses)
+                            game, white_opening_obj, black_defense_obj = self.game_manager.setup_new_game(self.white_openings, self.black_defenses)
                             if not game:
                                 self.ui.display_message("New game cancelled.")
                                 continue
+                            self.game_log_manager.log_new_game_header(game, white_opening_obj, black_defense_obj)
                             self.ui.display_game_start_message(game)
                         elif choice == '2':
                             game_summaries = self.file_manager.get_saved_game_summaries()

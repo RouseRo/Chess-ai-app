@@ -90,7 +90,7 @@ class GameLogManager:
                 self.ui.display_message(f"Failed to load game: {error_reason}")
                 return None
             player1 = self.player_factory.create_player(header.white_key, name_override=header.white_name)
-            player2 = self.player_factory.create_player(header.black_key, name_override=header.black_name)
+            player2 = self.player_factory.create_player(header.black_key, name_override=header.blackName)
             from src.game import Game
             game = Game(player1, player2, white_strategy=header.white_strategy, 
                    black_strategy=header.black_strategy, 
@@ -118,3 +118,19 @@ class GameLogManager:
         except Exception as e:
             self.ui.display_message(f"Error loading log file: {e}")
             return None
+
+    def log_new_game_header(self, game, white_opening_obj=None, black_defense_obj=None):
+        import chess
+
+        logging.info("New Game Started")
+        logging.info(f"White: {game.players[chess.WHITE].model_name}")
+        logging.info(f"Black: {game.players[chess.BLACK].model_name}")
+        logging.info(f"White Player Key: {getattr(game, 'white_player_key', '')}")
+        logging.info(f"Black Player Key: {getattr(game, 'black_player_key', '')}")
+        logging.info(
+            f"White Strategy: {white_opening_obj or 'No Classic Chess Opening'}"
+        )
+        logging.info(
+            f"Black Strategy: {black_defense_obj or 'No Classic Chess Defense'}"
+        )
+        logging.info(f"Initial FEN: {game.board.fen()}")
