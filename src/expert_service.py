@@ -60,7 +60,13 @@ class ExpertService:
         self.ui.display_message("\nGetting a fun chess fact...")
         try:
             expert_player = AIPlayer(model_name=self.expert_model_name)
-            answer = expert_player.get_chess_fact_or_answer()
+            prompt = (
+                "Give me a unique chess fact or piece of trivia. "
+                "Do not repeat facts about the Queen's movement. "
+                "You may share a historical event, a famous player's achievement, a record, a rule, or something from recent chess news. "
+                "If possible, avoid repeating facts from previous answers."
+            )
+            answer = expert_player.get_chess_fact_or_answer(prompt)
             self.ui.display_message("\n--- Fun Chess Fact ---")
             self.ui.display_message(answer)
             self.ui.display_message("----------------------")
@@ -72,6 +78,84 @@ class ExpertService:
         except Exception as e:
             self.ui.display_message(f"{RED}Sorry, I couldn't get a fact. Error: {e}{ENDC}")
         self.ui.get_user_input("Press Enter to return to the main menu.")
+
+    def analyze_position(self, position_fen):
+        """
+        Ask the chessmaster AI model to analyze the given FEN board position.
+        """
+        self.ui.display_message("\nAnalyzing position with the Chessmaster...")
+        try:
+            expert_player = AIPlayer(model_name=self.expert_model_name)
+            prompt = (
+                f"Analyze this chess position (FEN): {position_fen}\n"
+                "Give a brief evaluation, best moves for both sides, and any tactical ideas."
+            )
+            answer = expert_player.get_chess_fact_or_answer(prompt)
+            self.ui.display_message("\n--- Chessmaster's Analysis ---")
+            self.ui.display_message(answer)
+            self.ui.display_message("-------------------------------")
+        except Exception as e:
+            self.ui.display_message(f"{RED}Sorry, analysis failed. Error: {e}{ENDC}")
+        self.ui.get_user_input("Press Enter to return to the menu.")
+
+    def opening_advice(self):
+        """
+        Ask the chessmaster AI model for general chess opening advice.
+        Saves the answer to docs/EXPERT_ANSWERS.md.
+        """
+        self.ui.display_message("\nGetting opening advice from the Chessmaster...")
+        try:
+            expert_player = AIPlayer(model_name=self.expert_model_name)
+            prompt = (
+                "Give practical advice for chess openings. "
+                "Include general principles, common mistakes, and tips for improvement."
+            )
+            answer = expert_player.get_chess_fact_or_answer(prompt)
+            self.ui.display_message("\n--- Chessmaster's Opening Advice ---")
+            self.ui.display_message(answer)
+            self.ui.display_message("-------------------------------")
+            self._save_expert_answer(prompt, answer)
+        except Exception as e:
+            self.ui.display_message(f"{RED}Sorry, opening advice failed. Error: {e}{ENDC}")
+        self.ui.get_user_input("Press Enter to return to the menu.")
+
+    def ask_chess_question(self, question=None):
+        """
+        Prompt the user for a chess question, ask the chessmaster AI model, and save the answer.
+        """
+        if not question:
+            question = self.ui.get_user_input("Enter your chess question: ").strip()
+        self.ui.display_message("\nAsking the Chessmaster your question...")
+        try:
+            expert_player = AIPlayer(model_name=self.expert_model_name)
+            answer = expert_player.get_chess_fact_or_answer(question)
+            self.ui.display_message("\n--- Chessmaster's Answer ---")
+            self.ui.display_message(answer)
+            self.ui.display_message("-----------------------------")
+            self._save_expert_answer(question, answer)
+        except Exception as e:
+            self.ui.display_message(f"{RED}Sorry, I couldn't get an answer. Error: {e}{ENDC}")
+        self.ui.get_user_input("Press Enter to return to the menu.")
+
+    def get_latest_chess_news(self):
+        """
+        Fetch the latest chess news from the Chessmaster AI model and save it to CHESS_NEWS.md.
+        """
+        self.ui.display_message("\nFetching the latest chess news...")
+        try:
+            expert_player = AIPlayer(model_name=self.expert_model_name)
+            prompt = (
+                "Provide the latest news in the world of chess. "
+                "Include updates on tournaments, players, and other significant events."
+            )
+            news = expert_player.get_chess_fact_or_answer(prompt)
+            self.ui.display_message("\n--- Latest Chess News ---")
+            self.ui.display_message(news)
+            self.ui.display_message("--------------------------")
+            self._save_chess_news(news)
+        except Exception as e:
+            self.ui.display_message(f"{RED}Sorry, I couldn't fetch the news. Error: {e}{ENDC}")
+        self.ui.get_user_input("Press Enter to return to the menu.")
 
     # ---------- Internal persistence helpers ----------
 
@@ -126,4 +210,55 @@ class ExpertService:
                 f.write(block)
             return True
         except Exception:
+            return False
+
+    def _save_expert_answer(self, question: str, answer: str) -> bool:
+        """
+        Save expert Q&A to docs/EXPERT_ANSWERS.md with timestamp and sequential numbering.
+        """
+        try:
+            docs_dir = os.path.join(os.getcwd(), "docs")
+            os.makedirs(docs_dir, exist_ok=True)
+            path = os.path.join(docs_dir, "EXPERT_ANSWERS.md")
+            # Count existing questions
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                # Count lines starting with '#### Question'
+                import re
+                matches = re.findall(r"#### Question (\d+)", content)
+                next_num = int(matches[-1]) + 1 if matches else 1
+            else:
+                next_num = 1
+            date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            block = (
+                f"#### Question {next_num}\n"
+                f"**Asked:** {date_str}\n"
+                f"**Question:** {question}\n\n"
+                f"**Answer:**\n{answer}\n\n---\n\n"
+            )
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(block)
+            return True
+        except Exception:
+            return False
+
+    def _save_chess_news(self, news: str) -> bool:
+        """
+        Save the latest chess news to docs/CHESS_NEWS.md with a timestamp.
+        """
+        try:
+            docs_dir = os.path.join(os.getcwd(), "docs")
+            os.makedirs(docs_dir, exist_ok=True)
+            path = os.path.join(docs_dir, "CHESS_NEWS.md")
+            date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            block = (
+                f"### {date_str}\n"
+                f"{news}\n\n---\n\n"
+            )
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(block)
+            return True
+        except Exception as e:
+            self.ui.display_message(f"{RED}Failed to save news. Error: {e}{ENDC}")
             return False

@@ -5,8 +5,9 @@ CYAN = "\033[96m"
 ENDC = "\033[0m"
 
 class MenuHandlers:
-    def __init__(self, ui):
+    def __init__(self, ui, chess_expert_menu):
         self.ui = ui
+        self.chess_expert_menu = chess_expert_menu
 
     def display_main_menu(self):
         print(f"\n{CYAN}--- Main Menu ---{ENDC}", flush=True)
@@ -16,5 +17,9 @@ class MenuHandlers:
         print(f"  {YELLOW}4{ENDC}: View Player Stats", flush=True)
         print(f"  {CYAN}?{ENDC}: Ask a Chess Expert", flush=True)
         print(f"  {RED}q{ENDC}: Quit", flush=True)
-        print(f"{YELLOW}Enter your choice:{ENDC} ", end="", flush=True)
-        return input().strip().lower()
+        user_input = input(f"{YELLOW}Enter your choice: {ENDC}").strip()
+        if user_input.startswith('?'):
+            question = user_input[1:].strip()
+            self.chess_expert_menu.handle_chess_expert_menu(direct_question=question)
+        else:
+            return user_input.lower()

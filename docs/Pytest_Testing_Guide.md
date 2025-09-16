@@ -172,3 +172,22 @@ We use a combination of techniques to automate password input:
 ---
 
 For more details, see the code and tests in the `src/` and `tests/` directories.
+
+---
+
+### Summary of Updates:
+1. **Added Test Descriptions:**
+   - Detailed the purpose and steps for each test.
+
+2. **Updated Utilities Section:**
+   - Explained the purpose of helper functions like [expect_with_debug](http://_vscodecontentref_/0).
+
+3. **Environment Setup:**
+   - Included details about the test environment and how to run the tests.
+
+4. **Recent Updates Section:**
+   - Highlighted recent changes to the tests.
+
+---
+
+Let me know if you need further updates or additional documentation!
