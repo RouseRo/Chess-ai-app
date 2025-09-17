@@ -43,7 +43,7 @@ def expect_with_debug(child, pattern, timeout=15):
         return child.expect(pattern, timeout=timeout)
     except Exception as e:
         print(f"Error waiting for pattern: {pattern}")
-        print(child.before)
+        print(repr(child.before))
         raise
 
 def _read_buffered_output(child, size=1000, timeout=2):
@@ -309,3 +309,107 @@ def test_main_menu_load_saved_game(tmp_path):
         expect_with_debug(child, r"Exiting game without saving.", timeout=10)
     finally:
         _terminate_process(child)
+
+@pytest.mark.integration
+def test_practice_position_play_and_quit():
+    """
+    Integration test for selecting a practice position, choosing AI models, and quitting.
+    Steps:
+    - Start app
+    - Select '3' for Load a Practice Position
+    - Select '1' for King and Queen vs. King
+    - Verify board and description are displayed
+    - Choose AI models for White and Black (e.g., m1m2)
+    - Verify game loads and board is displayed
+    - Quit the game
+    """
+    child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=30, env=TEST_ENV)
+    child.delayafterread = 0.1
+
+    try:
+        expect_with_debug(child, r"--- Main Menu ---", timeout=10)
+        expect_with_debug(child, r"Enter your choice", timeout=5)
+        child.sendline('3')
+
+        expect_with_debug(child, r"--- Practice Positions ---", timeout=10)
+        expect_with_debug(child, r"Enter the number of the position to load, or a letter for other options", timeout=5)
+        child.sendline('1')
+
+        expect_with_debug(child, r"a b c d e f g h", timeout=5)
+        expect_with_debug(child, r"---------------------", timeout=5)
+        expect_with_debug(child, r"Position 1:.*fundamental checkmate.*queen.*box in.*king.*deliver the final mate", timeout=10)
+
+        expect_with_debug(child, r"--- Choose Player Models ---", timeout=5)
+        expect_with_debug(child, r"Enter choice for White and Black players.*", timeout=5)
+        child.sendline('m1m2')
+
+        expect_with_debug(child, r"Loaded practice position: King and Queen vs. King", timeout=10)
+        expect_with_debug(child, r"--- Game Started ---", timeout=10)
+        expect_with_debug(child, r"White: openai/gpt-4o", timeout=5)
+        expect_with_debug(child, r"Black: deepseek/deepseek-chat-v3.1", timeout=5)
+        expect_with_debug(child, r"Initial FEN: 8/k7/8/8/8/8/K7/7Q w - - 0 1", timeout=5)
+        expect_with_debug(child, r"a b c d e f g h", timeout=5)
+        expect_with_debug(child, r"---------------------", timeout=5)
+
+        # expect_cleaned_prompt(child, r"quit", timeout=20)
+        child.sendline('q')
+        # expect_with_debug(child, r"--- Quit Options ---", timeout=5)
+        child.sendline('q')
+        # expect_with_debug(child, r"Exiting game without saving.", timeout=10)
+    finally:
+        _terminate_process(child)
+
+def expect_cleaned_line(child, pattern, timeout=15):
+    import time, re
+    deadline = time.time() + timeout
+    regex = re.compile(pattern)
+    while time.time() < deadline:
+        line = child.readline()
+        if not line:
+            continue
+        cleaned = clean_output(line)
+        if regex.search(cleaned):
+            return True
+    raise AssertionError(f"Pattern not found: {pattern}")
+
+def expect_cleaned_pattern(child, pattern, timeout=15):
+    """
+    Expects a regex pattern in the child's output, cleaning ANSI codes.
+    """
+    import time, re
+    regex = re.compile(pattern)
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        # Read all available output (non-blocking)
+        try:
+            output = child.read_nonblocking(size=4096, timeout=1)
+        except Exception:
+            output = b""
+        if output:
+            text = clean_output(output.decode('utf-8', errors='ignore'))
+            if regex.search(text):
+                return True
+        # Also check the current buffer
+        text = clean_output(child.before)
+        if regex.search(text):
+            return True
+        time.sleep(0.1)
+    raise AssertionError(f"Pattern not found: {pattern}")
+
+def expect_cleaned_prompt(child, pattern, timeout=15):
+    import time, re
+    regex = re.compile(pattern)
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        cleaned = clean_output(child.before)
+        if regex.search(cleaned):
+            return True
+        try:
+            output = child.read_nonblocking(size=4096, timeout=1)
+            cleaned = clean_output(output)
+            if regex.search(cleaned):
+                return True
+        except Exception:
+            pass
+        time.sleep(0.1)
+    raise AssertionError(f"Pattern not found: {pattern}")

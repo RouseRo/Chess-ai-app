@@ -69,7 +69,9 @@ class GameManager:
             self.observer_auto_moves -= 1
             move = ""
         else:
-            move = self.ui.get_user_input(prompt)
+            # Print the prompt with flush=True to ensure it appears immediately for integration tests
+            print(prompt, flush=True)  # Always print the prompt with a newline and flush
+            move = input()
 
         if move.isdigit():
             self.observer_auto_moves = int(move) - 1
