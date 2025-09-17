@@ -90,7 +90,8 @@ class GameLogManager:
                 self.ui.display_message(f"Failed to load game: {error_reason}")
                 return None
             player1 = self.player_factory.create_player(header.white_key, name_override=header.white_name)
-            player2 = self.player_factory.create_player(header.black_key, name_override=header.blackName)
+            # FIX: Use 'black_name' instead of 'blackName'
+            player2 = self.player_factory.create_player(header.black_key, name_override=header.black_name)
             from src.game import Game
             game = Game(player1, player2, white_strategy=header.white_strategy, 
                    black_strategy=header.black_strategy, 
