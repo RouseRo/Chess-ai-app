@@ -50,4 +50,3 @@ class PlayerStatsManager:
         # Convert PlayerStats objects to dicts for UI
         stats_dict = {name: v.__dict__ for name, v in self.player_stats.items()}
         self.ui.display_player_stats(stats_dict)
-        self.ui.get_user_input("Press Enter to return to the main menu.")

@@ -183,18 +183,12 @@ class UIManager:
         return white_opening, black_defense, white_key, black_key
 
     def display_player_stats(self, stats):
-        print(f"\n{CYAN}{BOLD}--- Player Statistics ---{ENDC}", flush=True)
-        # Table header with colors, Player column widened, Losses column width fixed for alignment
         print(f"{BOLD}{'Player':<33} | {GREEN}Wins{ENDC:^6} | {RED}Losses{ENDC:^5}| {YELLOW}Draws{ENDC:^7}{ENDC}", flush=True)
         print(f"{'-'*33} | {'-'*6} | {'-'*6} | {'-'*7}", flush=True)
-        # Table rows
-        for name, v in sorted(stats.items(), key=lambda x: (-x[1].get('wins',0), x[0])):
-            player_display = f"{CYAN}{name:<33}{ENDC}"
-            wins_display = f"{GREEN}{v.get('wins',0):^6}{ENDC}"
-            losses_display = f"{RED}{v.get('losses',0):^6}{ENDC}"
-            draws_display = f"{YELLOW}{v.get('draws',0):^7}{ENDC}"
-            print(f"{player_display} | {wins_display} | {losses_display} | {draws_display}", flush=True)
-        print(f"{YELLOW}Press Enter to return to the main menu.{ENDC}", flush=True)
+        for name, stat in stats.items():
+            print(f"{name:<33} | {GREEN}{stat['wins']:^6}{ENDC} | {RED}{stat['losses']:^6}{ENDC} | {YELLOW}{stat['draws']:^7}{ENDC}")
+        # Remove the "Press Enter to return to the main menu." prompt
+        # print(f"{YELLOW}Press Enter to return to the main menu.{ENDC}", flush=True)
 
     def display_game_start_message(self, game):
         title = self._color_title("--- Game Started ---")
