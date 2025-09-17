@@ -127,10 +127,8 @@ def test_main_menu_player_stats_flow():
         
         # Wait for the stats screen to appear
         expect_with_debug(child, r"--- Player Statistics ---")
-        expect_with_debug(child, r"Press Enter to return to the main menu", timeout=10)
         
-        # Press Enter to go back
-        child.sendline('')
+        # No need to send Enter, it always returns to the main menu
         
         # Expect to be back at the main menu
         expect_with_debug(child, r"--- Main Menu ---")
