@@ -6,7 +6,8 @@ Tested flows:
 - Viewing player statistics and returning to the menu
 - Accessing the Chess Expert submenu and returning
 - Starting a new game and quitting
-- (New) Loading a practice position and quitting
+- Loading a practice position and quitting
+- Loading a saved game and quitting
 
 Test utilities:
 - Uses pexpect to interact with the CLI application.
@@ -272,3 +273,39 @@ def test_load_practice_position_menu_sequence():
     finally:
         if child.proc.poll() is None:
             child.proc.terminate()
+
+@pytest.mark.integration
+def test_main_menu_load_saved_game(tmp_path):
+    """
+    Integration test: Load a Saved Game from the main menu.
+    - Starts the app
+    - Selects '2' to load a saved game
+    - Selects the first available saved game
+    - Verifies the game loads and the board is displayed
+    """
+    child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=30, env=TEST_ENV)
+    child.delayafterread = 0.1
+
+    try:
+        # Main menu
+        expect_with_debug(child, r"--- Main Menu ---", timeout=10)
+        expect_with_debug(child, r"Enter your choice", timeout=5)
+        child.sendline('2')
+
+        # Load a Saved Game menu
+        expect_with_debug(child, r"--- Load a Saved Game ---", timeout=10)
+        expect_with_debug(child, r"Enter the number of the game to load, or 'm' to return:", timeout=5)
+        child.sendline('1')
+
+        # Should load the game and display the board
+        expect_with_debug(child, r"a b c d e f g h", timeout=10)
+        expect_with_debug(child, r"---------------------", timeout=5)
+        expect_with_debug(child, r"Move \d+.*:.*", timeout=10)
+
+        # Quit the loaded game
+        child.sendline('q')
+        expect_with_debug(child, r"--- Quit Options ---", timeout=10)
+        child.sendline('q')
+        expect_with_debug(child, r"Exiting game without saving.", timeout=10)
+    finally:
+        _terminate_process(child)
