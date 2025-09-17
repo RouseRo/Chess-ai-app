@@ -185,7 +185,7 @@ class UIManager:
     def display_player_stats(self, stats):
         print(f"\n{CYAN}{BOLD}--- Player Statistics ---{ENDC}", flush=True)
         # Table header with colors, Player column widened, Losses column width fixed for alignment
-        print(f"{BOLD}{'Player':<33} | {GREEN}Wins{ENDC:^6} | {RED}Losses{ENDC:^6} | {YELLOW}Draws{ENDC:^7}{ENDC}", flush=True)
+        print(f"{BOLD}{'Player':<33} | {GREEN}Wins{ENDC:^6} | {RED}Losses{ENDC:^5}| {YELLOW}Draws{ENDC:^7}{ENDC}", flush=True)
         print(f"{'-'*33} | {'-'*6} | {'-'*6} | {'-'*7}", flush=True)
         # Table rows
         for name, v in sorted(stats.items(), key=lambda x: (-x[1].get('wins',0), x[0])):
