@@ -92,7 +92,7 @@ class GameLogManager:
             player1 = self.player_factory.create_player(header.white_key, name_override=header.white_name)
             # FIX: Use 'black_name' instead of 'blackName'
             player2 = self.player_factory.create_player(header.black_key, name_override=header.black_name)
-            from src.game import Game
+            from src.game_manager import Game
             game = Game(player1, player2, white_strategy=header.white_strategy, 
                    black_strategy=header.black_strategy, 
                    white_player_key=header.white_key, 
@@ -135,3 +135,51 @@ class GameLogManager:
             f"Black Strategy: {black_defense_obj or 'No Classic Chess Defense'}"
         )
         logging.info(f"Initial FEN: {game.board.fen()}")
+
+    def log_move(self, move_number, move_san, move_uci, fen=None):
+        msg = f"Move {move_number}: {move_san} ({move_uci})"
+        if fen:
+            msg += f" | FEN: {fen}"
+        logging.info(msg)
+
+    def log_last_move(self, board):
+        """Logs the last move made on the board, including SAN, UCI, and FEN."""
+        if board.move_stack:
+            last_move = board.move_stack[-1]
+            try:
+                move_san = board.san(last_move)
+            except Exception:
+                move_san = "INVALID"
+            move_uci = last_move.uci()
+            self.log_move(board.fullmove_number, move_san, move_uci, fen=board.fen())
+
+    def play_turn(self, game):
+        board = game.board
+        logging.debug(f"Board FEN before move: {board.fen()}")
+
+        if board.move_stack:
+            last_move = board.move_stack[-1]
+            move_uci = last_move.uci()
+            logging.debug(f"Last move in UCI: {move_uci}")
+
+            # Check if the move is legal
+            if board.is_legal(last_move):
+                try:
+                    move_san = board.san(last_move)
+                    logging.debug(f"Last move in SAN: {move_san}")
+                except Exception as e:
+                    logging.error(f"Error generating SAN for move {last_move}: {e}")
+                    move_san = "INVALID"
+            else:
+                logging.error(f"Move {move_uci} is not legal in the current board state: {board.fen()}")
+                move_san = "ILLEGAL"
+
+            # Log the move
+            try:
+                self.game_log_manager.log_move(board.fullmove_number, move_san, move_uci, fen=board.fen())
+            except Exception as e:
+                logging.error(f"Error logging move {move_uci}: {e}")
+        else:
+            logging.debug("No moves have been made yet.")
+
+        return game, GameLoopAction.CONTINUE

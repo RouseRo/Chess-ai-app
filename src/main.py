@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 
 import chess
 
-from src.game import Game, RED, ENDC
 from src.ui_manager import UIManager
 from src.file_manager import FileManager
 from src.expert_service import ExpertService
@@ -19,11 +18,21 @@ from src.game_manager import GameManager
 from src.in_game_menu_handlers import InGameMenuHandlers
 from src.chess_expert_menu import ChessExpertMenu
 from src.menu_handlers import MenuHandlers
-from src.game import GameLoopAction
+from src.game_manager import GameLoopAction
+from src.game_manager import ChessGame
+from src.colors import RED, ENDC
 
 
 LOG_FILE = 'chess_game.log'
 PLAYER_STATS_FILE = 'logs/player_stats.json'
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    filename='debug.log',
+    filemode='w',  # Overwrites the log file with each run
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 class ChessApp:
     """The main application class that orchestrates the game."""
@@ -51,10 +60,15 @@ class ChessApp:
         self.player_factory = PlayerFactory(
             self.ui, self.ai_models, self.stockfish_configs, self.stockfish_path
         )
-        self.game_log_manager = GameLogManager(self.ui, self.player_factory, self.ai_models, self.stockfish_configs)
+        self.game_log_manager = GameLogManager(
+            self.ui,
+            self.player_factory,
+            self.ai_models,
+            self.stockfish_configs
+        )
         self.player_stats_manager = PlayerStatsManager(self.ui, self.file_manager)
         # Pass file_manager to GameManager here:
-        self.game_manager = GameManager(self.ui, self.player_factory, self.ai_models, self.stockfish_configs, self.file_manager)
+        self.game_manager = GameManager(self.ui, self.player_factory, self.ai_models, self.stockfish_configs, self.file_manager, self.game_log_manager)
         self.in_game_menu_handlers = InGameMenuHandlers(
             self.ui,
             self.file_manager,

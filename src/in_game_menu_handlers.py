@@ -3,8 +3,7 @@ import json
 import shutil
 import logging
 import chess
-from src.game import GameLoopAction
-from src.game import Game
+from src.constants import GameLoopAction
 from src.human_player import HumanPlayer
 
 class InGameMenuHandlers:

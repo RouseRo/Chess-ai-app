@@ -1,5 +1,6 @@
 import chess
-from src.game import BLUE, CYAN, GREEN, YELLOW, RED, WHITE, ENDC, MAGENTA, BOLD
+from src.colors import WHITE, BLUE, BOLD, CYAN, YELLOW, GREEN, MAGENTA, RED, ENDC
+from src.constants import GameLoopAction
 
 class UIManager:
     """Simple console UI helper. Menu titles and option text are shown in color."""

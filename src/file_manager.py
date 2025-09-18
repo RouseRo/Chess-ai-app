@@ -5,7 +5,7 @@ import re
 import shutil
 from datetime import datetime, timezone
 
-from src.game import RED, ENDC
+from src.colors import RED, ENDC
 
 class FileManager:
     """Handles file operations like saving/loading games and stats."""

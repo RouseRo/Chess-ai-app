@@ -1,22 +1,25 @@
 import chess
-from src.game import Game, GameLoopAction, RED, ENDC
-from src.human_player import HumanPlayer
-import logging  # Import logging module
+import logging
 import inspect
 import sys
-from src.game import WHITE, CYAN, YELLOW, GREEN, MAGENTA, ENDC
+
+from src.human_player import HumanPlayer
+from src.game_log_manager import GameLogManager
+from src.ui_manager import UIManager
+from src.colors import WHITE, CYAN, YELLOW, GREEN, MAGENTA, RED, BLUE, ENDC
+from src.constants import GameLoopAction
 
 class GameManager:
-    def __init__(self, ui, player_factory, ai_models, stockfish_configs, file_manager):
+    def __init__(self, ui, player_factory, ai_models, stockfish_configs, file_manager, game_log_manager):
         self.ui = ui
         self.player_factory = player_factory
         self.ai_models = ai_models
         self.stockfish_configs = stockfish_configs
-        self.file_manager = file_manager  # <-- Add this line
+        self.file_manager = file_manager
+        self.game_log_manager = game_log_manager
 
     def setup_new_game(self, white_openings, black_defenses):
         """Create and return a new Game from UI choices. Returns None if the user cancels."""
-        # Only call the UI to get all choices, including opening/defense as a single input
         choices = self.ui.display_setup_menu_and_get_choices(
             white_openings,
             black_defenses,
@@ -31,80 +34,77 @@ class GameManager:
         white_player = self.player_factory.create_player(white_key, color_label="White")
         black_player = self.player_factory.create_player(black_key, color_label="Black")
 
-        # Map keys to string values (since your dict maps keys to strings)
         white_opening_obj = white_openings.get(white_opening_key)
         black_defense_obj = black_defenses.get(black_defense_key)
 
-        game = Game(
+        game = ChessGame(
             white_player, black_player,
             white_player_key=white_key,
             black_player_key=black_key
         )
 
-        # Set the strategies on the game object
         game.white_strategy = white_opening_obj
         game.black_strategy = black_defense_obj
 
         game.initialize_game()
-        # --- Return the actual objects, not the keys ---
         return game, white_opening_obj, black_defense_obj
 
     def play_turn(self, game):
         self.ui.display_board(game.board)
-        current_player = game.get_current_player()
+        board = game.board
+        current_player = game.get_current_player() if hasattr(game, "get_current_player") else None
+        turn_color = "White" if board.turn else "Black"
+        move_number = board.fullmove_number
 
-        turn_color = "White" if game.board.turn else "Black"
-        move_number = game.board.fullmove_number
         prompt = (
             f"{WHITE}Move {move_number}{ENDC} "
             f"{CYAN}({getattr(current_player, 'model_name', str(current_player))}{ENDC} "
-            f"{YELLOW}as {turn_color}{ENDC}{CYAN}){ENDC}: "
-            f"{GREEN}'ENTER'{ENDC} to let player move, "
+            f"{YELLOW}as {turn_color}{ENDC}{CYAN}){ENDC}:\n"
+            f"  Enter your move in UCI format (e.g., e2e4, h1c1)\n"
+            f"  {GREEN}'ENTER'{ENDC} to let player move, "
             f"{WHITE}a{ENDC}{YELLOW} #{ENDC} for auto-play, "
             f"{GREEN}'q'{ENDC} to quit, or "
-            f"{MAGENTA}'m'{ENDC} for menu: "
+            f"{MAGENTA}'m'{ENDC} for menu:\n"
         )
 
-        if hasattr(self, "observer_auto_moves") and self.observer_auto_moves > 0:
-            self.observer_auto_moves -= 1
-            move = ""
-        else:
-            # Print the prompt with flush=True to ensure it appears immediately for integration tests
-            print(prompt, flush=True)  # Always print the prompt with a newline and flush
-            move = input()
-
-        if move.isdigit():
-            self.observer_auto_moves = int(move) - 1
-            move = ""
+        print(prompt, flush=True)
+        move = input().strip()
 
         if move == 'q':
             quit_choice = self.ui.get_human_quit_choice()
-            if quit_choice == 'r':
-                game.resign_current_player()
-                self.ui.display_game_over_message(game)
-                return game, GameLoopAction.RETURN_TO_MENU
-            elif quit_choice == 's':
+            if quit_choice == 's':
                 self.file_manager.save_game_log()
-                self.ui.display_message("Game saved. Exiting to main menu.")
-                return game, GameLoopAction.QUIT_APPLICATION  # <-- Change this line
-            elif quit_choice == 'q':
-                self.ui.display_message("Exiting game without saving.")
+                self.ui.display_message("Game saved. Exiting.")
                 return game, GameLoopAction.QUIT_APPLICATION
-            elif quit_choice == 'c':
+            elif quit_choice == 'q':
+                self.ui.display_message("Exiting without saving.")
+                return game, GameLoopAction.QUIT_APPLICATION
+            else:
+                self.ui.display_message("Returning to game.")
                 return game, GameLoopAction.CONTINUE
         elif move == 'm':
             return game, GameLoopAction.IN_GAME_MENU
-        elif move.strip():
+        elif move == '':
+            # Let the player (AI or human) make a move automatically
             try:
-                game.make_manual_move(move)
-            except Exception as e:
-                self.ui.display_message(f"{RED}Invalid move: {e}{ENDC}")
-        else:
-            self.ui.display_turn_message(game)
-            try:
-                game.play_turn()
+                move = current_player.get_move(game)
+                if move:
+                    chess_move = chess.Move.from_uci(move)
+                    if chess_move in board.legal_moves:
+                        board.push(chess_move)
+                        self.game_log_manager.log_last_move(board)
             except Exception as e:
                 self.ui.display_message(f"{RED}AI move error: {e}{ENDC}")
+        else:
+            try:
+                chess_move = chess.Move.from_uci(move)
+                if chess_move in board.legal_moves:
+                    board.push(chess_move)
+                    self.game_log_manager.log_last_move(board)
+                else:
+                    self.ui.display_message(f"{RED}Illegal move: {move}{ENDC}")
+            except Exception as e:
+                self.ui.display_message(f"{RED}Invalid move: {e}{ENDC}")
 
         return game, GameLoopAction.CONTINUE
 
@@ -127,50 +127,38 @@ class GameManager:
 
         while True:
             if game is None:
-                game = self.setup_new_game()
+                game, _, _ = self.setup_new_game()
                 if game is None:
                     break  # User canceled game setup
 
-            game, action = self.play_turn(game)  # <-- Unpack both values!
+            game, action = self.play_turn(game)
             if action == GameLoopAction.QUIT_APPLICATION:
-                break  # Exit the loop and quit the application
+                break
             elif action == GameLoopAction.IN_GAME_MENU:
                 self.ui.display_message("In-game menu is not yet implemented.")
             elif action == GameLoopAction.CONTINUE:
                 result = self.determine_game_result(game)
                 if result:
                     self.ui.display_message(f"Game over! Result: {result}")
-                    game = None  # Reset game after it ends
+                    game = None
             else:
                 self.ui.display_message(f"Unknown action: {action}")
 
-    def play_game(self, game):
-        move_number = 1
-        while not game.is_over():
-            self.ui.display_board(game.board)
-            current_player = game.current_player()
-            color = "White" if game.turn == "w" else "Black"
-            player_name = current_player.name
-            skill_str = f" (Skill: {current_player.skill})" if hasattr(current_player, "skill") and current_player.skill else ""
-            prompt = f"Move {move_number} ({color}): {player_name}{skill_str}"
+class ChessGame:
+    def __init__(self, white_player, black_player, white_player_key=None, black_player_key=None):
+        self.white_player = white_player
+        self.black_player = black_player
+        self.white_player_key = white_player_key
+        self.black_player_key = black_player_key
+        self.board = chess.Board()
+        self.white_strategy = None
+        self.black_strategy = None
 
-            self.ui.display_message(f"{prompt}")
-            move = self.ui.get_user_input("Enter your move (or press Enter to let the player move): ")
+    def initialize_game(self):
+        self.board.reset()
 
-            if move.strip():
-                try:
-                    game.make_manual_move(move)
-                except Exception as e:
-                    self.ui.display_message(f"{RED}Invalid move: {e}{ENDC}")
-            else:
-                self.ui.display_message(f"{prompt} is thinking...")
-                try:
-                    move = current_player.get_move(game)
-                    game.make_manual_move(move)
-                except Exception as e:
-                    self.ui.display_message(f"{RED}AI move error: {e}{ENDC}")
+    def get_current_player(self):
+        return self.white_player if self.board.turn == chess.WHITE else self.black_player
 
-            if game.turn == "b":
-                move_number += 1
-
-        # ...existing code...
+    def is_over(self):
+        return self.board.is_game_over()

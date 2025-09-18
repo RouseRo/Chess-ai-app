@@ -1,6 +1,6 @@
 import json
 from src.data_models import PlayerStats, stats_to_dict
-from src.game import BLUE, CYAN, GREEN, YELLOW, RED, WHITE, ENDC, MAGENTA, BOLD  # <-- Import color constants
+from src.colors import BLUE, CYAN, GREEN, YELLOW, RED, WHITE, ENDC, MAGENTA, BOLD  # <-- Import color constants
 
 PLAYER_STATS_FILE = 'logs/player_stats.json'
 
