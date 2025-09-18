@@ -18,7 +18,7 @@ class GameManager:
         self.file_manager = file_manager
         self.game_log_manager = game_log_manager
 
-    def setup_new_game(self, white_openings, black_defenses):
+    def setup_new_game(self, white_openings, black_defenses, fen=None):
         """Create and return a new Game from UI choices. Returns None if the user cancels."""
         choices = self.ui.display_setup_menu_and_get_choices(
             white_openings,
@@ -46,12 +46,13 @@ class GameManager:
         game.white_strategy = white_opening_obj
         game.black_strategy = black_defense_obj
 
-        game.initialize_game()
+        game.initialize_game(fen)  # Pass the FEN if provided (for practice positions)
         return game, white_opening_obj, black_defense_obj
 
     def play_turn(self, game):
         self.ui.display_board(game.board)
         board = game.board
+        print(f"DEBUG: Board fen at start of turn: {board.fen()}")
         current_player = game.get_current_player() if hasattr(game, "get_current_player") else None
         turn_color = "White" if board.turn else "Black"
         move_number = board.fullmove_number
@@ -106,6 +107,7 @@ class GameManager:
             except Exception as e:
                 self.ui.display_message(f"{RED}Invalid move: {e}{ENDC}")
 
+        print(f"DEBUG: Board fen at end of turn: {board.fen()}")
         return game, GameLoopAction.CONTINUE
 
     def determine_game_result(self, game):
@@ -121,16 +123,18 @@ class GameManager:
         except Exception:
             return "1/2-1/2"
 
-    def run(self):
+    def run(self, game=None):
         """Main game loop, managing turns and game state."""
-        game = None
+        print(f"DEBUG: Game is None: {game is None}")
+        if game is None:
+            print("DEBUG: Calling setup_new_game")
+            game, _, _ = self.setup_new_game()
+            if game is None:
+                return  # User canceled game setup
+        else:
+            print(f"DEBUG: Game fen: {game.board.fen()}")
 
         while True:
-            if game is None:
-                game, _, _ = self.setup_new_game()
-                if game is None:
-                    break  # User canceled game setup
-
             game, action = self.play_turn(game)
             if action == GameLoopAction.QUIT_APPLICATION:
                 break
@@ -141,6 +145,7 @@ class GameManager:
                 if result:
                     self.ui.display_message(f"Game over! Result: {result}")
                     game = None
+                    break  # Exit the loop after game over
             else:
                 self.ui.display_message(f"Unknown action: {action}")
 
@@ -154,11 +159,29 @@ class ChessGame:
         self.white_strategy = None
         self.black_strategy = None
 
-    def initialize_game(self):
-        self.board.reset()
+    def initialize_game(self, fen=None):
+        print(f"DEBUG: Initializing game with fen: {fen}")
+        if fen:
+            print(f"DEBUG: Setting fen: {fen}")
+            self.board.set_fen(fen)
+        else:
+            print("DEBUG: Resetting board")
+            self.board.reset()
 
     def get_current_player(self):
         return self.white_player if self.board.turn == chess.WHITE else self.black_player
 
     def is_over(self):
         return self.board.is_game_over()
+
+    def set_board_from_fen(self, fen):
+        """Set the board position from a FEN string."""
+        self.board.set_fen(fen)
+
+    @property
+    def players(self):
+        import chess
+        return {
+            chess.WHITE: self.white_player,
+            chess.BLACK: self.black_player
+        }

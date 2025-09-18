@@ -5,6 +5,7 @@ import logging
 import chess
 from src.constants import GameLoopAction
 from src.human_player import HumanPlayer
+from src.game_manager import ChessGame
 
 class InGameMenuHandlers:
     def __init__(self, ui, file_manager, player_factory, ai_models, stockfish_configs, expert_service, game_runner):
@@ -78,9 +79,9 @@ class InGameMenuHandlers:
                     continue
                 player1 = self.player_factory.create_player(white_player_key, color_label="White")
                 player2 = self.player_factory.create_player(black_player_key, color_label="Black")
-                new_game = Game(player1, player2, white_player_key=white_player_key, black_player_key=black_player_key)
+                new_game = ChessGame(player1, player2, white_player_key=white_player_key, black_player_key=black_player_key)
                 new_game.set_board_from_fen(position['fen'])
-                new_game.initialize_game()
+                new_game.initialize_game(fen=position['fen'])
                 self.ui.display_message(f"Loaded practice position: {position['name']}")
                 # Diagnostic: Log object details before returning
                 logging.info(f"[DIAG] Returning new_game: {new_game}")

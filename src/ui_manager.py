@@ -194,8 +194,8 @@ class UIManager:
     def display_game_start_message(self, game):
         title = self._color_title("--- Game Started ---")
         print(title)
-        white = game.players[chess.WHITE].model_name
-        black = game.players[chess.BLACK].model_name
+        white = game.white_player.model_name if hasattr(game.white_player, "model_name") else str(game.white_player)
+        black = game.black_player.model_name if hasattr(game.black_player, "model_name") else str(game.black_player)
         print(f"White: {white}")
         print(f"Black: {black}")
         print(f"Initial FEN: {game.board.fen()}")
