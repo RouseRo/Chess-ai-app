@@ -8,6 +8,7 @@ from src.game_log_manager import GameLogManager
 from src.ui_manager import UIManager
 from src.colors import WHITE, CYAN, YELLOW, GREEN, MAGENTA, RED, BLUE, ENDC
 from src.constants import GameLoopAction
+from src.chess_game import ChessGame
 
 logger = logging.getLogger(__name__)
 

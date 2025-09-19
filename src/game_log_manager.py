@@ -6,6 +6,7 @@ import chess
 import os
 from src.data_models import PlayerStats, GameHeader, stats_to_dict, GameLoopAction
 from datetime import datetime
+from src.chess_game import ChessGame  # instead of Game
 
 LOG_FILE = 'chess_game.log'
 
@@ -70,8 +71,7 @@ class GameLogManager:
                 return None
             player1 = self.player_factory.create_player(header.white_key, name_override=header.white_name)
             player2 = self.player_factory.create_player(header.black_key, name_override=header.black_name)
-            from src.game_manager import Game
-            game = Game(player1, player2, white_strategy=header.white_strategy, 
+            game = ChessGame(player1, player2, white_strategy=header.white_strategy, 
                    black_strategy=header.black_strategy, 
                    white_player_key=header.white_key, 
                    black_player_key=header.black_key)
