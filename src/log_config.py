@@ -31,3 +31,9 @@ def setup_logging():
     # Suppress DEBUG logs from Stockfish UCI protocol handlers
     logging.getLogger("chess.engine").setLevel(logging.WARNING)
     logging.getLogger("asyncio").setLevel(logging.WARNING)
+
+    # Suppress INFO logs from external libraries
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("openai").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    # Add any other noisy libraries as needed
