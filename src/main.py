@@ -268,8 +268,14 @@ class ChessApp:
                             if chosen_summary and chosen_summary not in ['m', 'q']:
                                 game = self.game_log_manager.load_game_from_log(chosen_summary['filename'])
                         elif choice == '3':
+                            # Practice Position: ensure header is logged before any moves
+                            self.game_log_manager.initialize_new_game_log()
                             new_game, action = self.in_game_menu_handlers.handle_practice_load_in_menu(game)
                             if new_game:
+                                # Try to get opening/defense info if available, else use None
+                                white_opening_obj = getattr(new_game, "white_strategy", None)
+                                black_defense_obj = getattr(new_game, "black_strategy", None)
+                                self.game_log_manager.log_new_game_header(new_game, white_opening_obj, black_defense_obj)
                                 game = new_game
                                 self.ui.display_game_start_message(game)
                         elif choice == '4':
