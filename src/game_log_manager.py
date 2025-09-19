@@ -3,27 +3,32 @@ import json
 import re
 import shutil
 import chess
+import os
 from src.data_models import PlayerStats, GameHeader, stats_to_dict, GameLoopAction
 
 LOG_FILE = 'chess_game.log'
 
+logger = logging.getLogger()  # This will use the config from setup_logging()
+
 class GameLogManager:
-    def __init__(self, ui, player_factory, ai_models, stockfish_configs):
+    def __init__(self, ui=None, ai_models=None, stockfish_configs=None, player_factory=None):
+        self.log_buffer = []
+        self.current_log_file = None
         self.ui = ui
-        self.player_factory = player_factory
         self.ai_models = ai_models
         self.stockfish_configs = stockfish_configs
+        self.player_factory = player_factory
+        # Self-diagnostics
+        print("DIAGNOSTIC: GameLogManager __init__ called")
+        print(f"  id(self): {id(self)}")
+        print(f"  id(self.log_buffer): {id(self.log_buffer)}")
+        print(f"  log_buffer initial: {self.log_buffer}")
 
     def initialize_new_game_log(self):
-        """Shuts down existing log handlers and re-initializes the log file in write mode."""
-        logging.shutdown()
-        logging.basicConfig(
-            filename=LOG_FILE,
-            level=logging.INFO,
-            format='%(asctime)s - %(message)s',
-            filemode='w'
-        )
-        logging.getLogger("httpx").setLevel(logging.WARNING)
+        """
+        Resets the log buffer for a new game.
+        """
+        self.log_buffer = []
 
     def parse_log_header(self, lines, all_player_keys, debug=False):
         # ...copy the full function body from main.py...
@@ -136,22 +141,60 @@ class GameLogManager:
         )
         logging.info(f"Initial FEN: {game.board.fen()}")
 
-    def log_move(self, move_number, move_san, move_uci, fen=None):
-        msg = f"Move {move_number}: {move_san} ({move_uci})"
-        if fen:
-            msg += f" | FEN: {fen}"
-        logging.info(msg)
+    def log_move(self, move_number, player, san, uci, fen):
+        logger.info(f"Logging move {move_number}: {san} ({uci}) by {player}")
+        logger.debug(f"FEN after move: {fen}")
+        print("DIAGNOSTIC: log_move called")
+        print(f"  move_number: {move_number}, player: {player}, san: {san}, uci: {uci}, fen: {fen}")
+        move_line = f"{move_number}. {player}: {san} ({uci}) FEN: {fen}"
+        self.log_buffer.append(move_line)
+        print(f"DIAGNOSTIC: log_buffer after move: {self.log_buffer}")
 
-    def log_last_move(self, board):
+    def log_last_move(self, board, player_name=None):
+        print(f"DEBUG: Logging last move - Board FEN: {board.fen()}")
         """Logs the last move made on the board, including SAN, UCI, and FEN."""
         if board.move_stack:
             last_move = board.move_stack[-1]
             try:
                 move_san = board.san(last_move)
-            except Exception:
+            except Exception as e:
+                print(f"DEBUG: Exception in SAN generation: {e}")
                 move_san = "INVALID"
             move_uci = last_move.uci()
-            self.log_move(board.fullmove_number, move_san, move_uci, fen=board.fen())
+            # Determine player name if not provided
+            if player_name is None:
+                color = board.turn ^ 1  # The player who just moved
+                if hasattr(board, 'players'):
+                    player = board.players[color]
+                    player_name = getattr(player, 'name', str(player))
+                else:
+                    player_name = "Unknown"
+            print(f"DIAGNOSTIC: Calling log_move with: {board.fullmove_number}, {player_name}, {move_san}, {move_uci}, {board.fen()}")
+            self.log_move(board.fullmove_number, player_name, move_san, move_uci, board.fen())
+
+    def log_game_start(self, player1, player2, white_key, black_key, white_opening, black_defense, initial_fen):
+        logger.info("Logging game start")
+        logger.debug(
+            f"Players: {str(player1)} vs {str(player2)}, "
+            f"Keys: {white_key}/{black_key}, "
+            f"Openings: {white_opening}/{black_defense}, "
+            f"FEN: {initial_fen}"
+        )
+        print("DIAGNOSTIC: log_game_start called")
+        print(f"  id(self): {id(self)}")
+        print(f"  id(self.log_buffer): {id(self.log_buffer)}")
+        print(f"  log_buffer before header append: {self.log_buffer}")
+        print(f"  player1: {player1}, player2: {player2}")
+        print(f"  white_key: {white_key}, black_key: {black_key}")
+        print(f"  white_opening: {white_opening}, black_defense: {black_defense}")
+        print(f"  initial_fen: {initial_fen}")
+        self.log_buffer.append(f"[White] {str(player1)} ({white_key})")
+        self.log_buffer.append(f"[Black] {str(player2)} ({black_key})")
+        self.log_buffer.append(f"[Initial FEN] {initial_fen}")
+        self.log_buffer.append(f"[White Opening] {white_opening}")
+        self.log_buffer.append(f"[Black Defense] {black_defense}")
+        self.log_buffer.append("-" * 40)
+        print(f"DIAGNOSTIC: log_buffer after header: {self.log_buffer}")
 
     def play_turn(self, game):
         board = game.board
@@ -176,10 +219,39 @@ class GameLogManager:
 
             # Log the move
             try:
-                self.game_log_manager.log_move(board.fullmove_number, move_san, move_uci, fen=board.fen())
+                color = board.turn ^ 1  # The player who just moved
+                player = game.players[color]
+                player_name = getattr(player, 'name', str(player))
+                print("DIAGNOSTIC: About to log move", board.fullmove_number, player_name, move_san, move_uci, board.fen())
+                # Correct: includes the player argument
+                self.log_move(board.fullmove_number, player_name, move_san, move_uci, board.fen())
             except Exception as e:
                 logging.error(f"Error logging move {move_uci}: {e}")
         else:
             logging.debug("No moves have been made yet.")
 
         return game, GameLoopAction.CONTINUE
+
+    def add_log_line(self, line):
+        # Alternative to append
+        self.log_buffer = self.log_buffer + [line]
+
+    def save_game_log(self, file_path=None):
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        abs_path = os.path.join(project_root, 'chess_game.log')
+        logger.info(f"Game log absolute path: {abs_path}")
+        try:
+            with open(abs_path, 'w', encoding='utf-8') as f:
+                for line in self.log_buffer:
+                    f.write(line + '\n')
+                    logger.info(f"GameLog: {line}")
+            logger.info(f"Game log successfully written to {abs_path}")
+        except Exception as e:
+            logger.error(f"Exception while writing game log: {e}")
+
+    def flush_log(self):
+        logger.info("Flushing log to disk")
+        print("DIAGNOSTIC: flush_log called")
+        print(f"  log_buffer before flush: {self.log_buffer}")
+        self.save_game_log()
+        print(f"  log_buffer after flush: {self.log_buffer}")

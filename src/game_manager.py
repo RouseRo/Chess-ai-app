@@ -9,6 +9,8 @@ from src.ui_manager import UIManager
 from src.colors import WHITE, CYAN, YELLOW, GREEN, MAGENTA, RED, BLUE, ENDC
 from src.constants import GameLoopAction
 
+logger = logging.getLogger(__name__)
+
 class GameManager:
     def __init__(self, ui, player_factory, ai_models, stockfish_configs, file_manager, game_log_manager):
         self.ui = ui
@@ -19,6 +21,8 @@ class GameManager:
         self.game_log_manager = game_log_manager
 
     def setup_new_game(self, white_openings, black_defenses, fen=None):
+        logger.info("Setting up new game")
+        logger.debug(f"White openings: {white_openings}, Black defenses: {black_defenses}, FEN: {fen}")
         """Create and return a new Game from UI choices. Returns None if the user cancels."""
         choices = self.ui.display_setup_menu_and_get_choices(
             white_openings,
@@ -92,16 +96,18 @@ class GameManager:
                 if move:
                     chess_move = chess.Move.from_uci(move)
                     if chess_move in board.legal_moves:
+                        move_san = board.san(chess_move)  # Generate SAN before pushing
                         board.push(chess_move)
-                        self.game_log_manager.log_last_move(board)
+                        self.game_log_manager.log_move(board.fullmove_number, getattr(current_player, 'name', str(current_player)), move_san, move, board.fen())
             except Exception as e:
                 self.ui.display_message(f"{RED}AI move error: {e}{ENDC}")
         else:
             try:
                 chess_move = chess.Move.from_uci(move)
                 if chess_move in board.legal_moves:
+                    move_san = board.san(chess_move)  # Generate SAN before pushing
                     board.push(chess_move)
-                    self.game_log_manager.log_last_move(board)
+                    self.game_log_manager.log_move(board.fullmove_number, getattr(current_player, 'name', str(current_player)), move_san, move, board.fen())
                 else:
                     self.ui.display_message(f"{RED}Illegal move: {move}{ENDC}")
             except Exception as e:

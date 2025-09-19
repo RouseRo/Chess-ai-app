@@ -1,12 +1,10 @@
 class HumanPlayer:
     """Represents a human player in the game."""
     def __init__(self, name="Human"):
-        self._name = name
+        self.name = name
 
-    @property
-    def model_name(self):
-        """Returns the name of the human player."""
-        return self._name
+    def __str__(self):
+        return self.name
 
     def compute_move(self, board, **kwargs):
         """
