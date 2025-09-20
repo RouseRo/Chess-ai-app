@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 import chess
 
-from src.game import Game, RED, ENDC
+from src.colors import RED, ENDC
 from src.ui_manager import UIManager
 from src.file_manager import FileManager
 from src.expert_service import ExpertService
@@ -19,7 +19,8 @@ from src.game_manager import GameManager
 from src.in_game_menu_handlers import InGameMenuHandlers
 from src.chess_expert_menu import ChessExpertMenu
 from src.menu_handlers import MenuHandlers
-from src.game import GameLoopAction
+from src.constants import GameLoopAction
+from src.log_config import setup_logging
 
 
 LOG_FILE = 'chess_game.log'
@@ -51,10 +52,22 @@ class ChessApp:
         self.player_factory = PlayerFactory(
             self.ui, self.ai_models, self.stockfish_configs, self.stockfish_path
         )
-        self.game_log_manager = GameLogManager(self.ui, self.player_factory, self.ai_models, self.stockfish_configs)
+        self.game_log_manager = GameLogManager(
+            ui=self.ui,
+            ai_models=self.ai_models,
+            stockfish_configs=self.stockfish_configs,
+            player_factory=self.player_factory
+        )
         self.player_stats_manager = PlayerStatsManager(self.ui, self.file_manager)
         # Pass file_manager to GameManager here:
-        self.game_manager = GameManager(self.ui, self.player_factory, self.ai_models, self.stockfish_configs, self.file_manager)
+        self.game_manager = GameManager(
+            self.ui,
+            self.player_factory,
+            self.ai_models,
+            self.stockfish_configs,
+            self.file_manager,
+            self.game_log_manager  # <-- now included
+        )
         self.in_game_menu_handlers = InGameMenuHandlers(
             self.ui,
             self.file_manager,
@@ -62,7 +75,8 @@ class ChessApp:
             self.ai_models,
             self.stockfish_configs,
             self.expert_service,
-            self  # <-- Pass self as game_runner, assuming ChessApp has run_game_loop
+            self.game_manager,
+            self.game_log_manager  # <-- add this argument
         )
         self.chess_expert_menu = ChessExpertMenu(self.ui, self.expert_service)
         self.menu_handlers = MenuHandlers(self.ui, self.chess_expert_menu)
@@ -254,8 +268,14 @@ class ChessApp:
                             if chosen_summary and chosen_summary not in ['m', 'q']:
                                 game = self.game_log_manager.load_game_from_log(chosen_summary['filename'])
                         elif choice == '3':
+                            # Practice Position: ensure header is logged before any moves
+                            self.game_log_manager.initialize_new_game_log()
                             new_game, action = self.in_game_menu_handlers.handle_practice_load_in_menu(game)
                             if new_game:
+                                # Try to get opening/defense info if available, else use None
+                                white_opening_obj = getattr(new_game, "white_strategy", None)
+                                black_defense_obj = getattr(new_game, "black_strategy", None)
+                                self.game_log_manager.log_new_game_header(new_game, white_opening_obj, black_defense_obj)
                                 game = new_game
                                 self.ui.display_game_start_message(game)
                         elif choice == '4':
@@ -285,4 +305,5 @@ def main():
         sys.exit(0)
 
 if __name__ == "__main__":
+    setup_logging()
     main()

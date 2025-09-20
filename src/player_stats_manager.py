@@ -1,5 +1,6 @@
 import json
 from src.data_models import PlayerStats, stats_to_dict
+from src.colors import BLUE, CYAN, GREEN, YELLOW, RED, WHITE, ENDC, MAGENTA, BOLD  # <-- Import color constants
 
 PLAYER_STATS_FILE = 'logs/player_stats.json'
 
@@ -47,7 +48,8 @@ class PlayerStatsManager:
     def view_player_stats(self):
         """Loads and displays player statistics."""
         self.load_player_stats()
+        # Print section header before displaying stats, with color
+        print(f"\n{CYAN}--- Player Statistics ---{ENDC}")
         # Convert PlayerStats objects to dicts for UI
         stats_dict = {name: v.__dict__ for name, v in self.player_stats.items()}
         self.ui.display_player_stats(stats_dict)
-        self.ui.get_user_input("Press Enter to return to the main menu.")

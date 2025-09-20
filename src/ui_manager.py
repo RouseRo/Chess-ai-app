@@ -1,5 +1,6 @@
 import chess
-from src.game import BLUE, CYAN, GREEN, YELLOW, RED, WHITE, ENDC, MAGENTA, BOLD
+from src.colors import WHITE, BLUE, BOLD, CYAN, YELLOW, GREEN, MAGENTA, RED, ENDC
+from src.constants import GameLoopAction
 
 class UIManager:
     """Simple console UI helper. Menu titles and option text are shown in color."""
@@ -93,8 +94,8 @@ class UIManager:
     def display_practice_positions_and_get_choice(self, positions):
         title = self._color_title("--- Practice Positions ---")
         print(title)
-        for i, p in enumerate(positions, start=1):
-            print(f"  {WHITE}{i}:{ENDC} {CYAN}{p.get('name','Unknown')}  ({p.get('fen','')}){ENDC}")
+        for key, p in positions.items():  # <-- Fix: iterate over items() since positions is a dict
+            print(f"  {WHITE}{key}:{ENDC} {CYAN}{p.get('name','Unknown')}  ({p.get('fen','')}){ENDC}")
         print(f"  {WHITE}m:{ENDC} {CYAN}Return to Main Menu{ENDC}")
         print(f"  {WHITE}q:{ENDC} {CYAN}Quit Application{ENDC}")
         print(f"  {WHITE}?:{ENDC} {CYAN}?<question>: Ask Chess Expert{ENDC}")
@@ -103,12 +104,8 @@ class UIManager:
             return choice
         if choice.lower() in ['m', 'q']:
             return choice.lower()
-        try:
-            idx = int(choice) - 1
-            if 0 <= idx < len(positions):
-                return positions[idx]
-        except Exception:
-            pass
+        if choice in positions:  # <-- Fix: check if choice is in positions dict
+            return choice  # <-- Fix: return the choice key, not the position dict
         return None
 
     def display_model_menu_and_get_choice(self, ai_models, stockfish_configs):
@@ -180,27 +177,35 @@ class UIManager:
             white_opening = ""
             black_defense = ""
 
+        # --- Show selected openings/defenses for confirmation ---
+        print(f"\n{CYAN}Selected openings/defenses:{ENDC}")
+        if white_opening in white_openings:
+            name = white_openings.get(white_opening, 'Unknown Opening')
+            print(f"  {WHITE}White:{ENDC} {CYAN}{name}{ENDC} (Key: {white_opening})")
+        else:
+            print(f"  {WHITE}White:{ENDC} {CYAN}No opening selected{ENDC}")
+
+        if black_defense in black_defenses:
+            name = black_defenses.get(black_defense, 'Unknown Defense')
+            print(f"  {WHITE}Black:{ENDC} {CYAN}{name}{ENDC} (Key: {black_defense})")
+        else:
+            print(f"  {WHITE}Black:{ENDC} {CYAN}No defense selected{ENDC}")
+
         return white_opening, black_defense, white_key, black_key
 
     def display_player_stats(self, stats):
-        print(f"\n{CYAN}{BOLD}--- Player Statistics ---{ENDC}", flush=True)
-        # Table header with colors, Player column widened, Losses column width fixed for alignment
-        print(f"{BOLD}{'Player':<33} | {GREEN}Wins{ENDC:^6} | {RED}Losses{ENDC:^6} | {YELLOW}Draws{ENDC:^7}{ENDC}", flush=True)
+        print(f"{BOLD}{'Player':<33} | {GREEN}Wins{ENDC:^6} | {RED}Losses{ENDC:^5}| {YELLOW}Draws{ENDC:^7}{ENDC}", flush=True)
         print(f"{'-'*33} | {'-'*6} | {'-'*6} | {'-'*7}", flush=True)
-        # Table rows
-        for name, v in sorted(stats.items(), key=lambda x: (-x[1].get('wins',0), x[0])):
-            player_display = f"{CYAN}{name:<33}{ENDC}"
-            wins_display = f"{GREEN}{v.get('wins',0):^6}{ENDC}"
-            losses_display = f"{RED}{v.get('losses',0):^6}{ENDC}"
-            draws_display = f"{YELLOW}{v.get('draws',0):^7}{ENDC}"
-            print(f"{player_display} | {wins_display} | {losses_display} | {draws_display}", flush=True)
-        print(f"{YELLOW}Press Enter to return to the main menu.{ENDC}", flush=True)
+        for name, stat in stats.items():
+            print(f"{name:<33} | {GREEN}{stat['wins']:^6}{ENDC} | {RED}{stat['losses']:^6}{ENDC} | {YELLOW}{stat['draws']:^7}{ENDC}")
+        # Remove the "Press Enter to return to the main menu." prompt
+        # print(f"{YELLOW}Press Enter to return to the main menu.{ENDC}", flush=True)
 
     def display_game_start_message(self, game):
         title = self._color_title("--- Game Started ---")
         print(title)
-        white = game.players[chess.WHITE].model_name
-        black = game.players[chess.BLACK].model_name
+        white = game.white_player.model_name if hasattr(game.white_player, "model_name") else str(game.white_player)
+        black = game.black_player.model_name if hasattr(game.black_player, "model_name") else str(game.black_player)
         print(f"White: {white}")
         print(f"Black: {black}")
         print(f"Initial FEN: {game.board.fen()}")
