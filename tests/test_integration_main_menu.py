@@ -26,6 +26,7 @@ import re
 import time
 import os
 import shutil  # Add this import
+from src.main import setup_stockfish
 
 # Command to run the application as a module, with unbuffered output (-u)
 PY_CMD = [sys.executable, "-u", "-m", "src.main"]
@@ -274,7 +275,7 @@ def test_load_practice_position_menu_sequence():
         expect_with_debug(child, r"Available AI models:", timeout=5)
         expect_with_debug(child, r"Available Stockfish configs:", timeout=5)
         expect_with_debug(child, r"Enter choice for White and Black players.*", timeout=5)
-        child.sendline('m1m2')
+        child.sendline('s3s1')
 
         # Debug log lines
         expect_with_debug(child, r"DEBUG: About to log game start", timeout=5)
@@ -438,3 +439,8 @@ def expect_cleaned_prompt(child, pattern, timeout=15):
             pass
         time.sleep(0.1)
     raise AssertionError(f"Pattern not found: {pattern}")
+
+def test_stockfish_setup():
+    path, configs = setup_stockfish()
+    assert path is not None
+    # ... further assertions ...
