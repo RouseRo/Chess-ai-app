@@ -2,7 +2,13 @@ import os
 import json
 
 def load_stockfish_config(config_path="src/config.json"):
-    """Load Stockfish path and configs from config.json or environment."""
+    """
+    Load Stockfish path and configs.
+    Priority:
+    1. STOCKFISH_EXECUTABLE environment variable (if set)
+    2. "stockfish_path" in config.json
+    3. Default: "stockfish"
+    """
     try:
         with open(config_path, 'r') as f:
             config = json.load(f)
