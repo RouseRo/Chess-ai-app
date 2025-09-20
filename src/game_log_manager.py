@@ -98,9 +98,12 @@ class GameLogManager:
     def log_new_game_header(self, game, white_opening_obj=None, black_defense_obj=None):
         import chess
         # Write header to log buffer (for chess_game.log)
-        self.log_buffer.append(f"[Date] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        self.log_buffer.append(f"[White] {game.players[chess.WHITE].model_name}")
-        self.log_buffer.append(f"[Black] {game.players[chess.BLACK].model_name}")
+        white_player = game.players[chess.WHITE]
+        black_player = game.players[chess.BLACK]
+        white_name = getattr(white_player, "model_name", getattr(white_player, "name", str(white_player)))
+        black_name = getattr(black_player, "model_name", getattr(black_player, "name", str(black_player)))
+        self.log_buffer.append(f"[White] {white_name}")
+        self.log_buffer.append(f"[Black] {black_name}")
         self.log_buffer.append(f"[White_Player_Key] {getattr(game, 'white_player_key', '')}")
         self.log_buffer.append(f"[Black_Player_Key] {getattr(game, 'black_player_key', '')}")
         self.log_buffer.append(f"[White_Strategy] {white_opening_obj or 'No Classic Chess Opening'}")
@@ -109,8 +112,8 @@ class GameLogManager:
         self.log_buffer.append("-" * 40)
         # Also log to debug.log for diagnostics
         logging.info("New Game Started")
-        logging.info(f"White: {game.players[chess.WHITE].model_name}")
-        logging.info(f"Black: {game.players[chess.BLACK].model_name}")
+        logging.info(f"White: {white_name}")
+        logging.info(f"Black: {black_name}")
         logging.info(f"White Player Key: {getattr(game, 'white_player_key', '')}")
         logging.info(f"Black Player Key: {getattr(game, 'black_player_key', '')}")
         logging.info(f"White Strategy: {white_opening_obj or 'No Classic Chess Opening'}")
