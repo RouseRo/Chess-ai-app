@@ -8,6 +8,7 @@ from src.game_log_manager import GameLogManager
 from src.ui_manager import UIManager
 from src.colors import WHITE, CYAN, YELLOW, GREEN, MAGENTA, RED, BLUE, ENDC
 from src.constants import GameLoopAction
+from src.chess_game import ChessGame
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,7 @@ class GameManager:
         self.stockfish_configs = stockfish_configs
         self.file_manager = file_manager
         self.game_log_manager = game_log_manager
+        self.observer_auto_moves = 0  # <-- Add this line
 
     def setup_new_game(self, white_openings, black_defenses, fen=None):
         logger.info("Setting up new game")
@@ -56,7 +58,6 @@ class GameManager:
     def play_turn(self, game):
         self.ui.display_board(game.board)
         board = game.board
-        print(f"DEBUG: Board fen at start of turn: {board.fen()}")
         current_player = game.get_current_player() if hasattr(game, "get_current_player") else None
         turn_color = "White" if board.turn else "Black"
         move_number = board.fullmove_number
@@ -72,8 +73,17 @@ class GameManager:
             f"{MAGENTA}'m'{ENDC} for menu:\n"
         )
 
-        print(prompt, flush=True)
-        move = input().strip()
+        # Observer auto-play logic
+        if hasattr(self, "observer_auto_moves") and self.observer_auto_moves > 0:
+            self.observer_auto_moves -= 1
+            move = ""
+        else:
+            move = input(prompt).strip()
+
+        # If user enters a digit, set observer_auto_moves
+        if move.isdigit():
+            self.observer_auto_moves = int(move) - 1  # -1 because this move will be auto-played now
+            move = ""  # Treat as auto-play for this turn
 
         if move == 'q':
             quit_choice = self.ui.get_human_quit_choice()
@@ -113,7 +123,6 @@ class GameManager:
             except Exception as e:
                 self.ui.display_message(f"{RED}Invalid move: {e}{ENDC}")
 
-        print(f"DEBUG: Board fen at end of turn: {board.fen()}")
         return game, GameLoopAction.CONTINUE
 
     def determine_game_result(self, game):
@@ -131,14 +140,12 @@ class GameManager:
 
     def run(self, game=None):
         """Main game loop, managing turns and game state."""
-        print(f"DEBUG: Game is None: {game is None}")
         if game is None:
-            print("DEBUG: Calling setup_new_game")
             game, _, _ = self.setup_new_game()
             if game is None:
                 return  # User canceled game setup
         else:
-            print(f"DEBUG: Game fen: {game.board.fen()}")
+            pass
 
         while True:
             game, action = self.play_turn(game)
@@ -166,12 +173,9 @@ class ChessGame:
         self.black_strategy = None
 
     def initialize_game(self, fen=None):
-        print(f"DEBUG: Initializing game with fen: {fen}")
         if fen:
-            print(f"DEBUG: Setting fen: {fen}")
             self.board.set_fen(fen)
         else:
-            print("DEBUG: Resetting board")
             self.board.reset()
 
     def get_current_player(self):

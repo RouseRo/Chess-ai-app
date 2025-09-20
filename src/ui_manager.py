@@ -94,8 +94,8 @@ class UIManager:
     def display_practice_positions_and_get_choice(self, positions):
         title = self._color_title("--- Practice Positions ---")
         print(title)
-        for i, p in enumerate(positions, start=1):
-            print(f"  {WHITE}{i}:{ENDC} {CYAN}{p.get('name','Unknown')}  ({p.get('fen','')}){ENDC}")
+        for key, p in positions.items():  # <-- Fix: iterate over items() since positions is a dict
+            print(f"  {WHITE}{key}:{ENDC} {CYAN}{p.get('name','Unknown')}  ({p.get('fen','')}){ENDC}")
         print(f"  {WHITE}m:{ENDC} {CYAN}Return to Main Menu{ENDC}")
         print(f"  {WHITE}q:{ENDC} {CYAN}Quit Application{ENDC}")
         print(f"  {WHITE}?:{ENDC} {CYAN}?<question>: Ask Chess Expert{ENDC}")
@@ -104,12 +104,8 @@ class UIManager:
             return choice
         if choice.lower() in ['m', 'q']:
             return choice.lower()
-        try:
-            idx = int(choice) - 1
-            if 0 <= idx < len(positions):
-                return positions[idx]
-        except Exception:
-            pass
+        if choice in positions:  # <-- Fix: check if choice is in positions dict
+            return choice  # <-- Fix: return the choice key, not the position dict
         return None
 
     def display_model_menu_and_get_choice(self, ai_models, stockfish_configs):
@@ -180,6 +176,20 @@ class UIManager:
         else:
             white_opening = ""
             black_defense = ""
+
+        # --- Show selected openings/defenses for confirmation ---
+        print(f"\n{CYAN}Selected openings/defenses:{ENDC}")
+        if white_opening in white_openings:
+            name = white_openings.get(white_opening, 'Unknown Opening')
+            print(f"  {WHITE}White:{ENDC} {CYAN}{name}{ENDC} (Key: {white_opening})")
+        else:
+            print(f"  {WHITE}White:{ENDC} {CYAN}No opening selected{ENDC}")
+
+        if black_defense in black_defenses:
+            name = black_defenses.get(black_defense, 'Unknown Defense')
+            print(f"  {WHITE}Black:{ENDC} {CYAN}{name}{ENDC} (Key: {black_defense})")
+        else:
+            print(f"  {WHITE}Black:{ENDC} {CYAN}No defense selected{ENDC}")
 
         return white_opening, black_defense, white_key, black_key
 

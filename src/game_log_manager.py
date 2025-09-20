@@ -5,6 +5,8 @@ import shutil
 import chess
 import os
 from src.data_models import PlayerStats, GameHeader, stats_to_dict, GameLoopAction
+from datetime import datetime
+from src.chess_game import ChessGame  # instead of Game
 
 LOG_FILE = 'chess_game.log'
 
@@ -18,11 +20,6 @@ class GameLogManager:
         self.ai_models = ai_models
         self.stockfish_configs = stockfish_configs
         self.player_factory = player_factory
-        # Self-diagnostics
-        print("DIAGNOSTIC: GameLogManager __init__ called")
-        print(f"  id(self): {id(self)}")
-        print(f"  id(self.log_buffer): {id(self.log_buffer)}")
-        print(f"  log_buffer initial: {self.log_buffer}")
 
     def initialize_new_game_log(self):
         """
@@ -31,47 +28,25 @@ class GameLogManager:
         self.log_buffer = []
 
     def parse_log_header(self, lines, all_player_keys, debug=False):
-        # ...copy the full function body from main.py...
-        # (No changes needed except indentation and self if you use instance variables)
         header_data = {}
-        if debug:
-            print("\n==== DIAGNOSTICS: PARSING LOG HEADER ====", flush=True)
-            print(f"Processing {len(lines)} lines, looking at first 10", flush=True)
-            print(f"Available player keys: {all_player_keys}", flush=True)
-        if debug:
-            print("\n--- FIRST 10 LINES OF FILE ---", flush=True)
-            for i, line in enumerate(lines[:10]):
-                print(f"LINE {i+1}: {line.strip()}", flush=True)
-        if debug:
-            print("\n--- REGEX MATCHING RESULTS ---", flush=True)
         for i, line in enumerate(lines[:10]):
-            if debug:
-                print(f"Processing line {i+1}: {line.strip()}", flush=True)
             match = re.match(r"\[(\w+)\s+\"(.+?)\"\]", line)
             if match:
                 key, value = match.groups()
                 header_data[key.lower()] = value
-                if debug:
-                    print(f"  ✓ MATCHED: key='{key.lower()}', value='{value}'", flush=True)
             else:
                 alt_match = re.search(r'.*- ([^:]+):\s*(.+)', line)
                 if alt_match:
                     key, value = alt_match.groups()
                     clean_key = key.lower().replace(' ', '_')
                     header_data[clean_key] = value
-                    if debug:
-                        print(f"  ✓ ALT MATCHED: key='{clean_key}', value='{value}'", flush=True)
         required_keys = ['white', 'black', 'white_player_key', 'black_player_key']
         if not all(k in header_data for k in required_keys):
             missing = [k for k in required_keys if k not in header_data]
             error_msg = f"Header is missing required tags ({', '.join(missing)})."
-            if debug:
-                print(f"\n❌ ERROR: {error_msg}", flush=True)
             return None, error_msg
         if header_data['white_player_key'] not in all_player_keys or header_data['black_player_key'] not in all_player_keys:
             error_msg = "Player key in log is not in current config."
-            if debug:
-                print(f"\n❌ ERROR: {error_msg}", flush=True)
             return None, error_msg
         return GameHeader(
             white_name=header_data['white'],
@@ -95,10 +70,8 @@ class GameLogManager:
                 self.ui.display_message(f"Failed to load game: {error_reason}")
                 return None
             player1 = self.player_factory.create_player(header.white_key, name_override=header.white_name)
-            # FIX: Use 'black_name' instead of 'blackName'
             player2 = self.player_factory.create_player(header.black_key, name_override=header.black_name)
-            from src.game_manager import Game
-            game = Game(player1, player2, white_strategy=header.white_strategy, 
+            game = ChessGame(player1, player2, white_strategy=header.white_strategy, 
                    black_strategy=header.black_strategy, 
                    white_player_key=header.white_key, 
                    black_player_key=header.black_key)
@@ -117,9 +90,6 @@ class GameLogManager:
                         last_fen = fen_part
             if last_fen:
                 game.set_board_from_fen(last_fen)
-                print(f"Set board position from FEN", flush=True)
-            else:
-                print("Warning: No FEN found in log file", flush=True)
             return game
         except Exception as e:
             self.ui.display_message(f"Error loading log file: {e}")
@@ -127,41 +97,44 @@ class GameLogManager:
 
     def log_new_game_header(self, game, white_opening_obj=None, black_defense_obj=None):
         import chess
-
+        # Write header to log buffer (for chess_game.log)
+        white_player = game.players[chess.WHITE]
+        black_player = game.players[chess.BLACK]
+        white_name = getattr(white_player, "model_name", getattr(white_player, "name", str(white_player)))
+        black_name = getattr(black_player, "model_name", getattr(black_player, "name", str(black_player)))
+        self.log_buffer.append(f"[White] {white_name}")
+        self.log_buffer.append(f"[Black] {black_name}")
+        self.log_buffer.append(f"[White_Player_Key] {getattr(game, 'white_player_key', '')}")
+        self.log_buffer.append(f"[Black_Player_Key] {getattr(game, 'black_player_key', '')}")
+        self.log_buffer.append(f"[White_Strategy] {white_opening_obj or 'No Classic Chess Opening'}")
+        self.log_buffer.append(f"[Black_Strategy] {black_defense_obj or 'No Classic Chess Defense'}")
+        self.log_buffer.append(f"[Initial_FEN] {game.board.fen()}")
+        self.log_buffer.append("-" * 40)
+        # Also log to debug.log for diagnostics
         logging.info("New Game Started")
-        logging.info(f"White: {game.players[chess.WHITE].model_name}")
-        logging.info(f"Black: {game.players[chess.BLACK].model_name}")
+        logging.info(f"White: {white_name}")
+        logging.info(f"Black: {black_name}")
         logging.info(f"White Player Key: {getattr(game, 'white_player_key', '')}")
         logging.info(f"Black Player Key: {getattr(game, 'black_player_key', '')}")
-        logging.info(
-            f"White Strategy: {white_opening_obj or 'No Classic Chess Opening'}"
-        )
-        logging.info(
-            f"Black Strategy: {black_defense_obj or 'No Classic Chess Defense'}"
-        )
+        logging.info(f"White Strategy: {white_opening_obj or 'No Classic Chess Opening'}")
+        logging.info(f"Black Strategy: {black_defense_obj or 'No Classic Chess Defense'}")
         logging.info(f"Initial FEN: {game.board.fen()}")
 
     def log_move(self, move_number, player, san, uci, fen):
         logger.info(f"Logging move {move_number}: {san} ({uci}) by {player}")
         logger.debug(f"FEN after move: {fen}")
-        print("DIAGNOSTIC: log_move called")
-        print(f"  move_number: {move_number}, player: {player}, san: {san}, uci: {uci}, fen: {fen}")
         move_line = f"{move_number}. {player}: {san} ({uci}) FEN: {fen}"
         self.log_buffer.append(move_line)
-        print(f"DIAGNOSTIC: log_buffer after move: {self.log_buffer}")
 
     def log_last_move(self, board, player_name=None):
-        print(f"DEBUG: Logging last move - Board FEN: {board.fen()}")
         """Logs the last move made on the board, including SAN, UCI, and FEN."""
         if board.move_stack:
             last_move = board.move_stack[-1]
             try:
                 move_san = board.san(last_move)
             except Exception as e:
-                print(f"DEBUG: Exception in SAN generation: {e}")
                 move_san = "INVALID"
             move_uci = last_move.uci()
-            # Determine player name if not provided
             if player_name is None:
                 color = board.turn ^ 1  # The player who just moved
                 if hasattr(board, 'players'):
@@ -169,7 +142,6 @@ class GameLogManager:
                     player_name = getattr(player, 'name', str(player))
                 else:
                     player_name = "Unknown"
-            print(f"DIAGNOSTIC: Calling log_move with: {board.fullmove_number}, {player_name}, {move_san}, {move_uci}, {board.fen()}")
             self.log_move(board.fullmove_number, player_name, move_san, move_uci, board.fen())
 
     def log_game_start(self, player1, player2, white_key, black_key, white_opening, black_defense, initial_fen):
@@ -180,21 +152,12 @@ class GameLogManager:
             f"Openings: {white_opening}/{black_defense}, "
             f"FEN: {initial_fen}"
         )
-        print("DIAGNOSTIC: log_game_start called")
-        print(f"  id(self): {id(self)}")
-        print(f"  id(self.log_buffer): {id(self.log_buffer)}")
-        print(f"  log_buffer before header append: {self.log_buffer}")
-        print(f"  player1: {player1}, player2: {player2}")
-        print(f"  white_key: {white_key}, black_key: {black_key}")
-        print(f"  white_opening: {white_opening}, black_defense: {black_defense}")
-        print(f"  initial_fen: {initial_fen}")
         self.log_buffer.append(f"[White] {str(player1)} ({white_key})")
         self.log_buffer.append(f"[Black] {str(player2)} ({black_key})")
         self.log_buffer.append(f"[Initial FEN] {initial_fen}")
         self.log_buffer.append(f"[White Opening] {white_opening}")
         self.log_buffer.append(f"[Black Defense] {black_defense}")
         self.log_buffer.append("-" * 40)
-        print(f"DIAGNOSTIC: log_buffer after header: {self.log_buffer}")
 
     def play_turn(self, game):
         board = game.board
@@ -205,7 +168,6 @@ class GameLogManager:
             move_uci = last_move.uci()
             logging.debug(f"Last move in UCI: {move_uci}")
 
-            # Check if the move is legal
             if board.is_legal(last_move):
                 try:
                     move_san = board.san(last_move)
@@ -217,13 +179,10 @@ class GameLogManager:
                 logging.error(f"Move {move_uci} is not legal in the current board state: {board.fen()}")
                 move_san = "ILLEGAL"
 
-            # Log the move
             try:
                 color = board.turn ^ 1  # The player who just moved
                 player = game.players[color]
                 player_name = getattr(player, 'name', str(player))
-                print("DIAGNOSTIC: About to log move", board.fullmove_number, player_name, move_san, move_uci, board.fen())
-                # Correct: includes the player argument
                 self.log_move(board.fullmove_number, player_name, move_san, move_uci, board.fen())
             except Exception as e:
                 logging.error(f"Error logging move {move_uci}: {e}")
@@ -251,7 +210,4 @@ class GameLogManager:
 
     def flush_log(self):
         logger.info("Flushing log to disk")
-        print("DIAGNOSTIC: flush_log called")
-        print(f"  log_buffer before flush: {self.log_buffer}")
         self.save_game_log()
-        print(f"  log_buffer after flush: {self.log_buffer}")

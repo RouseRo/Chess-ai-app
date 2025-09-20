@@ -74,3 +74,14 @@ class AIPlayer:
         
         # If parsing fails, we cannot make a move.
         return None
+
+    def get_move(self, game):
+        """
+        Returns a legal move in UCI format for the current position, using the AI model and (optionally) the player's strategy.
+        """
+        import chess
+        strategy = getattr(game, "white_strategy", None) if game.board.turn == chess.WHITE else getattr(game, "black_strategy", None)
+        move = self.compute_move(game.board, strategy)
+        if move is not None:
+            return move.uci() if hasattr(move, "uci") else move
+        return None
