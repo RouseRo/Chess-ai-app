@@ -1,0 +1,20 @@
+import os
+import json
+
+def load_stockfish_config(config_path="src/config.json"):
+    """Load Stockfish path and configs from config.json or environment."""
+    try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+            stockfish_path = os.environ.get(
+                "STOCKFISH_EXECUTABLE",
+                config.get("stockfish_path", "stockfish")
+            )
+            stockfish_configs = config.get("stockfish_configs", {})
+            return stockfish_path, stockfish_configs
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        raise RuntimeError(f"Could not load or parse '{config_path}': {e}")
+
+def is_stockfish_available(stockfish_path):
+    """Check if Stockfish binary is available."""
+    return os.path.isfile(stockfish_path) or stockfish_path == "stockfish"
