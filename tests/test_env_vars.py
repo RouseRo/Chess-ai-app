@@ -31,6 +31,8 @@ def test_windows_env_vars():
     assert os.environ.get('HOMEDRIVE'), "HOMEDRIVE not set"
     print("HOMEPATH:", os.environ.get('HOMEPATH'))
     assert os.environ.get('HOMEPATH'), "HOMEPATH not set"
+    print("STOCKFISH_EXECUTABLE:", os.environ.get('STOCKFISH_EXECUTABLE'))
+    # No assert for STOCKFISH_EXECUTABLE, as it may not always be set
 
 def test_path_variables():
     # System paths
