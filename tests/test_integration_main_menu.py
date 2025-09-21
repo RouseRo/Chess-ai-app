@@ -442,8 +442,14 @@ def expect_cleaned_prompt(child, pattern, timeout=15):
 
 def test_00_stockfish_setup():
     import os
-    # Set the correct Stockfish path for this test
-    os.environ["STOCKFISH_EXECUTABLE"] = r"C:\stockfish\stockfish-windows-x86-64-avx2\stockfish\stockfish-windows-x86-64-avx2.exe"
+    import json
+
+    # Load the Stockfish executable path from config_pytest.json
+    with open("src/config_pytest.json", "r") as f:
+        config = json.load(f)
+        stockfish_executable = config.get("stockfish_executable")
+
+    os.environ["STOCKFISH_EXECUTABLE"] = stockfish_executable
     print(f"DEBUG: Env STOCKFISH_EXECUTABLE: {os.environ.get('STOCKFISH_EXECUTABLE')}")
     path, configs = setup_stockfish()
     print(f"DEBUG: Stockfish path being checked: '{path}'")

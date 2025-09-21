@@ -8,10 +8,16 @@ def load_stockfish_config(config_path="src/config.json"):
     1. STOCKFISH_EXECUTABLE environment variable (if set)
     2. "stockfish_path" in config.json
     3. Default: "stockfish"
+    Also sets os.environ["STOCKFISH_EXECUTABLE"] from config if present.
     """
     try:
         with open(config_path, 'r') as f:
             config = json.load(f)
+            # Set the environment variable from config if present
+            stockfish_executable = config.get("stockfish_executable")
+            if stockfish_executable:
+                os.environ["STOCKFISH_EXECUTABLE"] = stockfish_executable
+
             stockfish_path = os.environ.get(
                 "STOCKFISH_EXECUTABLE",
                 config.get("stockfish_path", "stockfish")

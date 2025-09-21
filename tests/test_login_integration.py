@@ -20,6 +20,9 @@ TEST_ENV = os.environ.copy()
 TEST_ENV["PYTHONIOENCODING"] = "utf-8"
 TEST_ENV["CHESS_APP_TEST_MODE"] = "1"  # Add this to your app to detect test mode
 
+# Configure Stockfish executable path
+os.environ["STOCKFISH_EXECUTABLE"] = r"C:\stockfish\stockfish-windows-x86-64-avx2\stockfish\stockfish-windows-x86-64-avx2.exe"
+
 def strip_ansi_codes(text):
     """Remove ANSI color codes from text output"""
     ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
