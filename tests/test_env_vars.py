@@ -1,7 +1,23 @@
 import os
 import pytest
+from src.stockfish_utils import load_stockfish_config
 
 def test_windows_env_vars():
+    # Use stockfish_utils to load config and set env var
+    stockfish_path, _ = load_stockfish_config()
+    print("Loaded Stockfish path from config:", stockfish_path)
+    print("Env STOCKFISH_EXECUTABLE:", os.environ.get('STOCKFISH_EXECUTABLE'))
+
+    # Check that the env var matches the config value (if present)
+    with open("src/config.json", "r") as f:
+        import json
+        config = json.load(f)
+        config_exe = config.get("stockfish_executable")
+        if config_exe:
+            assert os.environ.get("STOCKFISH_EXECUTABLE") == config_exe, (
+                f"STOCKFISH_EXECUTABLE env var should match config value: {config_exe}"
+            )
+
     # Windows-specific variables
     print("USERPROFILE:", os.environ.get('USERPROFILE'))
     assert os.environ.get('USERPROFILE'), "USERPROFILE not set"
