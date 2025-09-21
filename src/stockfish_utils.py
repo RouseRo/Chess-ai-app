@@ -6,8 +6,9 @@ def load_stockfish_config(config_path="src/config.json"):
     Load Stockfish path and configs.
     Priority:
     1. STOCKFISH_EXECUTABLE environment variable (if set)
-    2. "stockfish_path" in config.json
-    3. Default: "stockfish"
+    2. "stockfish_executable" in config.json
+    3. "stockfish_path" in config.json
+    4. Default: "stockfish"
     Also sets os.environ["STOCKFISH_EXECUTABLE"] from config if present.
     """
     try:
@@ -18,9 +19,12 @@ def load_stockfish_config(config_path="src/config.json"):
             if stockfish_executable:
                 os.environ["STOCKFISH_EXECUTABLE"] = stockfish_executable
 
-            stockfish_path = os.environ.get(
-                "STOCKFISH_EXECUTABLE",
-                config.get("stockfish_path", "stockfish")
+            # Priority: env var > stockfish_executable > stockfish_path > "stockfish"
+            stockfish_path = (
+                os.environ.get("STOCKFISH_EXECUTABLE")
+                or stockfish_executable
+                or config.get("stockfish_path")
+                or "stockfish"
             )
             stockfish_configs = config.get("stockfish_configs", {})
             return stockfish_path, stockfish_configs

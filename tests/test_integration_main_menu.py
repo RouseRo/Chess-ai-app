@@ -27,6 +27,7 @@ import time
 import os
 import shutil  # Add this import
 from src.main import setup_stockfish
+from src.stockfish_utils import load_stockfish_config, is_stockfish_available
 
 # Command to run the application as a module, with unbuffered output (-u)
 PY_CMD = [sys.executable, "-u", "-m", "src.main"]
@@ -176,7 +177,6 @@ def test_main_menu_chess_expert_flow():
         # Ensure the process is terminated
         _terminate_process(child)
 
-@pytest.mark.skip(reason="Skipping until fixed")
 @pytest.mark.integration
 def test_main_menu_new_game_flow():
     """Test the flow of starting a new game from the main menu
@@ -228,11 +228,10 @@ def test_main_menu_new_game_flow():
         child.sendline('q')
         expect_with_debug(child, r"--- Quit Options ---", timeout=5)
         child.sendline('q')
-        expect_with_debug(child, r"Exiting game without saving.", timeout=10)
+        expect_with_debug(child, r"Exiting without saving.", timeout=10)
     finally:
         _terminate_process(child)
 
-@pytest.mark.skip(reason="Skipping until fixed")
 @pytest.mark.integration
 def test_load_practice_position_menu_sequence():
     """
@@ -246,6 +245,17 @@ def test_load_practice_position_menu_sequence():
     - Verify game loads and board is displayed
     - Quit the game
     """
+
+    # Ensure Stockfish config is loaded and available before any other asserts
+    stockfish_path, stockfish_configs = load_stockfish_config()
+    print(f"DEBUG: Stockfish path from config: {stockfish_path}")
+    print(f"DEBUG: Stockfish configs from config: {stockfish_configs}")
+    print(f"DEBUG: os.environ['STOCKFISH_EXECUTABLE']: {os.environ.get('STOCKFISH_EXECUTABLE')}")
+    print("DEBUG: File exists?", os.path.isfile(stockfish_path))
+    print(f"DEBUG: Stockfish available? {is_stockfish_available(stockfish_path)}")
+    if not is_stockfish_available(stockfish_path):
+        pytest.skip(f"Stockfish binary not found at {stockfish_path}, skipping test.")
+
     child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=30, env=TEST_ENV)
     child.delayafterread = 0.1
 
@@ -294,7 +304,7 @@ def test_load_practice_position_menu_sequence():
         child.sendline('q')
         expect_with_debug(child, r"--- Quit Options ---", timeout=5)
         child.sendline('q')
-        expect_with_debug(child, r"Exiting game without saving.", timeout=10)
+        expect_with_debug(child, r"Exiting without saving.", timeout=10)
     finally:
         _terminate_process(child)
 
@@ -331,7 +341,7 @@ def test_main_menu_load_saved_game(tmp_path):
         child.sendline('q')
         expect_with_debug(child, r"--- Quit Options ---", timeout=10)
         child.sendline('q')
-        expect_with_debug(child, r"Exiting game without saving.", timeout=10)
+        expect_with_debug(child, r"Exiting without saving.", timeout=10)
     finally:
         _terminate_process(child)
 
@@ -440,6 +450,7 @@ def expect_cleaned_prompt(child, pattern, timeout=15):
         time.sleep(0.1)
     raise AssertionError(f"Pattern not found: {pattern}")
 
+@pytest.mark.integration
 def test_00_stockfish_setup():
     import os
     import json
