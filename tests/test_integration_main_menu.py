@@ -440,7 +440,14 @@ def expect_cleaned_prompt(child, pattern, timeout=15):
         time.sleep(0.1)
     raise AssertionError(f"Pattern not found: {pattern}")
 
-def test_stockfish_setup():
+def test_00_stockfish_setup():
+    import os
+    # Set the correct Stockfish path for this test
+    os.environ["STOCKFISH_EXECUTABLE"] = r"C:\stockfish\stockfish-windows-x86-64-avx2\stockfish\stockfish-windows-x86-64-avx2.exe"
+    print(f"DEBUG: Env STOCKFISH_EXECUTABLE: {os.environ.get('STOCKFISH_EXECUTABLE')}")
     path, configs = setup_stockfish()
-    assert path is not None
-    # ... further assertions ...
+    print(f"DEBUG: Stockfish path being checked: '{path}'")
+    assert path, "Stockfish path should not be empty"
+    if path != "stockfish":
+        assert os.path.isfile(path), f"Stockfish binary not found at {path}"
+    assert isinstance(configs, dict), "Stockfish configs should be a dictionary"

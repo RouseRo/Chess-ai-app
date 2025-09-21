@@ -24,6 +24,7 @@ Tests are organized in the `tests/` directory, which keeps them separate from th
 tests/
 ├── test_basic.py                  # Basic tests and examples
 ├── test_integration_main_menu.py  # Integration tests for menu flows
+├── test_env_vars.py               # Tests for environment variables
 └── ... other test files
 ```
 
@@ -44,6 +45,14 @@ pytest tests/test_integration_main_menu.py
 
 # Run a specific test function within a file
 pytest tests/test_integration_main_menu.py::test_main_menu_new_game_flow
+```
+
+### Viewing Print Output
+By default, pytest captures all output from print statements.  
+To see print output during test runs, use the `-s` flag:
+
+```bash
+pytest -s tests/test_env_vars.py
 ```
 
 ### Using Markers (`-m` option)
@@ -168,6 +177,17 @@ We use a combination of techniques to automate password input:
   Ensure Stockfish is installed and the path is set via `STOCKFISH_EXECUTABLE` in your workflow and code.
 - **OpenAI API Key Error:**  
   Set a dummy `OPENAI_API_KEY` in your CI environment for tests that instantiate the OpenAI client.
+
+## Environment Variable Testing
+
+A dedicated test file, `tests/test_env_vars.py`, is included to verify that key Windows and pytest-related environment variables are set and accessible.  
+To see the values of these variables during test runs, use the `-s` flag with pytest:
+
+```bash
+pytest -s tests/test_env_vars.py
+```
+
+This will print the values of variables such as `USERPROFILE`, `APPDATA`, `PATH`, and others, helping you debug environment issues.
 
 ---
 
