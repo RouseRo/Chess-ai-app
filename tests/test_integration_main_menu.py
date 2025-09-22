@@ -506,6 +506,7 @@ def expect_cleaned_prompt(child, pattern, timeout=15):
         time.sleep(0.1)
     raise AssertionError(f"Pattern not found: {pattern}")
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only Stockfish test")
 @pytest.mark.integration
 def test_00_stockfish_setup():
     import os
