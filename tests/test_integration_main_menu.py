@@ -294,7 +294,6 @@ def test_practice_position_menu_with_AI_models():
     finally:
         _terminate_process(child)
 
-@pytest.mark.skip(reason="Skipping until fixed")
 @pytest.mark.integration
 def test_load_practice_position_menu_seq_with_stockfish():
     """
@@ -304,18 +303,13 @@ def test_load_practice_position_menu_seq_with_stockfish():
     - Select '3' for Load a Practice Position
     - Select '1' for King and Queen vs. King
     - Verify board and description are displayed
-    - Choose AI models for White and Black (m1m2)
+    - Choose Stockfish for White and Black (s3s1)
     - Verify game loads and board is displayed
     - Quit the game
     """
 
     # Ensure Stockfish config is loaded and available before any other asserts
     stockfish_path, stockfish_configs = load_stockfish_config()
-    print(f"DEBUG: Stockfish path from config: {stockfish_path}")
-    print(f"DEBUG: Stockfish configs from config: {stockfish_configs}")
-    print(f"DEBUG: os.environ['STOCKFISH_EXECUTABLE']: {os.environ.get('STOCKFISH_EXECUTABLE')}")
-    print("DEBUG: File exists?", os.path.isfile(stockfish_path))
-    print(f"DEBUG: Stockfish available? {is_stockfish_available(stockfish_path)}")
     if not is_stockfish_available(stockfish_path):
         pytest.skip(f"Stockfish binary not found at {stockfish_path}, skipping test.")
 
@@ -357,8 +351,7 @@ def test_load_practice_position_menu_seq_with_stockfish():
 
         # Game start and board display
         expect_with_debug(child, r"--- Game Started ---", timeout=10)
-        expect_with_debug(child, r"White: openai/gpt-4o", timeout=5)
-        expect_with_debug(child, r"Black: deepseek/deepseek-chat-v3.1", timeout=5)
+        expect_with_debug(child, r"White: Stockfish \(Skill: 20\)\r?\nBlack: Stockfish \(Skill: 5\)", timeout=10)
         expect_with_debug(child, r"Initial FEN: 8/k7/8/8/8/8/K7/7Q w - - 0 1", timeout=5)
         expect_with_debug(child, r"a b c d e f g h", timeout=5)
         expect_with_debug(child, r"---------------------", timeout=5)
