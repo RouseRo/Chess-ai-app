@@ -16,6 +16,8 @@
   "ai_models": {
     "m1": "openai/gpt-4o"
   },
+  "stockfish_path": "C:/stockfish/stockfish-windows-x86-64-avx2.exe",
+  "stockfish_executable": "C:\\stockfish\\stockfish-windows-x86-64-avx2.exe",
   "stockfish_configs": {
     "s1": {
       "name": "Quick, Casual",

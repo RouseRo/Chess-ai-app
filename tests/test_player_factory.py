@@ -33,3 +33,56 @@ def test_create_ai_player(mocker):
     factory = PlayerFactory(ui=mock_ui, ai_models=ai_models_config, stockfish_configs={}, stockfish_path="")
     player = factory.create_player('m1')
     assert player is not None
+
+def test_create_stockfish_player(mocker):
+    """Tests creating a Stockfish player from config."""
+    import json
+    # Load the Stockfish path from config_pytest.json
+    with open("src/config_pytest.json", "r") as f:
+        config = json.load(f)
+    stockfish_path = config.get("stockfish_executable", "")
+
+    mock_ui = mocker.MagicMock()
+    stockfish_configs = {
+        "s1": {
+            "name": "Quick, Casual",
+            "parameters": {"Skill Level": 5, "UCI_LimitStrength": "false"}
+        }
+    }
+    # Patch StockfishPlayer to avoid launching the real engine
+    mock_stockfish_player = mocker.patch("src.player_factory.StockfishPlayer", autospec=True)
+    factory = PlayerFactory(
+        ui=mock_ui,
+        ai_models={},
+        stockfish_configs=stockfish_configs,
+        stockfish_path=stockfish_path
+    )
+    player = factory.create_player('s1')
+    assert player is not None
+    mock_stockfish_player.assert_called_once_with(
+        stockfish_path,
+        parameters=stockfish_configs["s1"]["parameters"]
+    )
+
+def test_create_stockfish_player_invalid_path(mocker):
+    """Tests creating a Stockfish player with an invalid path and expects an error."""
+    mock_ui = mocker.MagicMock()
+    stockfish_configs = {
+        "s1": {
+            "name": "Quick, Casual",
+            "parameters": {"Skill Level": 5, "UCI_LimitStrength": "false"}
+        }
+    }
+    # Patch StockfishPlayer to raise FileNotFoundError when called with an invalid path
+    mock_stockfish_player = mocker.patch(
+        "src.player_factory.StockfishPlayer",
+        side_effect=FileNotFoundError("Stockfish binary not found")
+    )
+    factory = PlayerFactory(
+        ui=mock_ui,
+        ai_models={},
+        stockfish_configs=stockfish_configs,
+        stockfish_path="Z:\\invalid\\path\\stockfish.exe"
+    )
+    with pytest.raises(FileNotFoundError, match="Stockfish binary not found"):
+        factory.create_player('s1')

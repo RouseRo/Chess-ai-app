@@ -20,7 +20,8 @@
     "m4": "anthropic/claude-3-opus",
     "m5": "meta-llama/llama-3-70b-instruct"
   },
-  "stockfish_path": "C:/stockfish/stockfish-windows-x86-64-avx2/stockfish/stockfish-windows-x86-64-avx2.exe",
+  "stockfish_path": "C:/stockfish/stockfish-windows-x86-64-avx2.exe",
+  "stockfish_executable": "C:\\stockfish\\stockfish-windows-x86-64-avx2.exe",
   "stockfish_configs": {
     "s1": {
       "name": "Quick, Casual",

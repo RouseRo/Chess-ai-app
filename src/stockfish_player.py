@@ -13,7 +13,8 @@ class StockfishPlayer:
         """
         self.stockfish_path = stockfish_path
         self.parameters = parameters or {}
-        self.stockfish = Stockfish(path=self.stockfish_path, parameters=self.parameters)  # <-- Fix: use self.stockfish_path
+        print(f"DEBUG: Attempting to launch Stockfish at: {self.stockfish_path}")  # Add this before the Stockfish() call
+        self.stockfish = Stockfish(path=self.stockfish_path, parameters=self.parameters)
         self.name = name
 
         skill_level = self.stockfish.get_parameters().get("Skill Level", "N/A")

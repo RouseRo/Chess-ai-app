@@ -57,6 +57,7 @@ class PlayerFactory:
         elif player_key.startswith('s'):
             config = self.stockfish_configs.get(player_key)
             if config:
+                print(f"DEBUG: Creating StockfishPlayer with path: {self.stockfish_path}")
                 return StockfishPlayer(self.stockfish_path, parameters=config.get('parameters'))
 
         raise ValueError(f"Unknown or invalid player key: {player_key}")

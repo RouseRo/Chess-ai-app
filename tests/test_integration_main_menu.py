@@ -8,14 +8,10 @@ Tested flows:
 - Starting a new game and quitting
 - Loading a practice position and quitting
 - Loading a saved game and quitting
-
-Test utilities:
-- Uses pexpect to interact with the CLI application.
-- Uses regex matching for output verification.
-- Cleans up child processes after each test.
-
-Environment:
-- Sets CHESS_APP_TEST_MODE=1 for deterministic test behavior.
+- Loading a practice position with Stockfish as a player
+- Loading a practice position with AI models as both players
+- Selecting a practice position, choosing AI models, and quitting
+- Stockfish setup/configuration validation
 """
 
 import sys
@@ -26,6 +22,8 @@ import re
 import time
 import os
 import shutil  # Add this import
+from src.main import setup_stockfish
+from src.stockfish_utils import load_stockfish_config, is_stockfish_available
 
 # Command to run the application as a module, with unbuffered output (-u)
 PY_CMD = [sys.executable, "-u", "-m", "src.main"]
@@ -175,7 +173,6 @@ def test_main_menu_chess_expert_flow():
         # Ensure the process is terminated
         _terminate_process(child)
 
-@pytest.mark.skip(reason="Skipping until fixed")
 @pytest.mark.integration
 def test_main_menu_new_game_flow():
     """Test the flow of starting a new game from the main menu
@@ -227,13 +224,79 @@ def test_main_menu_new_game_flow():
         child.sendline('q')
         expect_with_debug(child, r"--- Quit Options ---", timeout=5)
         child.sendline('q')
-        expect_with_debug(child, r"Exiting game without saving.", timeout=10)
+        expect_with_debug(child, r"Exiting without saving.", timeout=10)
+    finally:
+        _terminate_process(child)
+
+@pytest.mark.integration
+def test_practice_position_menu_with_AI_models():
+    """
+    Integration test for loading a practice position and selecting AI models for both players.
+    Steps:
+    - Start app
+    - Select '3' for Load a Practice Position
+    - Select '2' for King and Rook vs. King
+    - Verify board and description are displayed
+    - Choose AI models for White and Black (m1m2)
+    - Verify game loads and board is displayed
+    - Quit the game
+    """
+    child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=30, env=TEST_ENV)
+    child.delayafterread = 0.1
+
+    try:
+        # Main menu
+        expect_with_debug(child, r"--- Main Menu ---", timeout=10)
+        expect_with_debug(child, r"Enter your choice", timeout=5)
+        child.sendline('3')
+
+        # Practice positions menu
+        expect_with_debug(child, r"--- Practice Positions ---", timeout=10)
+        expect_with_debug(child, r"Enter the number of the position to load, or a letter for other options", timeout=5)
+        child.sendline('2')
+
+        # Board display
+        expect_with_debug(child, r"a b c d e f g h", timeout=5)
+        expect_with_debug(child, r"---------------------", timeout=5)
+        expect_with_debug(child, r"1\| . . . . . . . R \|1", timeout=5)
+        expect_with_debug(child, r"---------------------", timeout=5)
+        expect_with_debug(child, r"a b c d e f g h", timeout=5)
+
+        # Position description
+        expect_with_debug(child, r"Position 2: King and Rook vs. King - White to move and deliver checkmate using the rook and king.", timeout=5)
+
+        # Player model menu
+        expect_with_debug(child, r"--- Choose Player Models ---", timeout=5)
+        expect_with_debug(child, r"Available AI models:", timeout=5)
+        expect_with_debug(child, r"Available Stockfish configs:", timeout=5)
+        expect_with_debug(child, r"Enter choice for White and Black players.*", timeout=5)
+        child.sendline('m1m2')
+
+        # Debug log lines
+        expect_with_debug(child, r"DEBUG: About to log game start", timeout=5)
+        expect_with_debug(child, r"DEBUG: Logged game start", timeout=5)
+        expect_with_debug(child, r"DEBUG: Flushed log", timeout=5)
+
+        # Game start and board display
+        expect_with_debug(child, r"--- Game Started ---", timeout=10)
+        expect_with_debug(child, r"White: openai/gpt-4o", timeout=5)
+        expect_with_debug(child, r"Black: deepseek/deepseek-chat-v3.1", timeout=5)
+        expect_with_debug(child, r"Initial FEN: 8/k7/8/8/8/8/K7/7R w - - 0 1", timeout=5)
+        expect_with_debug(child, r"a b c d e f g h", timeout=5)
+        expect_with_debug(child, r"---------------------", timeout=5)
+
+        # Move prompt and quit
+        expect_with_debug(child, r"Move 1.*openai/gpt-4o.*as White.*:", timeout=10)
+        child.sendline('q')
+        expect_with_debug(child, r"--- Quit Options ---", timeout=5)
+        child.sendline('q')
+        expect_with_debug(child, r"Exiting without saving.", timeout=10)
     finally:
         _terminate_process(child)
 
 @pytest.mark.skip(reason="Skipping until fixed")
 @pytest.mark.integration
-def test_load_practice_position_menu_sequence():
+def test_load_practice_position_menu_seq_with_stockfish():
     """
     Integration test for the 'Load a Practice Position' menu sequence.
     Steps:
@@ -245,6 +308,17 @@ def test_load_practice_position_menu_sequence():
     - Verify game loads and board is displayed
     - Quit the game
     """
+
+    # Ensure Stockfish config is loaded and available before any other asserts
+    stockfish_path, stockfish_configs = load_stockfish_config()
+    print(f"DEBUG: Stockfish path from config: {stockfish_path}")
+    print(f"DEBUG: Stockfish configs from config: {stockfish_configs}")
+    print(f"DEBUG: os.environ['STOCKFISH_EXECUTABLE']: {os.environ.get('STOCKFISH_EXECUTABLE')}")
+    print("DEBUG: File exists?", os.path.isfile(stockfish_path))
+    print(f"DEBUG: Stockfish available? {is_stockfish_available(stockfish_path)}")
+    if not is_stockfish_available(stockfish_path):
+        pytest.skip(f"Stockfish binary not found at {stockfish_path}, skipping test.")
+
     child = PopenSpawn(PY_CMD, encoding='utf-8', timeout=30, env=TEST_ENV)
     child.delayafterread = 0.1
 
@@ -274,7 +348,7 @@ def test_load_practice_position_menu_sequence():
         expect_with_debug(child, r"Available AI models:", timeout=5)
         expect_with_debug(child, r"Available Stockfish configs:", timeout=5)
         expect_with_debug(child, r"Enter choice for White and Black players.*", timeout=5)
-        child.sendline('m1m2')
+        child.sendline('s3s1')
 
         # Debug log lines
         expect_with_debug(child, r"DEBUG: About to log game start", timeout=5)
@@ -293,7 +367,7 @@ def test_load_practice_position_menu_sequence():
         child.sendline('q')
         expect_with_debug(child, r"--- Quit Options ---", timeout=5)
         child.sendline('q')
-        expect_with_debug(child, r"Exiting game without saving.", timeout=10)
+        expect_with_debug(child, r"Exiting without saving.", timeout=10)
     finally:
         _terminate_process(child)
 
@@ -330,7 +404,7 @@ def test_main_menu_load_saved_game(tmp_path):
         child.sendline('q')
         expect_with_debug(child, r"--- Quit Options ---", timeout=10)
         child.sendline('q')
-        expect_with_debug(child, r"Exiting game without saving.", timeout=10)
+        expect_with_debug(child, r"Exiting without saving.", timeout=10)
     finally:
         _terminate_process(child)
 
@@ -438,3 +512,22 @@ def expect_cleaned_prompt(child, pattern, timeout=15):
             pass
         time.sleep(0.1)
     raise AssertionError(f"Pattern not found: {pattern}")
+
+@pytest.mark.integration
+def test_00_stockfish_setup():
+    import os
+    import json
+
+    # Load the Stockfish executable path from config_pytest.json
+    with open("src/config_pytest.json", "r") as f:
+        config = json.load(f)
+        stockfish_executable = config.get("stockfish_executable")
+
+    os.environ["STOCKFISH_EXECUTABLE"] = stockfish_executable
+    print(f"DEBUG: Env STOCKFISH_EXECUTABLE: {os.environ.get('STOCKFISH_EXECUTABLE')}")
+    path, configs = setup_stockfish()
+    print(f"DEBUG: Stockfish path being checked: '{path}'")
+    assert path, "Stockfish path should not be empty"
+    if path != "stockfish":
+        assert os.path.isfile(path), f"Stockfish binary not found at {path}"
+    assert isinstance(configs, dict), "Stockfish configs should be a dictionary"

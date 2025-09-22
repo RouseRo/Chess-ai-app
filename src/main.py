@@ -307,3 +307,20 @@ def main():
 if __name__ == "__main__":
     setup_logging()
     main()
+
+def setup_stockfish(config_path="src/config.json"):
+    """Utility to load Stockfish path and configs for integration tests or app."""
+    import os
+    import json
+
+    try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+            stockfish_path = os.environ.get(
+                "STOCKFISH_EXECUTABLE",
+                config.get("stockfish_path", "stockfish")
+            )
+            stockfish_configs = config.get("stockfish_configs", {})
+            return stockfish_path, stockfish_configs
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        raise RuntimeError(f"Could not load or parse '{config_path}': {e}")
