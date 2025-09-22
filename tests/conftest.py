@@ -7,7 +7,7 @@ import pytest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # In your test setup or config
-os.environ["STOCKFISH_EXECUTABLE"] = "/usr/games/stockfish"
+os.environ["STOCKFISH_EXECUTABLE"] = "C:\\stockfish\\stockfish-windows-x86-64-avx2.exe"
 
 @pytest.fixture
 def app_instance():
