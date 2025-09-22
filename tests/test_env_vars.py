@@ -1,8 +1,10 @@
 import os
+import sys
 import pytest
 import json
 from src.stockfish_utils import load_stockfish_config
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only test")
 def test_windows_env_vars():
     # Windows-specific variables
     print("USERPROFILE:", os.environ.get('USERPROFILE'))
@@ -36,6 +38,7 @@ def test_windows_env_vars():
     print("STOCKFISH_EXECUTABLE:", os.environ.get('STOCKFISH_EXECUTABLE'))
     # No assert for STOCKFISH_EXECUTABLE, as it may not always be set
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only test")
 def test_path_variables():
     # System paths
     path = os.environ.get('PATH')
