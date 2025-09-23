@@ -3,7 +3,7 @@ from src.player_factory import PlayerFactory
 from src.human_player import HumanPlayer
 from src.ai_player import AIPlayer
 
-@pytest.mark.skip(reason="Skipping until fixed")
+# @pytest.mark.skip(reason="Skipping until fixed")
 def test_create_human_player(mocker):
     """Tests creating a human player, mocking the UI prompt."""
     # 1. Setup the mock
@@ -18,7 +18,7 @@ def test_create_human_player(mocker):
     
     # 4. Assert the results
     assert isinstance(player, HumanPlayer)
-    assert "Robert" in player.model_name
+    assert "Robert" in player.name  # Updated to use the correct attribute
     # Assert that our mock was called correctly
     mock_ui.get_human_player_name.assert_called_once_with("White")
 
