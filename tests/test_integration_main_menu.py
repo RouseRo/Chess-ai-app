@@ -74,6 +74,7 @@ TEST_ENV = os.environ.copy()
 TEST_ENV["CHESS_APP_TEST_MODE"] = "1"
 
 @pytest.mark.integration
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only test")
 def test_main_menu_loads_and_quits():
     """
     Tests if the application starts, displays the main menu, and quits successfully.
