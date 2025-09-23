@@ -365,6 +365,7 @@ def test_load_practice_position_menu_seq_with_stockfish():
         _terminate_process(child)
 
 @pytest.mark.integration
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only test")
 def test_main_menu_load_saved_game(tmp_path):
     """
     Integration test: Load a Saved Game from the main menu.
