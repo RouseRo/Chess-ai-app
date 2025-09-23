@@ -74,7 +74,6 @@ TEST_ENV = os.environ.copy()
 TEST_ENV["CHESS_APP_TEST_MODE"] = "1"
 
 @pytest.mark.integration
-@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only test")
 def test_main_menu_loads_and_quits():
     """
     Tests if the application starts, displays the main menu, and quits successfully.
@@ -401,8 +400,9 @@ def test_main_menu_load_saved_game(tmp_path):
             expect_with_debug(child, r"Exiting without saving.", timeout=10)
         except pexpect.TIMEOUT:
             # If no saved games are present, handle gracefully
-            expect_with_debug(child, r"No saved games found", timeout=5)
-            expect_with_debug(child, r"--- Main Menu ---", timeout=5)
+            # Use cleaned output to match the message even with color codes
+            expect_cleaned_pattern(child, r"No saved games found", timeout=5)
+            expect_cleaned_pattern(child, r"--- Main Menu ---", timeout=5)
             # End test early since no saved games are available
             return
     finally:
