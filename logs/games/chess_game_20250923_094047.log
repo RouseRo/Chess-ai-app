@@ -1,0 +1,13 @@
+2025-09-23 09:39:22,475 - INFO - Setting up new game
+2025-09-23 09:40:00,211 - INFO - New Game Started
+2025-09-23 09:40:00,211 - INFO - White: Robert (hu)
+2025-09-23 09:40:00,211 - INFO - Black: Stockfish (Skill: 20)
+2025-09-23 09:40:00,211 - INFO - White Player Key: hu
+2025-09-23 09:40:00,211 - INFO - Black Player Key: s3
+2025-09-23 09:40:00,211 - INFO - White Strategy: No Classic Chess Opening
+2025-09-23 09:40:00,212 - INFO - Black Strategy: Play the Sicilian Defense.
+2025-09-23 09:40:00,212 - INFO - Initial FEN: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+2025-09-23 09:40:07,082 - INFO - Logging move 1: e4 (e2e4) by Robert (hu)
+2025-09-23 09:40:19,811 - INFO - Logging move 2: e5 (e7e5) by Stockfish
+2025-09-23 09:40:37,191 - INFO - Logging move 2: Nf3 (g1f3) by Robert (hu)
+2025-09-23 09:40:38,711 - INFO - Logging move 3: Nc6 (b8c6) by Stockfish
