@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chess-AI-App  Fun with Chess</title>
+  <link rel="stylesheet" href="chessboard.css">
+  <style>
+    #board { width: 400px; }
+  </style>
+</head>
+<body>
+  <div id="controls" style="text-align:center; margin-bottom:10px;">
+    <button id="newGameBtn">New Game</button>
+    <button id="flipBtn">Flip Board</button>
+    <button id="customBtn">My Feature</button>
+    <button id="loadPositionBtn">Load Custom Position</button>
+  </div>
+  <div id="board"></div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="chessboard.js"></script>
+  <script>
+    var board = Chessboard('board', 'start');
+
+    document.getElementById('newGameBtn').onclick = function() {
+      board.start();
+    };
+
+    document.getElementById('flipBtn').onclick = function() {
+      board.flip();
+    };
+
+    document.getElementById('customBtn').onclick = function() {
+      alert('Custom feature coming soon!');
+      // Add your custom JS here
+    };
+
+    document.getElementById('loadPositionBtn').onclick = function() {
+      // Example: Fool's Mate position
+      board.position('rnbqkb1r/pppppppp/8/8/8/8/PPPPPPP1/RNBQKBNR w KQkq - 0 1');
+    };
+  </script>
+</body>
+</html>
