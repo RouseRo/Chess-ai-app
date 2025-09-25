@@ -4,17 +4,27 @@
   <title>Chess-AI-App  Fun with Chess</title>
   <link rel="stylesheet" href="chessboard.css">
   <style>
-    #board { width: 400px; }
+    #board {
+      width: 400px;
+      margin-left: 10%;
+    }
+    #controls {
+      width: 400px;
+      margin-left: 10%;
+      margin-top: 20px;
+      text-align: center;
+      margin-bottom: 10px;
+    }
   </style>
 </head>
 <body>
-  <div id="controls" style="text-align:center; margin-bottom:10px;">
+  <div id="board"></div>
+  <div id="controls">
     <button id="newGameBtn">New Game</button>
     <button id="flipBtn">Flip Board</button>
-    <button id="customBtn">My Feature</button>
+    <button id="chessExpertBtn">Ask a Chess Expert</button>
     <button id="loadPositionBtn">Load Custom Position</button>
   </div>
-  <div id="board"></div>
 
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="chessboard.js"></script>
@@ -29,7 +39,7 @@
       board.flip();
     };
 
-    document.getElementById('customBtn').onclick = function() {
+      document.getElementById('chessExpertBtn').onclick = function () {
       alert('Custom feature coming soon!');
       // Add your custom JS here
     };
