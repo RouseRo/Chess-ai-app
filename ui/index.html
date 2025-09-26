@@ -24,16 +24,16 @@
       align-items: center;
       justify-content: center;
       background: #fafafa;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 10px;
     }
-    #side-text p {
+    #side-text p, #side-text pre {
       margin: 0;
-      text-align: center;
-      font-size: 1.2em;
+      text-align: left; /* Changed from center to left */
+      font-size: 1.1em;
       width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      word-break: break-all;
     }
     #controls {
       width: 400px;
@@ -50,7 +50,7 @@
     <div id="side-text">
       <p>This is a test</p>
     </div>
-    </div>
+  </div>
   <div id="controls">
     <button id="newGameBtn">New Game</button>
     <button id="flipBtn">Flip Board</button>
@@ -61,25 +61,107 @@
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="chessboard.js"></script>
   <script>
-    var board = Chessboard('board', 'start');
+          var board = Chessboard('board', {
+            draggable: true,
+            onDrop: function (source, target, piece, newPos, oldPos, orientation) {
+              var move = source + '-' + target; // or use chess.js for SAN/UCI
+              var fen = board.fen();
+              sendMoveToEngine(move, fen);
+            }
+          });
 
     document.getElementById('newGameBtn').onclick = function() {
       board.start();
+      updateSideText("New game started.", board.fen());
     };
 
     document.getElementById('flipBtn').onclick = function() {
       board.flip();
+      updateSideText("Board flipped.", board.fen());
     };
 
       document.getElementById('chessExpertBtn').onclick = function () {
-      alert('Custom feature coming soon!');
-      // Add your custom JS here
+        showExpertOptions();
+      };
+
+      function showExpertOptions() {
+        const html = `
+      <p><b>Chess Expert:</b> I can help you with the following:</p>
+      <ol>
+        <li>Answer a chess question</li>
+        <li>Tell a chess joke</li>
+        <li>Tell a fun chess fact</li>
+        <li>Get current chess news</li>
+      </ol>
+      <div style="margin-top:10px;">
+        <input id="expert-input" type="text" placeholder="Type your question or request here..." style="width:90%;padding:5px;" />
+        <button id="expert-send-btn" style="padding:5px 12px;margin-left:5px;">Send</button>
+      </div>
+    `;
+        document.getElementById('side-text').innerHTML = html;
+
+        document.getElementById('expert-send-btn').onclick = function () {
+          const userInput = document.getElementById('expert-input').value.trim();
+          handleExpertInput(userInput);
     };
+    }
+
+    function handleExpertInput(input) {
+      let response = "";
+      if (!input) {
+        response = "Please enter a question or request for the Chess Expert.";
+      } else if (/joke/i.test(input)) {
+        // You can call your backend here instead of hardcoding
+        response = "Why did the chess player bring a suitcase? Because he was traveling to the endgame!";
+      } else if (/fact/i.test(input)) {
+        response = "Fun Chess Fact: The longest chess game theoretically possible is 5,949 moves!";
+      } else if (/news/i.test(input)) {
+        response = "Current Chess News: Visit https://www.chess.com/news for the latest updates!";
+      } else {
+        response = "Chess Expert says: That's a great question! (This is a placeholder answer.)";
+      }
+      document.getElementById('side-text').innerHTML += `<p><b>Expert:</b> ${response}</p>`;
+    }
 
     document.getElementById('loadPositionBtn').onclick = function() {
       // Example: Fool's Mate position
-      board.position('rnbqkb1r/pppppppp/8/8/8/8/PPPPPPP1/RNBQKBNR w KQkq - 0 1');
+      var fen = 'rnbqkb1r/pppppppp/8/8/8/8/PPPPPPP1/RNBQKBNR w KQkq - 0 1';
+      board.position(fen);
+      updateSideText("Loaded custom position.", fen);
     };
+
+  function sendMoveToEngine(move, fen) {
+    fetch('http://localhost:8000/move', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ move: move, fen: fen })
+    })
+      .then(response => response.json())
+      .then(data => {
+        // Update the board with the new FEN from the engine
+        board.position(data.fen);
+        // Display diagnostic info: status, FEN, and move sent
+        updateSideText(
+          `Status: ${data.status}`,
+          data.fen,
+          move
+        );
+      })
+      .catch(err => {
+        updateSideText("Error communicating with engine: " + err, fen, move);
+      });
+  }
+
+  function updateSideText(status, fen, move) {
+    let html = `<p>${status}</p>`;
+    if (typeof move !== "undefined") {
+      html += `<pre>Move: ${move}</pre>`;
+    }
+    if (typeof fen !== "undefined") {
+      html += `<pre>FEN: ${fen}</pre>`;
+    }
+    document.getElementById('side-text').innerHTML = html;
+  }
   </script>
 </body>
 </html>
