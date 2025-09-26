@@ -1,0 +1,12 @@
+version: '3'
+services:
+  chess-engine:
+    build: ./engine
+    ports:
+      - "8000:8000"
+  chess-ui:
+    build: ./ui
+    ports:
+      - "8080:80"
+    depends_on:
+      - chess-engine
