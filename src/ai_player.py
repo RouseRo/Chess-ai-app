@@ -9,7 +9,7 @@ load_dotenv()
 class AIPlayer:
     """Represents a player using an AI model via OpenRouter."""
 
-    def __init__(self, model_name):
+    def __init__(self, model_name="openai/gpt-3.5-turbo"):
         self.model_name = model_name
         self.client = openai.OpenAI(
             base_url="https://openrouter.ai/api/v1",

@@ -7,9 +7,10 @@ from src.colors import RED, ENDC
 class ExpertService:
     """Handles expert Q&A, fun facts, and jokes storage."""
 
-    def __init__(self, ui, expert_model_name: str):
+    def __init__(self, ui, expert_model_name, ai_player=None):
         self.ui = ui
         self.expert_model_name = expert_model_name
+        self.ai_player = ai_player or AIPlayer(model_name=expert_model_name)
 
     # ---------- Public API (Refactored for API Use) ----------
 
