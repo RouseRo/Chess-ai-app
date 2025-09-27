@@ -1,9 +1,24 @@
 from fastapi import FastAPI, Response
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-import chess  # <-- Added import
+import chess
+
+# Import the refactored ExpertService
+from src.expert_service import ExpertService
+
+# Dummy UI for API context (no display, no input)
+class DummyUI:
+    def display_message(self, msg): pass
+    def get_user_input(self, prompt): return ""
+
+# Instantiate ExpertService for API use
+expert_service = ExpertService(ui=DummyUI(), expert_model_name="your-model-name")
 
 app = FastAPI()
+
+@app.get("/")
+def read_root():
+    return {"Hello": "World"}
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,36 +45,33 @@ def make_move(req: MoveRequest):
 def options_move():
     return Response(status_code=200)
 
+# ----------- Expert API Endpoints -----------
+
 class ExpertRequest(BaseModel):
     question: str = None
     fen: str = None
 
 @app.post("/expert/question")
 def ask_chess_question(req: ExpertRequest):
-    # Replace with your actual expert_service logic
-    if req.question:
-        return {"response": f"Chess Expert says: That's a great question! (Placeholder answer for: {req.question})"}
-    return {"response": "Please provide a chess question."}
-
-@app.get("/expert/joke")
-def get_chess_joke():
-    # Replace with your actual expert_service logic
-    return {"response": "Why did the chess player bring a suitcase? Because he was traveling to the endgame!"}
+    answer = expert_service.ask_chess_question(question=req.question)
+    return {"response": answer}
 
 @app.get("/expert/fact")
 def get_chess_fact():
-    return {"response": "Fun Chess Fact: The longest chess game theoretically possible is 5,949 moves!"}
-
-@app.get("/expert/news")
-def get_chess_news():
-    return {"response": "Current Chess News: Visit https://www.chess.com/news for the latest updates!"}
+    return {"response": expert_service.get_fun_fact()}
 
 @app.post("/expert/analyze")
 def analyze_position(req: ExpertRequest):
-    if req.fen:
-        return {"response": f"Analysis for FEN {req.fen}: (Placeholder analysis)"}
-    return {"response": "Please provide a FEN string to analyze."}
+    return {"response": expert_service.analyze_position(position_fen=req.fen)}
 
-@app.get("/expert/puzzle")
-def get_tactical_puzzle():
-    return {"response": "Here's a tactical puzzle: (Placeholder puzzle)"}
+@app.get("/expert/opening")
+def get_opening_advice():
+    return {"response": expert_service.opening_advice()}
+
+@app.get("/expert/news")
+def get_chess_news():
+    return {"response": expert_service.get_latest_chess_news()}
+
+@app.post("/expert/ask")
+def ask_expert(req: ExpertRequest):
+    return {"response": expert_service.ask_expert(question=req.question)}
