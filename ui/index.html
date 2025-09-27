@@ -107,20 +107,39 @@
     }
 
     function handleExpertInput(input) {
-      let response = "";
+      let url = "";
+      let options = {};
       if (!input) {
-        response = "Please enter a question or request for the Chess Expert.";
+        document.getElementById('side-text').innerHTML += `<p><b>Expert:</b> Please enter a question or request for the Chess Expert.</p>`;
+        return;
       } else if (/joke/i.test(input)) {
-        // You can call your backend here instead of hardcoding
-        response = "Why did the chess player bring a suitcase? Because he was traveling to the endgame!";
+        // No joke endpoint, fallback to fact endpoint for demonstration
+        url = "http://localhost:8000/expert/fact";
+        options = { method: "GET" };
       } else if (/fact/i.test(input)) {
-        response = "Fun Chess Fact: The longest chess game theoretically possible is 5,949 moves!";
+        url = "http://localhost:8000/expert/fact";
+        options = { method: "GET" };
       } else if (/news/i.test(input)) {
-        response = "Current Chess News: Visit https://www.chess.com/news for the latest updates!";
+        url = "http://localhost:8000/expert/news";
+        options = { method: "GET" };
       } else {
-        response = "Chess Expert says: That's a great question! (This is a placeholder answer.)";
+        url = "http://localhost:8000/expert/question";
+        options = {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: input })
+        };
       }
-      document.getElementById('side-text').innerHTML += `<p><b>Expert:</b> ${response}</p>`;
+
+      fetch(url, options)
+        .then(response => response.json())
+        .then(data => {
+          let answer = data.response || "No response from expert.";
+          document.getElementById('side-text').innerHTML += `<p><b>Expert:</b> ${answer}</p>`;
+        })
+        .catch(err => {
+          document.getElementById('side-text').innerHTML += `<p><b>Expert:</b> Error: ${err}</p>`;
+        });
     }
 
     document.getElementById('loadPositionBtn').onclick = function() {
