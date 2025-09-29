@@ -6,7 +6,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - OPENAI_API_KEY=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
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
   chess-ui:
     build: ./ui
     ports:
