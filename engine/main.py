@@ -2,17 +2,26 @@ from fastapi import FastAPI, Response
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 import chess
+import os
 
-# Import the refactored ExpertService
+# Import the refactored ExpertService and AIPlayer
 from src.expert_service import ExpertService
+from src.ai_player import AIPlayer
 
 # Dummy UI for API context (no display, no input)
 class DummyUI:
     def display_message(self, msg): pass
     def get_user_input(self, prompt): return ""
 
-# Instantiate ExpertService for API use
-expert_service = ExpertService(ui=DummyUI(), expert_model_name="your-model-name")
+# Initialize OpenRouter AIPlayer with a valid default model name
+ai_player = AIPlayer(model_name="openai/gpt-3.5-turbo")
+
+# Instantiate ExpertService for API use, passing the AIPlayer instance
+expert_service = ExpertService(
+    ui=DummyUI(),
+    expert_model_name="openai/gpt-3.5-turbo",
+    ai_player=ai_player
+)
 
 app = FastAPI()
 

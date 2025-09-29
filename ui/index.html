@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Chess-AI-App  Fun with Chess</title>
+  <title>Chess-AI-App Fun with Chess</title>
   <link rel="stylesheet" href="chessboard.css">
   <style>
     .main-row {
@@ -9,31 +9,50 @@
       flex-direction: row;
       align-items: flex-start;
       margin-left: 10%;
-      margin-top: 2.5%; /* Reduced top margin by 50% */
+      margin-top: 2.5%;
     }
     #board {
       width: 400px;
     }
-    #side-text {
+    #side-panel {
       width: 400px;
       height: 400px;
       border: 6px solid #444;
       margin-left: 20px;
       box-sizing: border-box;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       background: #fafafa;
+      display: flex;
       flex-direction: column;
       overflow-y: auto;
-      padding: 10px;
+      padding: 0;
     }
-    #side-text p, #side-text pre {
-      margin: 0;
-      text-align: left; /* Changed from center to left */
-      font-size: 1.1em;
-      width: 100%;
-      word-break: break-all;
+    .tab-buttons {
+      display: flex;
+      border-bottom: 1px solid #ccc;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px;
+      cursor: pointer;
+      background: #eee;
+      border: none;
+      border-right: 1px solid #ccc;
+      font-size: 1em;
+      outline: none;
+    }
+    .tab-btn:last-child {
+      border-right: none;
+    }
+    .tab-btn.active {
+      background: #fafafa;
+      font-weight: bold;
+      border-bottom: 2px solid #444;
+    }
+    .tab-content {
+      flex: 1;
+      padding: 10px;
+      overflow-y: auto;
+      height: 100%;
     }
     #controls {
       width: 400px;
@@ -47,8 +66,21 @@
 <body>
   <div class="main-row">
     <div id="board"></div>
-    <div id="side-text">
-      <p>This is a test</p>
+    <div id="side-panel">
+      <div class="tab-buttons">
+        <button class="tab-btn active" onclick="showTab('expert-tab', event)">Expert</button>
+        <button class="tab-btn" onclick="showTab('players-tab', event)">Players</button>
+      </div>
+      <div id="expert-tab" class="tab-content" style="display:block;">
+        <div id="expert-content">
+          <p>Welcome to the Chess Expert tab!</p>
+        </div>
+      </div>
+      <div id="players-tab" class="tab-content" style="display:none;">
+        <div id="players-content">
+          <p>Players tab coming soon. Here you will be able to select White and Black players.</p>
+        </div>
+      </div>
     </div>
   </div>
   <div id="controls">
@@ -61,59 +93,62 @@
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="chessboard.js"></script>
   <script>
-          var board = Chessboard('board', {
-            draggable: true,
-            onDrop: function (source, target, piece, newPos, oldPos, orientation) {
-              var move = source + '-' + target; // or use chess.js for SAN/UCI
-              var fen = board.fen();
-              sendMoveToEngine(move, fen);
-            }
-          });
+    var board = Chessboard('board', {
+      draggable: true,
+      onDrop: function (source, target, piece, newPos, oldPos, orientation) {
+        var move = source + '-' + target;
+        var fen = board.fen();
+        sendMoveToEngine(move, fen);
+      }
+    });
 
-    document.getElementById('newGameBtn').onclick = function() {
-      board.start();
-      updateSideText("New game started.", board.fen());
-    };
+    function showTab(tabId, event) {
+      document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+      document.getElementById(tabId).style.display = 'block';
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+    }
 
-    document.getElementById('flipBtn').onclick = function() {
-      board.flip();
-      updateSideText("Board flipped.", board.fen());
-    };
+    function updateExpertContent(status, fen, move) {
+      let html = `<p>${status}</p>`;
+      if (typeof move !== "undefined") {
+        html += `<pre>Move: ${move}</pre>`;
+      }
+      if (typeof fen !== "undefined") {
+        html += `<pre>FEN: ${fen}</pre>`;
+      }
+      document.getElementById('expert-content').innerHTML = html;
+    }
 
-      document.getElementById('chessExpertBtn').onclick = function () {
-        showExpertOptions();
+    function showExpertOptions() {
+      const html = `
+        <p><b>Chess Expert:</b> I can help you with the following:</p>
+        <ol>
+          <li>Answer a chess question</li>
+          <li>Tell a chess joke</li>
+          <li>Tell a fun chess fact</li>
+          <li>Get current chess news</li>
+        </ol>
+        <div style="margin-top:10px;">
+          <input id="expert-input" type="text" placeholder="Type your question or request here..." style="width:90%;padding:5px;" />
+          <button id="expert-send-btn" style="padding:5px 12px;margin-left:5px;">Send</button>
+        </div>
+      `;
+      document.getElementById('expert-content').innerHTML = html;
+
+      document.getElementById('expert-send-btn').onclick = function () {
+        const userInput = document.getElementById('expert-input').value.trim();
+        handleExpertInput(userInput);
       };
-
-      function showExpertOptions() {
-        const html = `
-      <p><b>Chess Expert:</b> I can help you with the following:</p>
-      <ol>
-        <li>Answer a chess question</li>
-        <li>Tell a chess joke</li>
-        <li>Tell a fun chess fact</li>
-        <li>Get current chess news</li>
-      </ol>
-      <div style="margin-top:10px;">
-        <input id="expert-input" type="text" placeholder="Type your question or request here..." style="width:90%;padding:5px;" />
-        <button id="expert-send-btn" style="padding:5px 12px;margin-left:5px;">Send</button>
-      </div>
-    `;
-        document.getElementById('side-text').innerHTML = html;
-
-        document.getElementById('expert-send-btn').onclick = function () {
-          const userInput = document.getElementById('expert-input').value.trim();
-          handleExpertInput(userInput);
-    };
     }
 
     function handleExpertInput(input) {
       let url = "";
       let options = {};
       if (!input) {
-        document.getElementById('side-text').innerHTML += `<p><b>Expert:</b> Please enter a question or request for the Chess Expert.</p>`;
+        document.getElementById('expert-content').innerHTML += `<p><b>Expert:</b> Please enter a question or request for the Chess Expert.</p>`;
         return;
       } else if (/joke/i.test(input)) {
-        // No joke endpoint, fallback to fact endpoint for demonstration
         url = "http://localhost:8000/expert/fact";
         options = { method: "GET" };
       } else if (/fact/i.test(input)) {
@@ -135,52 +170,56 @@
         .then(response => response.json())
         .then(data => {
           let answer = data.response || "No response from expert.";
-          document.getElementById('side-text').innerHTML += `<p><b>Expert:</b> ${answer}</p>`;
+          document.getElementById('expert-content').innerHTML += `<p><b>Expert:</b> ${answer}</p>`;
         })
         .catch(err => {
-          document.getElementById('side-text').innerHTML += `<p><b>Expert:</b> Error: ${err}</p>`;
+          document.getElementById('expert-content').innerHTML += `<p><b>Expert:</b> Error: ${err}</p>`;
         });
     }
 
-    document.getElementById('loadPositionBtn').onclick = function() {
-      // Example: Fool's Mate position
-      var fen = 'rnbqkb1r/pppppppp/8/8/8/8/PPPPPPP1/RNBQKBNR w KQkq - 0 1';
-      board.position(fen);
-      updateSideText("Loaded custom position.", fen);
+    function sendMoveToEngine(move, fen) {
+      fetch('http://localhost:8000/move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ move: move, fen: fen })
+      })
+        .then(response => response.json())
+        .then(data => {
+          board.position(data.fen);
+          updateExpertContent(
+            `Status: ${data.status}`,
+            data.fen,
+            move
+          );
+        })
+        .catch(err => {
+          updateExpertContent("Error communicating with engine: " + err, fen, move);
+        });
+    }
+
+    document.getElementById('newGameBtn').onclick = function() {
+      board.start();
+      updateExpertContent("New game started.", board.fen());
     };
 
-  function sendMoveToEngine(move, fen) {
-    fetch('http://localhost:8000/move', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ move: move, fen: fen })
-    })
-      .then(response => response.json())
-      .then(data => {
-        // Update the board with the new FEN from the engine
-        board.position(data.fen);
-        // Display diagnostic info: status, FEN, and move sent
-        updateSideText(
-          `Status: ${data.status}`,
-          data.fen,
-          move
-        );
-      })
-      .catch(err => {
-        updateSideText("Error communicating with engine: " + err, fen, move);
-      });
-  }
+    document.getElementById('flipBtn').onclick = function() {
+      board.flip();
+      updateExpertContent("Board flipped.", board.fen());
+    };
 
-  function updateSideText(status, fen, move) {
-    let html = `<p>${status}</p>`;
-    if (typeof move !== "undefined") {
-      html += `<pre>Move: ${move}</pre>`;
-    }
-    if (typeof fen !== "undefined") {
-      html += `<pre>FEN: ${fen}</pre>`;
-    }
-    document.getElementById('side-text').innerHTML = html;
-  }
+    document.getElementById('chessExpertBtn').onclick = function () {
+      showTab('expert-tab', {target: document.querySelector('.tab-btn:nth-child(1)')});
+      showExpertOptions();
+    };
+
+    document.getElementById('loadPositionBtn').onclick = function() {
+      var fen = 'rnbqkb1r/pppppppp/8/8/8/8/PPPPPPP1/RNBQKBNR w KQkq - 0 1';
+      board.position(fen);
+      updateExpertContent("Loaded custom position.", fen);
+    };
+
+    // Initialize default tab content
+    showExpertOptions();
   </script>
 </body>
 </html>
