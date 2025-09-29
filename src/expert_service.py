@@ -7,57 +7,40 @@ from src.colors import RED, ENDC
 class ExpertService:
     """Handles expert Q&A, fun facts, and jokes storage."""
 
-    def __init__(self, ui, expert_model_name: str):
+    def __init__(self, ui, expert_model_name, ai_player=None):
         self.ui = ui
         self.expert_model_name = expert_model_name
+        self.ai_player = ai_player or AIPlayer(model_name=expert_model_name)
 
-    # ---------- Public API ----------
+    # ---------- Public API (Refactored for API Use) ----------
 
     def ask_expert(self, question: str | None = None):
         """
-        If question is None or blank, show menu:
-          1: Ask a chess question
-          2: Tell me a chess joke
-          3: Tell me some chess news
-        Saves jokes if requested.
+        If question is None or blank, return menu options as a string.
+        Otherwise, answer the question and return the answer string.
         """
         request_type = None
         if not question or not question.strip():
-            choice = self.ui.display_ask_expert_menu().strip().lower()
-            if choice == '1':
-                question = self.ui.get_user_input("What is your chess question? ").strip()
-                if not question:
-                    return
-                request_type = 'question'
-            elif choice == '2':
-                question = "Tell me a short, clean chess joke."
-                request_type = 'joke'
-            elif choice == '3':
-                question = "Provide 3 brief, recent chess news headlines with one-sentence summaries. Be concise."
-                request_type = 'news'
-            else:
-                return
+            # Return menu options as a string for API/Frontend to display
+            return (
+                "Ask the Chess Expert:\n"
+                "  1: Ask a chess question\n"
+                "  2: Tell me a chess joke\n"
+                "  3: Tell me some chess news\n"
+                "Please provide your choice or question."
+            )
 
-        self.ui.display_message("\nAsking the Chessmaster...")
         try:
             expert_player = AIPlayer(model_name=self.expert_model_name)
             answer = expert_player.get_chess_fact_or_answer(question)
-            self.ui.display_message("\n--- Chessmaster's Answer ---")
-            self.ui.display_message(answer)
-            self.ui.display_message("-----------------------------")
             if request_type == 'joke' and answer:
-                saved = self._save_chess_joke(answer)
-                if saved:
-                    self.ui.display_message("Joke saved to docs/CHESS_JOKES.md")
-                else:
-                    self.ui.display_message("Joke appears recently in CHESS_JOKES.md — not saved.")
+                self._save_chess_joke(answer)
+            return answer
         except Exception as e:
-            self.ui.display_message(f"{RED}Sorry, I couldn't get an answer. Error: {e}{ENDC}")
-        self.ui.get_user_input("Press Enter to return.")
+            return f"{RED}Sorry, I couldn't get an answer. Error: {e}{ENDC}"
 
     def get_fun_fact(self):
-        """Fetch a random fun chess fact and persist it if not a recent duplicate."""
-        self.ui.display_message("\nGetting a fun chess fact...")
+        """Fetch a random fun chess fact and persist it if not a recent duplicate. Returns the fact as a string."""
         try:
             expert_player = AIPlayer(model_name=self.expert_model_name)
             prompt = (
@@ -67,23 +50,16 @@ class ExpertService:
                 "If possible, avoid repeating facts from previous answers."
             )
             answer = expert_player.get_chess_fact_or_answer(prompt)
-            self.ui.display_message("\n--- Fun Chess Fact ---")
-            self.ui.display_message(answer)
-            self.ui.display_message("----------------------")
-            saved = self._save_fun_fact(answer)
-            if saved:
-                self.ui.display_message("Fun fact saved to docs/CHESS_FUN_FACTS.md")
-            else:
-                self.ui.display_message("This fact appears recently in CHESS_FUN_FACTS.md — not saved.")
+            self._save_fun_fact(answer)
+            return answer
         except Exception as e:
-            self.ui.display_message(f"{RED}Sorry, I couldn't get a fact. Error: {e}{ENDC}")
-        self.ui.get_user_input("Press Enter to return to the main menu.")
+            return f"{RED}Sorry, I couldn't get a fact. Error: {e}{ENDC}"
 
     def analyze_position(self, position_fen):
         """
         Ask the chessmaster AI model to analyze the given FEN board position.
+        Returns the analysis as a string.
         """
-        self.ui.display_message("\nAnalyzing position with the Chessmaster...")
         try:
             expert_player = AIPlayer(model_name=self.expert_model_name)
             prompt = (
@@ -91,19 +67,16 @@ class ExpertService:
                 "Give a brief evaluation, best moves for both sides, and any tactical ideas."
             )
             answer = expert_player.get_chess_fact_or_answer(prompt)
-            self.ui.display_message("\n--- Chessmaster's Analysis ---")
-            self.ui.display_message(answer)
-            self.ui.display_message("-------------------------------")
+            return answer
         except Exception as e:
-            self.ui.display_message(f"{RED}Sorry, analysis failed. Error: {e}{ENDC}")
-        self.ui.get_user_input("Press Enter to return to the menu.")
+            return f"{RED}Sorry, analysis failed. Error: {e}{ENDC}"
 
     def opening_advice(self):
         """
         Ask the chessmaster AI model for general chess opening advice.
         Saves the answer to docs/EXPERT_ANSWERS.md.
+        Returns the advice as a string.
         """
-        self.ui.display_message("\nGetting opening advice from the Chessmaster...")
         try:
             expert_player = AIPlayer(model_name=self.expert_model_name)
             prompt = (
@@ -111,37 +84,31 @@ class ExpertService:
                 "Include general principles, common mistakes, and tips for improvement."
             )
             answer = expert_player.get_chess_fact_or_answer(prompt)
-            self.ui.display_message("\n--- Chessmaster's Opening Advice ---")
-            self.ui.display_message(answer)
-            self.ui.display_message("-------------------------------")
             self._save_expert_answer(prompt, answer)
+            return answer
         except Exception as e:
-            self.ui.display_message(f"{RED}Sorry, opening advice failed. Error: {e}{ENDC}")
-        self.ui.get_user_input("Press Enter to return to the menu.")
+            return f"{RED}Sorry, opening advice failed. Error: {e}{ENDC}"
 
     def ask_chess_question(self, question=None):
         """
-        Prompt the user for a chess question, ask the chessmaster AI model, and save the answer.
+        Ask the chessmaster AI model a chess question and save the answer.
+        Returns the answer as a string.
         """
         if not question:
-            question = self.ui.get_user_input("Enter your chess question: ").strip()
-        self.ui.display_message("\nAsking the Chessmaster your question...")
+            return "No question provided."
         try:
             expert_player = AIPlayer(model_name=self.expert_model_name)
             answer = expert_player.get_chess_fact_or_answer(question)
-            self.ui.display_message("\n--- Chessmaster's Answer ---")
-            self.ui.display_message(answer)
-            self.ui.display_message("-----------------------------")
             self._save_expert_answer(question, answer)
+            return answer
         except Exception as e:
-            self.ui.display_message(f"{RED}Sorry, I couldn't get an answer. Error: {e}{ENDC}")
-        self.ui.get_user_input("Press Enter to return to the menu.")
+            return f"{RED}Sorry, I couldn't get an answer. Error: {e}{ENDC}"
 
     def get_latest_chess_news(self):
         """
         Fetch the latest chess news from the Chessmaster AI model and save it to CHESS_NEWS.md.
+        Returns the news as a string.
         """
-        self.ui.display_message("\nFetching the latest chess news...")
         try:
             expert_player = AIPlayer(model_name=self.expert_model_name)
             prompt = (
@@ -149,15 +116,12 @@ class ExpertService:
                 "Include updates on tournaments, players, and other significant events."
             )
             news = expert_player.get_chess_fact_or_answer(prompt)
-            self.ui.display_message("\n--- Latest Chess News ---")
-            self.ui.display_message(news)
-            self.ui.display_message("--------------------------")
             self._save_chess_news(news)
+            return news
         except Exception as e:
-            self.ui.display_message(f"{RED}Sorry, I couldn't fetch the news. Error: {e}{ENDC}")
-        self.ui.get_user_input("Press Enter to return to the menu.")
+            return f"{RED}Sorry, I couldn't fetch the news. Error: {e}{ENDC}"
 
-    # ---------- Internal persistence helpers ----------
+    # ---------- Internal persistence helpers (unchanged) ----------
 
     def _save_chess_joke(self, joke_text: str) -> bool:
         """Append a numbered, dated joke unless recently duplicated."""
@@ -259,6 +223,5 @@ class ExpertService:
             with open(path, "a", encoding="utf-8") as f:
                 f.write(block)
             return True
-        except Exception as e:
-            self.ui.display_message(f"{RED}Failed to save news. Error: {e}{ENDC}")
+        except Exception:
             return False

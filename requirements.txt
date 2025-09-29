@@ -1,9 +1,4 @@
-openai
-requests
-numpy
+fastapi
+uvicorn
 python-chess
-python-dotenv
-pexpect
-pytest
-stockfish
-pytest-mock
+openai

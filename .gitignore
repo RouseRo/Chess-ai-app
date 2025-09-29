@@ -1,0 +1,7 @@
+.env
+*.pyc
+*.pyd
+venv/Scripts/*.exe
+venv/Lib/site-packages/
+venv/Scripts/*
+ 

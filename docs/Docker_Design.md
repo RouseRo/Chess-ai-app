@@ -282,4 +282,92 @@ You can easily modify the appearance of chessboard.js and add custom buttons for
 
 ---
 
-**Ready to scaffold the backend API or frontend? Let me know your tech preferences!**
+## Installing chessboard.js and Creating the Directory Structure
+
+To integrate [chessboard.js](https://chessboardjs.com/) as your frontend, follow these steps:
+
+### 1. Create the UI Directory Structure
+
+Within your main project directory (`chess-ai-app/`), create a `ui/` folder for the frontend assets:
+
+```
+chess-ai-app/
+│
+├── engine/           # Python backend (your current app, with API)
+│   ├── Dockerfile
+│   └── ...
+│
+├── ui/               # Static web UI (chessboardjs, JS, web server)
+│   ├── Dockerfile
+│   ├── index.html
+│   ├── chessboard.js
+│   ├── chessboard.css
+│   └── img/
+│
+└── docker-compose.yml
+```
+
+### 2. Download chessboard.js
+
+- Visit [https://chessboardjs.com/download/](https://chessboardjs.com/download/) and download the latest release.
+- Extract the archive and copy the following files into your `ui/` directory:
+  - `chessboard.js`
+  - `chessboard.css`
+  - The `img/` folder (contains chess piece images)
+
+### 3. Add jQuery
+
+chessboard.js depends on [jQuery](https://jquery.com/).  
+You can include it in your `index.html` via CDN:
+
+```html
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+```
+
+### 4. Create a Minimal `index.html`
+
+Create `ui/index.html` with the following content:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chessboard.js Frontend</title>
+  <link rel="stylesheet" href="chessboard.css">
+  <style>
+    #board { width: 400px; }
+  </style>
+</head>
+<body>
+  <div id="board"></div>
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="chessboard.js"></script>
+  <script>
+    var board = Chessboard('board', 'start');
+  </script>
+</body>
+</html>
+```
+
+### 5. (Optional) Customize Your UI
+
+- chessboard.js is "just a board" and does not handle chess rules, move validation, or PGN parsing.
+- For chess logic (move validation, game state, etc.), integrate [chess.js](https://github.com/jhlywa/chess.js) or connect to your backend API.
+- You can add buttons, move history, and other UI elements as needed.
+
+### 6. (Optional) Add a Simple Web Server
+
+You can serve the static files using a simple web server (Node.js/Express, Python Flask, or nginx as shown in the Dockerfile examples above).
+
+---
+
+**Summary of Steps:**
+1. Create the `ui/` directory under your project root.
+2. Download and copy chessboard.js, chessboard.css, and the `img/` folder into `ui/`.
+3. Add an `index.html` that loads jQuery and chessboard.js, and displays the chessboard.
+4. (Optional) Add a Dockerfile and web server for containerized deployment.
+
+---
+
+**Note:**  
+chessboard.js is a flexible JavaScript chessboard component that does not include chess logic or a chess engine. It is designed to be used alongside other libraries (such as chess.js) or your backend API for full chess functionality. For more information, see [chessboardjs.com](http://chessboardjs.com) and the [README](https://github.com/oakmac/chessboardjs/blob/master/README.md).

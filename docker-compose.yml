@@ -1,0 +1,13 @@
+services:
+  chess-engine:
+    build:
+      context: .
+      dockerfile: engine/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+  chess-ui:
+    build: ./ui
+    ports:
+      - "8080:80"
