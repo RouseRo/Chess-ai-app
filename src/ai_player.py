@@ -3,26 +3,48 @@ import re
 import openai
 import chess
 from dotenv import load_dotenv
+load_dotenv(dotenv_path="c:/Users/rober/Source/Repos/Chess-ai-app/.env", override=True)
 
-load_dotenv()
+DEBUG = False  # Set to True to enable debug output
 
 class AIPlayer:
     """Represents a player using an AI model via OpenRouter."""
 
     def __init__(self, model_name="openai/gpt-3.5-turbo"):
         self.model_name = model_name
-        self.client = openai.OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=os.getenv("OPENAI_API_KEY"),
-        )
+        api_key = os.getenv("OPENAI_API_KEY")
+        if DEBUG:
+            print(f"[DEBUG] Using API key: {api_key[:15]}...")  # Only show first 15 chars for privacy
+        try:
+            self.client = openai.OpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=api_key,
+            )
+            if DEBUG:
+                print(f"[DEBUG] openai.OpenAI() returned: {self.client}")
+        except Exception as e:
+            if DEBUG:
+                print(f"[ERROR] Exception initializing OpenAI client: {e}")
+            self.client = None
+        if DEBUG:
+            print(f"[DEBUG] Initialized AIPlayer with model: {self.model_name}")
 
     def _get_ai_response(self, messages):
         """Generic method to get a response from the AI model."""
-        response = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=messages,
-        )
-        return response.choices[0].message.content
+        if DEBUG:
+            print(f"[DEBUG] Sending messages to AI: {messages}")
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+            )
+            if DEBUG:
+                print(f"[DEBUG] AI response: {response}")
+            return response.choices[0].message.content
+        except Exception as e:
+            if DEBUG:
+                print(f"[ERROR] Exception during AI response: {e}")
+            return f"[ERROR] {e}"
 
     def get_chess_fact_or_answer(self, question=None):
         """
@@ -39,6 +61,8 @@ class AIPlayer:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ]
+        if DEBUG:
+            print(f"[DEBUG] get_chess_fact_or_answer messages: {messages}")
         return self._get_ai_response(messages)
 
     def compute_move(self, board, strategy=None):
@@ -57,22 +81,35 @@ class AIPlayer:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ]
+        if DEBUG:
+            print(f"[DEBUG] compute_move messages: {messages}")
 
         uci_move = self._get_ai_response(messages).strip()
+        if DEBUG:
+            print(f"[DEBUG] Raw AI move response: {uci_move}")
         
         # Find a valid UCI move in the response, as models sometimes add extra text.
         match = re.search(r'[a-h][1-8][a-h][1-8][qrbn]?', uci_move)
         if match:
             uci_move = match.group(0)
+            if DEBUG:
+                print(f"[DEBUG] Parsed UCI move: {uci_move}")
             try:
                 move = chess.Move.from_uci(uci_move)
                 if move in board.legal_moves:
+                    if DEBUG:
+                        print(f"[DEBUG] Move is legal: {move}")
                     return move
+                else:
+                    if DEBUG:
+                        print(f"[DEBUG] Move is not legal: {move}")
             except ValueError:
-                # The model returned an invalid UCI string
-                pass
+                if DEBUG:
+                    print(f"[ERROR] Invalid UCI string from AI: {uci_move}")
         
         # If parsing fails, we cannot make a move.
+        if DEBUG:
+            print("[DEBUG] No valid move found.")
         return None
 
     def get_move(self, game):
@@ -81,7 +118,13 @@ class AIPlayer:
         """
         import chess
         strategy = getattr(game, "white_strategy", None) if game.board.turn == chess.WHITE else getattr(game, "black_strategy", None)
+        if DEBUG:
+            print(f"[DEBUG] get_move strategy: {strategy}")
         move = self.compute_move(game.board, strategy)
         if move is not None:
+            if DEBUG:
+                print(f"[DEBUG] get_move returning: {move.uci() if hasattr(move, 'uci') else move}")
             return move.uci() if hasattr(move, "uci") else move
+        if DEBUG:
+            print("[DEBUG] get_move returning: None")
         return None
