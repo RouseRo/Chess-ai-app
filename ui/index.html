@@ -65,7 +65,7 @@
       width: 400px;
       border: 2px solid #444;
       margin-left: calc(10% + 420px);
-      margin-top: 0;
+      margin-top: 20px; /* aligns with controls */
       margin-bottom: 16px;
       padding: 12px;
       background: #f9f9f9;
@@ -83,7 +83,7 @@
         <button id="chessExpertBtn">Ask a Chess Expert</button>
         <button id="loadPositionBtn">Load Custom Position</button>
       </div>
-      </div>
+    </div>
     <div id="side-panel">
       <div class="tab-buttons">
         <button class="tab-btn active" onclick="showTab('expert-tab', event)">Expert</button>
@@ -210,23 +210,13 @@
       </div>
     </div>
   </div>
-  <!-- Player info box below tab panel -->
-  <div id="player-info" style="
-    width:400px;
-    border:2px solid #444;
-    margin-left:calc(10% + 420px);
-    margin-top:0;
-    margin-bottom:16px;
-    padding:12px;
-    background:#f9f9f9;
-    box-sizing:border-box;
-  ">
+  <div id="player-info">
     <div style="margin-bottom:8px; text-align:left; font-weight:bold;">
       White: <span id="player-info-white"></span>
-  </div>
-  <div style="text-align:left; font-weight:bold;">
-    Black: <span id="player-info-black"></span>
-  </div>
+    </div>
+    <div style="text-align:left; font-weight:bold;">
+      Black: <span id="player-info-black"></span>
+    </div>
   </div>
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="chessboard.js"></script>
