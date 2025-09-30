@@ -293,7 +293,7 @@
         body: JSON.stringify({ move: move, fen: fen })
       })
         .then(response => response.json())
-        .then(data => {
+        .then(function (data) {
           board.position(data.fen);
           updateExpertContent(
             `Status: ${data.status}`,
@@ -301,7 +301,7 @@
             move
           );
         })
-        .catch(err => {
+        .catch(function (err) {
           updateExpertContent("Error communicating with engine: " + err, fen, move);
         });
     }
@@ -329,6 +329,15 @@
 
     // Initialize default tab content
     showExpertOptions();
+  </script>
+  <script src="player-selection.js"></script>
+  <!-- Add this to your index.html inside <head> for debugging -->
+  <!-- filepath: c:\Users\rober\Source\Repos\Chess-ai-app\ui\index.html -->
+  <script>
+    console.debug('index.html: loaded');
+    document.addEventListener('DOMContentLoaded', function () {
+      console.debug('index.html: DOMContentLoaded');
+    });
   </script>
 </body>
 </html>

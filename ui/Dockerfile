@@ -13,4 +13,5 @@ RUN [ -d "img" ] && cp -r img dist/ || true
 
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
+COPY player-selection.js /usr/share/nginx/html/
 EXPOSE 80
