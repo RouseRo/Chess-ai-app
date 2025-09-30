@@ -11,15 +11,44 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
   }
 
-  // Human player selection logic
-  document.getElementById('white-hu').addEventListener('change', function () {
-    document.getElementById('black-hu').disabled = this.checked;
-    console.debug('player-selection.js: white-hu changed, checked:', this.checked);
+  // Only one checkbox per White column
+  document.querySelectorAll('#ai-model-list input[id^="white-"]').forEach(function(checkbox) {
+    checkbox.addEventListener('change', function () {
+      if (this.checked) {
+        document.querySelectorAll('#ai-model-list input[id^="white-"]').forEach(function(box) {
+          if (box !== checkbox) box.checked = false;
+        });
+      }
+      // Human player logic
+      if (this.id === 'white-hu') {
+        document.getElementById('black-hu').disabled = this.checked;
+        console.debug('player-selection.js: white-hu changed, checked:', this.checked);
+      } else {
+        // If a non-human is selected for White, enable Black human checkbox
+        document.getElementById('black-hu').disabled = false;
+        console.debug('player-selection.js: non-human white selected, black-hu enabled');
+      }
+    });
   });
 
-  document.getElementById('black-hu').addEventListener('change', function () {
-    document.getElementById('white-hu').disabled = this.checked;
-    console.debug('player-selection.js: black-hu changed, checked:', this.checked);
+  // Only one checkbox per Black column
+  document.querySelectorAll('#ai-model-list input[id^="black-"]').forEach(function(checkbox) {
+    checkbox.addEventListener('change', function () {
+      if (this.checked) {
+        document.querySelectorAll('#ai-model-list input[id^="black-"]').forEach(function(box) {
+          if (box !== checkbox) box.checked = false;
+        });
+      }
+      // Human player logic
+      if (this.id === 'black-hu') {
+        document.getElementById('white-hu').disabled = this.checked;
+        console.debug('player-selection.js: black-hu changed, checked:', this.checked);
+      } else {
+        // If a non-human is selected for Black, enable White human checkbox
+        document.getElementById('white-hu').disabled = false;
+        console.debug('player-selection.js: non-human black selected, white-hu enabled');
+      }
+    });
   });
 
   // Reset button logic: uncheck and re-enable all checkboxes
