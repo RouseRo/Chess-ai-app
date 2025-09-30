@@ -19,7 +19,6 @@ document.addEventListener('DOMContentLoaded', function () {
           if (box !== checkbox) box.checked = false;
         });
       }
-      // Human player logic
       if (this.id === 'white-hu') {
         document.getElementById('black-hu').disabled = this.checked;
         console.debug('player-selection.js: white-hu changed, checked:', this.checked);
@@ -39,7 +38,6 @@ document.addEventListener('DOMContentLoaded', function () {
           if (box !== checkbox) box.checked = false;
         });
       }
-      // Human player logic
       if (this.id === 'black-hu') {
         document.getElementById('white-hu').disabled = this.checked;
         console.debug('player-selection.js: black-hu changed, checked:', this.checked);
@@ -58,17 +56,34 @@ document.addEventListener('DOMContentLoaded', function () {
       box.checked = false;
       box.disabled = false;
     });
+    // Reset player-info display
+    document.getElementById('player-info-white').textContent = '';
+    document.getElementById('player-info-black').textContent = '';
     console.debug('player-selection.js: resetPlayersBtn clicked, all checkboxes reset');
   });
 
-  // Set button logic: collect selected players for White and Black
+  // Set button logic: set player names in player-info box
   document.getElementById('setPlayersBtn').addEventListener('click', function () {
+    // Find checked white and black player
     const white = document.querySelector('#ai-model-list input[id^="white-"]:checked');
     const black = document.querySelector('#ai-model-list input[id^="black-"]:checked');
-    let whitePlayer = white ? white.id.replace('white-', '') : null;
-    let blackPlayer = black ? black.id.replace('black-', '') : null;
-    console.debug('player-selection.js: setPlayersBtn clicked');
-    console.debug('Selected White:', whitePlayer);
-    console.debug('Selected Black:', blackPlayer);
+    // Map checkbox id to display name
+    function getPlayerName(id) {
+      if (!id) return '';
+      if (id === 'hu') return 'Human';
+      if (id === 'm1') return 'openai/gpt-4o';
+      if (id === 'm2') return 'deepseek/deepseek-chat-v3.1';
+      if (id === 'm3') return 'google/gemini-2.5-pro';
+      if (id === 'm4') return 'anthropic/claude-3-opus';
+      if (id === 'm5') return 'meta-llama/llama-3-70b-instruct';
+      if (id === 's1') return 'Skill level: 5';
+      if (id === 's2') return 'Skill level: 10';
+      if (id === 's3') return 'Skill level: 20';
+      return id;
+    }
+    let whitePlayer = white ? getPlayerName(white.id.replace('white-', '')) : '';
+    let blackPlayer = black ? getPlayerName(black.id.replace('black-', '')) : '';
+    document.getElementById('player-info-white').textContent = whitePlayer;
+    document.getElementById('player-info-black').textContent = blackPlayer;
   });
 });

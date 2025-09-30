@@ -61,11 +61,29 @@
       margin-bottom: 10px;
       margin-left: 10%;
     }
+    #player-info {
+      width: 400px;
+      border: 2px solid #444;
+      margin-left: calc(10% + 420px);
+      margin-top: 0;
+      margin-bottom: 16px;
+      padding: 12px;
+      background: #f9f9f9;
+      box-sizing: border-box;
+    }
   </style>
 </head>
 <body>
   <div class="main-row">
-    <div id="board"></div>
+    <div>
+      <div id="board"></div>
+      <div id="controls">
+        <button id="newGameBtn">New Game</button>
+        <button id="flipBtn">Flip Board</button>
+        <button id="chessExpertBtn">Ask a Chess Expert</button>
+        <button id="loadPositionBtn">Load Custom Position</button>
+      </div>
+      </div>
     <div id="side-panel">
       <div class="tab-buttons">
         <button class="tab-btn active" onclick="showTab('expert-tab', event)">Expert</button>
@@ -192,13 +210,24 @@
       </div>
     </div>
   </div>
-  <div id="controls">
-    <button id="newGameBtn">New Game</button>
-    <button id="flipBtn">Flip Board</button>
-    <button id="chessExpertBtn">Ask a Chess Expert</button>
-    <button id="loadPositionBtn">Load Custom Position</button>
+  <!-- Player info box below tab panel -->
+  <div id="player-info" style="
+    width:400px;
+    border:2px solid #444;
+    margin-left:calc(10% + 420px);
+    margin-top:0;
+    margin-bottom:16px;
+    padding:12px;
+    background:#f9f9f9;
+    box-sizing:border-box;
+  ">
+    <div style="margin-bottom:8px; text-align:left; font-weight:bold;">
+      White: <span id="player-info-white"></span>
   </div>
-
+  <div style="text-align:left; font-weight:bold;">
+    Black: <span id="player-info-black"></span>
+  </div>
+  </div>
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="chessboard.js"></script>
   <script>
@@ -331,8 +360,6 @@
     showExpertOptions();
   </script>
   <script src="player-selection.js"></script>
-  <!-- Add this to your index.html inside <head> for debugging -->
-  <!-- filepath: c:\Users\rober\Source\Repos\Chess-ai-app\ui\index.html -->
   <script>
     console.debug('index.html: loaded');
     document.addEventListener('DOMContentLoaded', function () {
