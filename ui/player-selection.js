@@ -21,11 +21,17 @@ document.addEventListener('DOMContentLoaded', function () {
       }
       if (this.id === 'white-hu') {
         document.getElementById('black-hu').disabled = this.checked;
-        console.debug('player-selection.js: white-hu changed, checked:', this.checked);
+        // Disable all opening checkboxes if human is White
+        document.querySelectorAll('#white-openings-list input[type="checkbox"]').forEach(function(box) {
+          box.disabled = this.checked;
+          if (this.checked) box.checked = false;
+        }, this);
       } else {
-        // If a non-human is selected for White, enable Black human checkbox
         document.getElementById('black-hu').disabled = false;
-        console.debug('player-selection.js: non-human white selected, black-hu enabled');
+        // Enable all opening checkboxes if not human
+        document.querySelectorAll('#white-openings-list input[type="checkbox"]').forEach(function(box) {
+          box.disabled = false;
+        });
       }
     });
   });
@@ -40,26 +46,173 @@ document.addEventListener('DOMContentLoaded', function () {
       }
       if (this.id === 'black-hu') {
         document.getElementById('white-hu').disabled = this.checked;
-        console.debug('player-selection.js: black-hu changed, checked:', this.checked);
+        // Disable all defense checkboxes if human is Black
+        document.querySelectorAll('#black-defenses-list input[type="checkbox"]').forEach(function(box) {
+          box.disabled = this.checked;
+          if (this.checked) box.checked = false;
+        }, this);
       } else {
-        // If a non-human is selected for Black, enable White human checkbox
         document.getElementById('white-hu').disabled = false;
-        console.debug('player-selection.js: non-human black selected, white-hu enabled');
+        // Enable all defense checkboxes if not human
+        document.querySelectorAll('#black-defenses-list input[type="checkbox"]').forEach(function(box) {
+          box.disabled = false;
+        });
       }
     });
   });
 
-  // Reset button logic: uncheck and re-enable all checkboxes
-  document.getElementById('resetPlayersBtn').addEventListener('click', function () {
-    const checkboxes = document.querySelectorAll('#ai-model-list input[type="checkbox"]');
-    checkboxes.forEach(function(box) {
+  // Only one opening can be selected at a time
+  document.querySelectorAll('#white-openings-list input[type="checkbox"]').forEach(function(checkbox) {
+    checkbox.addEventListener('change', function () {
+      if (this.checked) {
+        document.querySelectorAll('#white-openings-list input[type="checkbox"]').forEach(function(box) {
+          if (box !== checkbox) box.checked = false;
+        });
+      }
+    });
+  });
+
+  // Only one defense can be selected at a time
+  document.querySelectorAll('#black-defenses-list input[type="checkbox"]').forEach(function(checkbox) {
+    checkbox.addEventListener('change', function () {
+      if (this.checked) {
+        document.querySelectorAll('#black-defenses-list input[type="checkbox"]').forEach(function(box) {
+          if (box !== checkbox) box.checked = false;
+        });
+      }
+    });
+  });
+
+  // Reset button logic for strategy tab
+  document.getElementById('resetStrategyBtn').addEventListener('click', function () {
+    document.querySelectorAll('#white-openings-list input[type="checkbox"]').forEach(function(box) {
       box.checked = false;
       box.disabled = false;
     });
-    // Reset player-info display
-    document.getElementById('player-info-white').textContent = '';
-    document.getElementById('player-info-black').textContent = '';
-    console.debug('player-selection.js: resetPlayersBtn clicked, all checkboxes reset');
+    document.querySelectorAll('#black-defenses-list input[type="checkbox"]').forEach(function(box) {
+      box.checked = false;
+      box.disabled = false;
+    });
+  });
+
+  // Set button logic for strategy tab
+  document.getElementById('setStrategyBtn').addEventListener('click', function () {
+    const opening = document.querySelector('#white-openings-list input[type="checkbox"]:checked');
+    const defense = document.querySelector('#black-defenses-list input[type="checkbox"]:checked');
+    let openingLabel = '';
+    let defenseLabel = '';
+    if (opening) {
+      const label = opening.nextElementSibling;
+      openingLabel = label ? label.textContent : '';
+    }
+    if (defense) {
+      const label = defense.nextElementSibling;
+      defenseLabel = label ? label.textContent : '';
+    }
+    document.getElementById('player-info-opening').textContent = openingLabel;
+    document.getElementById('player-info-defense').textContent = defenseLabel;
+  });
+
+  // Only one checkbox per White column
+  document.querySelectorAll('#ai-model-list input[id^="white-"]').forEach(function(checkbox) {
+    checkbox.addEventListener('change', function () {
+      if (this.checked) {
+        document.querySelectorAll('#ai-model-list input[id^="white-"]').forEach(function(box) {
+          if (box !== checkbox) box.checked = false;
+        });
+      }
+      if (this.id === 'white-hu') {
+        document.getElementById('black-hu').disabled = this.checked;
+        // Disable all opening checkboxes if human is White
+        document.querySelectorAll('#white-openings-list input[type="checkbox"]').forEach(function(box) {
+          box.disabled = this.checked;
+          if (this.checked) box.checked = false;
+        }, this);
+      } else {
+        document.getElementById('black-hu').disabled = false;
+        // Enable all opening checkboxes if not human
+        document.querySelectorAll('#white-openings-list input[type="checkbox"]').forEach(function(box) {
+          box.disabled = false;
+        });
+      }
+    });
+  });
+
+  // Only one checkbox per Black column
+  document.querySelectorAll('#ai-model-list input[id^="black-"]').forEach(function(checkbox) {
+    checkbox.addEventListener('change', function () {
+      if (this.checked) {
+        document.querySelectorAll('#ai-model-list input[id^="black-"]').forEach(function(box) {
+          if (box !== checkbox) box.checked = false;
+        });
+      }
+      if (this.id === 'black-hu') {
+        document.getElementById('white-hu').disabled = this.checked;
+        // Disable all defense checkboxes if human is Black
+        document.querySelectorAll('#black-defenses-list input[type="checkbox"]').forEach(function(box) {
+          box.disabled = this.checked;
+          if (this.checked) box.checked = false;
+        }, this);
+      } else {
+        document.getElementById('white-hu').disabled = false;
+        // Enable all defense checkboxes if not human
+        document.querySelectorAll('#black-defenses-list input[type="checkbox"]').forEach(function(box) {
+          box.disabled = false;
+        });
+      }
+    });
+  });
+
+  // Only one opening can be selected at a time
+  document.querySelectorAll('#white-openings-list input[type="checkbox"]').forEach(function(checkbox) {
+    checkbox.addEventListener('change', function () {
+      if (this.checked) {
+        document.querySelectorAll('#white-openings-list input[type="checkbox"]').forEach(function(box) {
+          if (box !== checkbox) box.checked = false;
+        });
+      }
+    });
+  });
+
+  // Only one defense can be selected at a time
+  document.querySelectorAll('#black-defenses-list input[type="checkbox"]').forEach(function(checkbox) {
+    checkbox.addEventListener('change', function () {
+      if (this.checked) {
+        document.querySelectorAll('#black-defenses-list input[type="checkbox"]').forEach(function(box) {
+          if (box !== checkbox) box.checked = false;
+        });
+      }
+    });
+  });
+
+  // Reset button logic for strategy tab
+  document.getElementById('resetStrategyBtn').addEventListener('click', function () {
+    document.querySelectorAll('#white-openings-list input[type="checkbox"]').forEach(function(box) {
+      box.checked = false;
+      box.disabled = false;
+    });
+    document.querySelectorAll('#black-defenses-list input[type="checkbox"]').forEach(function(box) {
+      box.checked = false;
+      box.disabled = false;
+    });
+  });
+
+  // Set button logic for strategy tab
+  document.getElementById('setStrategyBtn').addEventListener('click', function () {
+    const opening = document.querySelector('#white-openings-list input[type="checkbox"]:checked');
+    const defense = document.querySelector('#black-defenses-list input[type="checkbox"]:checked');
+    let openingLabel = '';
+    let defenseLabel = '';
+    if (opening) {
+      const label = opening.nextElementSibling;
+      openingLabel = label ? label.textContent : '';
+    }
+    if (defense) {
+      const label = defense.nextElementSibling;
+      defenseLabel = label ? label.textContent : '';
+    }
+    document.getElementById('player-info-opening').textContent = openingLabel;
+    document.getElementById('player-info-defense').textContent = defenseLabel;
   });
 
   // Set button logic: set player names in player-info box
