@@ -18,7 +18,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pytest pexpect python-dotenv stockfish
+        pip install pytest pexpect python-dotenv stockfish pytest-mock
     - name: Set dummy OpenAI API key for tests
       run: echo "OPENAI_API_KEY=dummy" >> $GITHUB_ENV
     - name: Run pytest (passwordless test mode)

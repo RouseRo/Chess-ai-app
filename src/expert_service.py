@@ -121,6 +121,22 @@ class ExpertService:
         except Exception as e:
             return f"{RED}Sorry, I couldn't fetch the news. Error: {e}{ENDC}"
 
+    def get_a_joke(self):
+        """
+        Fetch a chess joke from the Chessmaster AI model and persist it if not a recent duplicate.
+        Returns the joke as a string.
+        """
+        try:
+            expert_player = AIPlayer(model_name=self.expert_model_name)
+            prompt = (
+                "Tell me a chess joke. Make it original, clever, and suitable for all ages."
+            )
+            joke = expert_player.get_chess_fact_or_answer(prompt)
+            self._save_chess_joke(joke)
+            return joke
+        except Exception as e:
+            return f"{RED}Sorry, I couldn't get a joke. Error: {e}{ENDC}"
+
     # ---------- Internal persistence helpers (unchanged) ----------
 
     def _save_chess_joke(self, joke_text: str) -> bool:

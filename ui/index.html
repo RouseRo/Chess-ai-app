@@ -78,7 +78,116 @@
       </div>
       <div id="players-tab" class="tab-content" style="display:none;">
         <div id="players-content">
-          <p>Players tab coming soon. Here you will be able to select White and Black players.</p>
+          <p style="font-weight:bold; margin-bottom:8px; display: flex;">
+            <span style="flex-basis:15%; text-align:center;">White</span>
+            <span style="flex-basis:15%; text-align:center;">Black</span>
+            <span style="flex-basis:70%; text-align:left;">Player Name</span>
+          </p>
+          <div id="ai-model-list">
+            <div style="display: flex; margin-bottom:6px;">
+              <span style="flex-basis:15%; text-align:center;">
+                <input type="checkbox" id="white-hu">
+              </span>
+              <span style="flex-basis:15%; text-align:center;">
+                <input type="checkbox" id="black-hu">
+              </span>
+              <span style="flex-basis:70%; text-align:left;">
+                hu: human
+              </span>
+            </div>
+            <div style="display: flex; margin-bottom:6px;">
+              <span style="flex-basis:15%; text-align:center;">
+                <input type="checkbox" id="white-m1">
+              </span>
+              <span style="flex-basis:15%; text-align:center;">
+                <input type="checkbox" id="black-m1">
+              </span>
+              <span style="flex-basis:70%; text-align:left;">
+                m1: openai/gpt-4o
+              </span>
+            </div>
+            <div style="display: flex; margin-bottom:6px;">
+              <span style="flex-basis:15%; text-align:center;">
+                <input type="checkbox" id="white-m2">
+              </span>
+              <span style="flex-basis:15%; text-align:center;">
+                <input type="checkbox" id="black-m2">
+              </span>
+              <span style="flex-basis:70%; text-align:left;">
+                m2: deepseek/deepseek-chat-v3.1
+              </span>
+            </div>
+            <div style="display: flex; margin-bottom:6px;">
+              <span style="flex-basis:15%; text-align:center;">
+                <input type="checkbox" id="white-m3">
+              </span>
+              <span style="flex-basis:15%; text-align:center;">
+                <input type="checkbox" id="black-m3">
+              </span>
+              <span style="flex-basis:70%; text-align:left;">
+                m3: google/gemini-2.5-pro
+              </span>
+            </div>
+            <div style="display: flex; margin-bottom:6px;">
+              <span style="flex-basis:15%; text-align:center;">
+                <input type="checkbox" id="white-m4">
+              </span>
+              <span style="flex-basis:15%; text-align:center;">
+                <input type="checkbox" id="black-m4">
+              </span>
+              <span style="flex-basis:70%; text-align:left;">
+                m4: anthropic/claude-3-opus
+              </span>
+            </div>
+            <div style="display: flex; margin-bottom:6px;">
+              <span style="flex-basis:15%; text-align:center;">
+                <input type="checkbox" id="white-m5">
+              </span>
+              <span style="flex-basis:15%; text-align:center;">
+                <input type="checkbox" id="black-m5">
+              </span>
+              <span style="flex-basis:70%; text-align:left;">
+                m5: meta-llama/llama-3-70b-instruct
+              </span>
+            </div>
+            <div style="display: flex; margin-bottom:6px;">
+              <span style="flex-basis:15%; text-align:center;">
+                <input type="checkbox" id="white-s1">
+              </span>
+              <span style="flex-basis:15%; text-align:center;">
+                <input type="checkbox" id="black-s1">
+              </span>
+              <span style="flex-basis:70%; text-align:left;">
+                s1: skill level: 5
+              </span>
+            </div>
+            <div style="display: flex; margin-bottom:6px;">
+              <span style="flex-basis:15%; text-align:center;">
+                <input type="checkbox" id="white-s2">
+              </span>
+              <span style="flex-basis:15%; text-align:center;">
+                <input type="checkbox" id="black-s2">
+              </span>
+              <span style="flex-basis:70%; text-align:left;">
+                s2: skill level: 10
+              </span>
+            </div>
+            <div style="display: flex; margin-bottom:6px;">
+              <span style="flex-basis:15%; text-align:center;">
+                <input type="checkbox" id="white-s3">
+              </span>
+              <span style="flex-basis:15%; text-align:center;">
+                <input type="checkbox" id="black-s3">
+              </span>
+              <span style="flex-basis:70%; text-align:left;">
+                s3: skill level: 20
+              </span>
+            </div>
+          </div>
+          <div style="width:100%; display:flex; justify-content:center; margin-top:18px;">
+            <button id="setPlayersBtn" style="padding:8px 24px; margin-right:12px;">Set</button>
+            <button id="resetPlayersBtn" style="padding:8px 24px;">Reset</button>
+          </div>
         </div>
       </div>
     </div>
@@ -149,7 +258,7 @@
         document.getElementById('expert-content').innerHTML += `<p><b>Expert:</b> Please enter a question or request for the Chess Expert.</p>`;
         return;
       } else if (/joke/i.test(input)) {
-        url = "http://localhost:8000/expert/fact";
+        url = "http://localhost:8000/expert/joke";
         options = { method: "GET" };
       } else if (/fact/i.test(input)) {
         url = "http://localhost:8000/expert/fact";
@@ -184,7 +293,7 @@
         body: JSON.stringify({ move: move, fen: fen })
       })
         .then(response => response.json())
-        .then(data => {
+        .then(function (data) {
           board.position(data.fen);
           updateExpertContent(
             `Status: ${data.status}`,
@@ -192,7 +301,7 @@
             move
           );
         })
-        .catch(err => {
+        .catch(function (err) {
           updateExpertContent("Error communicating with engine: " + err, fen, move);
         });
     }
@@ -220,6 +329,15 @@
 
     // Initialize default tab content
     showExpertOptions();
+  </script>
+  <script src="player-selection.js"></script>
+  <!-- Add this to your index.html inside <head> for debugging -->
+  <!-- filepath: c:\Users\rober\Source\Repos\Chess-ai-app\ui\index.html -->
+  <script>
+    console.debug('index.html: loaded');
+    document.addEventListener('DOMContentLoaded', function () {
+      console.debug('index.html: DOMContentLoaded');
+    });
   </script>
 </body>
 </html>

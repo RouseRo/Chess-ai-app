@@ -84,3 +84,7 @@ def get_chess_news():
 @app.post("/expert/ask")
 def ask_expert(req: ExpertRequest):
     return {"response": expert_service.ask_expert(question=req.question)}
+
+@app.get("/expert/joke")
+def get_expert_joke():
+    return {"response": expert_service.get_a_joke()}
