@@ -312,6 +312,17 @@
       document.getElementById('expert-content').innerHTML = html;
     }
 
+    function updateGameContent(status, fen, move) {
+      let html = `<p>${status}</p>`;
+      if (typeof move !== "undefined") {
+        html += `<pre>Move: ${move}</pre>`;
+      }
+      if (typeof fen !== "undefined") {
+        html += `<pre>FEN: ${fen}</pre>`;
+      }
+      document.getElementById('game-content').innerHTML = html;
+    }
+
     function showExpertOptions() {
       const html = `
         <p><b>Chess Expert:</b> I can help you with the following:</p>
@@ -378,36 +389,36 @@
         .then(response => response.json())
         .then(function (data) {
           board.position(data.fen);
-          updateExpertContent(
+          updateGameContent(
             `Status: ${data.status}`,
             data.fen,
             move
           );
         })
         .catch(function (err) {
-          updateExpertContent("Error communicating with engine: " + err, fen, move);
+          updateGameContent("Error communicating with engine: " + err, fen, move);
         });
     }
 
     document.getElementById('newGameBtn').onclick = function() {
       board.start();
-      updateExpertContent("New game started.", board.fen());
+      updateGameContent("New game started.", board.fen());
     };
 
     document.getElementById('flipBtn').onclick = function() {
       board.flip();
-      updateExpertContent("Board flipped.", board.fen());
+      updateGameContent("Board flipped.", board.fen());
     };
 
     document.getElementById('chessExpertBtn').onclick = function () {
-      showTab('expert-tab', {target: document.querySelector('.tab-btn:nth-child(1)')});
+      showTab('expert-tab', {target: document.querySelector('.tab-btn:nth-child(2)')});
       showExpertOptions();
     };
 
     document.getElementById('loadPositionBtn').onclick = function() {
       var fen = 'rnbqkb1r/pppppppp/8/8/8/8/PPPPPPP1/RNBQKBNR w KQkq - 0 1';
       board.position(fen);
-      updateExpertContent("Loaded custom position.", fen);
+      updateGameContent("Loaded custom position.", fen);
     };
 
     // Initialize default tab content
