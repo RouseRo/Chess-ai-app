@@ -11,6 +11,51 @@ A console-based chess application supporting human and AI players, classic chess
 - View player stats and practice positions
 - Ask chess-related questions to an integrated chess expert
 
+## API Project Overview
+
+The Chess AI App also includes an API project that integrates the `engine/` and `ui/` directories:
+
+- **engine/**: Contains the chess engine logic, including AI integrations and move generation.
+- **ui/**: Contains the web-based user interface, built with TypeScript, HTML, and CSS.
+- **API**: Exposes endpoints for chess moves, expert questions, and game management. The API is built using FastAPI (Python) and connects the engine to the UI.
+
+### Running the API Project
+
+1. **Install dependencies**
+   - For the engine (Python):
+     ```
+     pip install -r engine/requirements.txt
+     ```
+   - For the UI (Node.js/TypeScript):
+     ```
+     cd ui
+     npm install
+     npm run build
+     ```
+
+2. **Start the API server**
+   ```
+   cd engine
+   uvicorn main:app --reload
+   ```
+
+3. **Start the UI**
+   - Serve the UI from the `ui/dist` directory using your preferred static file server or Docker.
+
+4. **Docker Compose**
+   - The project includes a `docker-compose.yml` for building and running both the engine and UI containers together:
+     ```
+     docker-compose build --no-cache
+     docker-compose up
+     ```
+
+### API Endpoints
+
+- `/move`: Submit a chess move and get the updated board state.
+- `/expert/question`: Ask chess-related questions.
+- `/expert/joke`, `/expert/fact`, `/expert/news`: Get chess jokes, facts, and news.
+- Additional endpoints for game management and logging.
+
 ## How to Use
 
 1. **Install dependencies**  
