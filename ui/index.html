@@ -86,11 +86,17 @@
     </div>
     <div id="side-panel">
       <div class="tab-buttons">
-        <button class="tab-btn active" onclick="showTab('expert-tab', event)">Expert</button>
+        <button class="tab-btn active" onclick="showTab('game-tab', event)">Game</button>
+        <button class="tab-btn" onclick="showTab('expert-tab', event)">Expert</button>
         <button class="tab-btn" onclick="showTab('players-tab', event)">Players</button>
         <button class="tab-btn" onclick="showTab('strategy-tab', event)">Strategy</button>
       </div>
-      <div id="expert-tab" class="tab-content" style="display:block;">
+      <div id="game-tab" class="tab-content" style="display:block;">
+        <div id="game-content">
+          <p>Welcome to the Chess Game tab!</p>
+        </div>
+      </div>
+      <div id="expert-tab" class="tab-content" style="display:none;">
         <div id="expert-content">
           <p>Welcome to the Chess Expert tab!</p>
         </div>
