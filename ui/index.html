@@ -61,15 +61,34 @@
       margin-bottom: 10px;
       margin-left: 10%;
     }
+    #player-info {
+      width: 400px;
+      border: 2px solid #444;
+      margin-left: calc(10% + 420px);
+      margin-top: 20px; /* aligns with controls */
+      margin-bottom: 16px;
+      padding: 12px;
+      background: #f9f9f9;
+      box-sizing: border-box;
+    }
   </style>
 </head>
 <body>
   <div class="main-row">
-    <div id="board"></div>
+    <div>
+      <div id="board"></div>
+      <div id="controls">
+        <button id="newGameBtn">New Game</button>
+        <button id="flipBtn">Flip Board</button>
+        <button id="chessExpertBtn">Ask a Chess Expert</button>
+        <button id="loadPositionBtn">Load Custom Position</button>
+      </div>
+    </div>
     <div id="side-panel">
       <div class="tab-buttons">
         <button class="tab-btn active" onclick="showTab('expert-tab', event)">Expert</button>
         <button class="tab-btn" onclick="showTab('players-tab', event)">Players</button>
+        <button class="tab-btn" onclick="showTab('strategy-tab', event)">Strategy</button>
       </div>
       <div id="expert-tab" class="tab-content" style="display:block;">
         <div id="expert-content">
@@ -190,15 +209,73 @@
           </div>
         </div>
       </div>
+      <div id="strategy-tab" class="tab-content" style="display:none;">
+        <div id="strategy-content">
+          <div style="font-weight:bold; margin-bottom:8px;">White Openings</div>
+          <div id="white-openings-list">
+            <div>
+              <input type="checkbox" id="white-opening-0">
+              <label for="white-opening-0">No Classic Chess Opening</label>
+            </div>
+            <div>
+              <input type="checkbox" id="white-opening-1">
+              <label for="white-opening-1">Play the Ruy Lopez.</label>
+            </div>
+            <div>
+              <input type="checkbox" id="white-opening-2">
+              <label for="white-opening-2">Play the Italian Game.</label>
+            </div>
+            <div>
+              <input type="checkbox" id="white-opening-3">
+              <label for="white-opening-3">Play the Queen's Gambit.</label>
+            </div>
+            <div>
+              <input type="checkbox" id="white-opening-4">
+              <label for="white-opening-4">Play the London System.</label>
+            </div>
+            <div>
+              <input type="checkbox" id="white-opening-5">
+              <label for="white-opening-5">Play the King's Gambit.</label>
+            </div>
+          </div>
+          <div style="font-weight:bold; margin:16px 0 8px 0;">Black Defenses</div>
+          <div id="black-defenses-list">
+            <div>
+              <input type="checkbox" id="black-defense-a">
+              <label for="black-defense-a">Play the Sicilian Defense.</label>
+            </div>
+            <div>
+              <input type="checkbox" id="black-defense-b">
+              <label for="black-defense-b">Play the French Defense.</label>
+            </div>
+            <div>
+              <input type="checkbox" id="black-defense-c">
+              <label for="black-defense-c">Play the Caro-Kann Defense.</label>
+            </div>
+            <div>
+              <input type="checkbox" id="black-defense-z">
+              <label for="black-defense-z">No Classic Chess Defense</label>
+            </div>
+          </div>
+          <!-- Add Set and Reset buttons at the bottom -->
+          <div style="width:100%; display:flex; justify-content:center; margin-top:18px;">
+            <button id="setStrategyBtn" style="padding:8px 24px; margin-right:12px;">Set</button>
+            <button id="resetStrategyBtn" style="padding:8px 24px;">Reset</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
-  <div id="controls">
-    <button id="newGameBtn">New Game</button>
-    <button id="flipBtn">Flip Board</button>
-    <button id="chessExpertBtn">Ask a Chess Expert</button>
-    <button id="loadPositionBtn">Load Custom Position</button>
+  <div id="player-info">
+    <div style="margin-bottom:8px; text-align:left; font-weight:bold; display:flex; align-items:center;">
+      <span>White: <span id="player-info-white"></span></span>
+      <span style="margin-left:24px;">Opening: <span id="player-info-opening"></span></span>
+    </div>
+    <div style="text-align:left; font-weight:bold; display:flex; align-items:center;">
+      <span>Black: <span id="player-info-black"></span></span>
+      <span style="margin-left:24px;">Defense: <span id="player-info-defense"></span></span>
+    </div>
   </div>
-
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="chessboard.js"></script>
   <script>
@@ -330,9 +407,7 @@
     // Initialize default tab content
     showExpertOptions();
   </script>
-  <script src="player-selection.js"></script>
-  <!-- Add this to your index.html inside <head> for debugging -->
-  <!-- filepath: c:\Users\rober\Source\Repos\Chess-ai-app\ui\index.html -->
+  <script src="dist/player-selection.js"></script>
   <script>
     console.debug('index.html: loaded');
     document.addEventListener('DOMContentLoaded', function () {

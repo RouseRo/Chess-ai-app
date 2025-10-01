@@ -4,10 +4,7 @@
   "description": "Frontend for Chess AI App using TypeScript",
   "main": "index.js",
   "scripts": {
-    "build": "tsc",
-    "start": "lite-server",
-    "watch": "tsc --watch",
-    "clean": "rm -rf dist"
+    "build": "tsc"
   },
   "author": "",
   "license": "MIT",
