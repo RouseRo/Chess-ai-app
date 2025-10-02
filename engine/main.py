@@ -47,19 +47,28 @@ async def move(request: Request):
     data = await request.json()
     move = data.get("move")
     fen = data.get("fen")
-    # Process user's move and engine's move here
-    # For example, using python-chess:
-    import chess
     board = chess.Board(fen)
-    board.push_san(move.replace('-', ''))  # Convert e2-e4 to e2e4 if needed
-    # Engine makes its move (example: e7e5)
-    engine_move = "e7e5"
-    board.push_san(engine_move)
+
+    user_move_uci = move.replace("-", "")
+    board.push_uci(user_move_uci)
+
+    # Pick a legal engine move (random for demo)
+    import random
+    legal_moves = list(board.legal_moves)
+    if legal_moves:
+        engine_move = random.choice(legal_moves)
+        board.push(engine_move)
+        engine_move_uci = engine_move.uci()
+        status = "Move accepted"
+    else:
+        engine_move_uci = None
+        status = "No legal moves for engine"
+
     new_fen = board.fen()
     return JSONResponse({
-        "status": "Move accepted",
+        "status": status,
         "fen": new_fen,
-        "engine_move": engine_move,
+        "engine_move": engine_move_uci,
         "source": "chess-engine-1"
     })
 
