@@ -301,17 +301,6 @@
       event.target.classList.add('active');
     }
 
-    function updateExpertContent(status, fen, move) {
-      let html = `<p>${status}</p>`;
-      if (typeof move !== "undefined") {
-        html += `<pre>Move: ${move}</pre>`;
-      }
-      if (typeof fen !== "undefined") {
-        html += `<pre>FEN: ${fen}</pre>`;
-      }
-      document.getElementById('expert-content').innerHTML = html;
-    }
-
     function updateGameContent(status, fen, move) {
       let html = `<p>${status}</p>`;
       if (typeof move !== "undefined") {
@@ -388,9 +377,22 @@
       })
         .then(response => response.json())
         .then(function (data) {
-          board.position(data.fen);
+          board.position(data.fen); // Update board with new FEN from engine
+
+          // Display move response details and new FEN on the game tab panel
+          let moveInfo = `Status: ${data.status}`;
+          if (data.engine_move) {
+            moveInfo += `<br>Engine Move: ${data.engine_move}`;
+          }
+          if (data.source) {
+            moveInfo += `<br>Source: ${data.source}`;
+          } else {
+            moveInfo += `<br>Source: chess-engine-1`;
+          }
+          moveInfo += `<br>New FEN: ${data.fen}`; // Show new FEN value
+
           updateGameContent(
-            `Status: ${data.status}`,
+            moveInfo,
             data.fen,
             move
           );
