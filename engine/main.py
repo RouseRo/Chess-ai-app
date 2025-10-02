@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Response, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 import chess
@@ -42,13 +43,25 @@ class MoveRequest(BaseModel):
     move: str  # SAN or UCI
 
 @app.post("/move")
-def make_move(req: MoveRequest):
-    board = chess.Board(req.fen)
-    try:
-        board.push_san(req.move)
-        return {"fen": board.fen(), "status": "ok"}
-    except Exception as e:
-        return {"fen": req.fen, "status": f"error: {str(e)}"}
+async def move(request: Request):
+    data = await request.json()
+    move = data.get("move")
+    fen = data.get("fen")
+    # Process user's move and engine's move here
+    # For example, using python-chess:
+    import chess
+    board = chess.Board(fen)
+    board.push_san(move.replace('-', ''))  # Convert e2-e4 to e2e4 if needed
+    # Engine makes its move (example: e7e5)
+    engine_move = "e7e5"
+    board.push_san(engine_move)
+    new_fen = board.fen()
+    return JSONResponse({
+        "status": "Move accepted",
+        "fen": new_fen,
+        "engine_move": engine_move,
+        "source": "chess-engine-1"
+    })
 
 @app.options("/move")
 def options_move():
