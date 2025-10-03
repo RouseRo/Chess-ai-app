@@ -62,7 +62,7 @@
       margin-left: 10%;
     }
     #player-info {
-      width: 400px;
+      width: 450px;
       border: 2px solid #444;
       margin-left: calc(10% + 420px);
       margin-top: 20px; /* aligns with controls */
@@ -306,10 +306,31 @@
       if (typeof move !== "undefined") {
         html += `<pre>Move: ${move}</pre>`;
       }
+      /*
       if (typeof fen !== "undefined") {
         html += `<pre>FEN: ${fen}</pre>`;
       }
+      */
+
+      // Check if both players are non-human
+      const whiteNonHuman = document.getElementById('white-hu') && !document.getElementById('white-hu').checked;
+      const blackNonHuman = document.getElementById('black-hu') && !document.getElementById('black-hu').checked;
+      if (whiteNonHuman && blackNonHuman) {
+        html += `<button id="startAiGameBtn" style="margin-top:10px;padding:8px 24px;">Start</button>`;
+      }
+
       document.getElementById('game-content').innerHTML = html;
+
+      // Add event listener for the start button if present
+      const startBtn = document.getElementById('startAiGameBtn');
+      if (startBtn) {
+        startBtn.onclick = function () {
+          // Standard chess starting position FEN
+          const startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+          // Send to engine for White's move
+          sendMoveToEngine(null, startFEN);
+        };
+      }
     }
 
     function showExpertOptions() {
@@ -384,12 +405,14 @@
           if (data.engine_move) {
             moveInfo += `<br>Engine Move: ${data.engine_move}`;
           }
+          /*
           if (data.source) {
             moveInfo += `<br>Source: ${data.source}`;
           } else {
             moveInfo += `<br>Source: chess-engine-1`;
           }
           moveInfo += `<br>New FEN: ${data.fen}`; // Show new FEN value
+          */
 
           updateGameContent(
             moveInfo,
