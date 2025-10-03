@@ -316,19 +316,33 @@
       const whiteNonHuman = document.getElementById('white-hu') && !document.getElementById('white-hu').checked;
       const blackNonHuman = document.getElementById('black-hu') && !document.getElementById('black-hu').checked;
       if (whiteNonHuman && blackNonHuman) {
-        html += `<button id="startAiGameBtn" style="margin-top:10px;padding:8px 24px;">Start</button>`;
+        html += `<button id="whiteAiMoveBtn" style="margin-top:10px;padding:8px 24px;">White</button>`;
+        html += `<button id="blackAiMoveBtn" style="margin-top:10px;margin-left:10px;padding:8px 24px;">Black</button>`;
       }
 
       document.getElementById('game-content').innerHTML = html;
 
-      // Add event listener for the start button if present
-      const startBtn = document.getElementById('startAiGameBtn');
-      if (startBtn) {
-        startBtn.onclick = function () {
-          // Standard chess starting position FEN
-          const startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-          // Send to engine for White's move
+      // Add event listeners for the White and Black buttons if present
+      const whiteBtn = document.getElementById('whiteAiMoveBtn');
+      if (whiteBtn) {
+        whiteBtn.onclick = function () {
+          // Standard chess starting position FEN or current FEN
+          const startFEN = fen || "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+          // Request engine for White's move (move=null)
           sendMoveToEngine(null, startFEN);
+        };
+      }
+      const blackBtn = document.getElementById('blackAiMoveBtn');
+      if (blackBtn) {
+        blackBtn.onclick = function () {
+          // Use current FEN, but set to black's turn if needed
+          let blackFEN = fen;
+          if (blackFEN && !blackFEN.includes(' b ')) {
+            // If not black's turn, switch turn in FEN
+            blackFEN = blackFEN.replace(' w ', ' b ');
+          }
+          // Request engine for Black's move (move=null)
+          sendMoveToEngine(null, blackFEN);
         };
       }
     }
