@@ -49,10 +49,12 @@ async def move(request: Request):
     fen = data.get("fen")
     board = chess.Board(fen)
 
-    user_move_uci = move.replace("-", "")
-    board.push_uci(user_move_uci)
+    # Only push user's move if provided
+    if move is not None:
+        user_move_uci = move.replace("-", "")
+        board.push_uci(user_move_uci)
 
-    # Pick a legal engine move (random for demo)
+    # Engine move (pick a random legal move for demo)
     import random
     legal_moves = list(board.legal_moves)
     if legal_moves:
