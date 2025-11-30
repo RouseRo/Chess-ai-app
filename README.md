@@ -22,6 +22,7 @@ A web-based chess application supporting human and AI players, with classic ches
 - **Player Stats**: View player statistics and practice positions
 - **Chess Expert**: Ask chess-related questions to an integrated expert assistant
 - **Interactive UI**: Drag-and-drop chessboard with real-time game updates
+- **Command-line Interface**: Play chess directly from the terminal
 
 ## Project Structure
 
@@ -36,6 +37,7 @@ Chess-ai-app/
 │   ├── chessboard.js   # Chessboard library
 │   └── chessboard.css  # Styling
 ├── src/                # Core application logic
+│   ├── main.py         # Command-line entry point
 │   ├── chess_game.py   # Game logic
 │   ├── expert_service.py # Expert AI service
 │   └── config.json     # Configuration
@@ -76,7 +78,36 @@ Chess-ai-app/
 
 ## Running the Application
 
-### Option 1: Docker Compose (Recommended)
+### Option 1: Command-line Version
+
+Run the application directly from the terminal:
+
+```powershell
+cd C:\Users\rober\Source\Repos\Chess-ai-app
+python -m src.main
+```
+
+This will display the main menu:
+```
+--- Main Menu ---
+  1: Play a New Game
+  2: Load a Saved Game
+  3: Load a Practice Position
+  4: View Player Stats
+  ?: Ask a Chess Expert
+  q: Quit
+Enter your choice:
+```
+
+**Menu Options:**
+- **1: Play a New Game** - Start a new chess game with player and strategy selection
+- **2: Load a Saved Game** - Load a previously saved game from logs
+- **3: Load a Practice Position** - Load a specific chess position to practice
+- **4: View Player Stats** - View statistics for configured players
+- **?: Ask a Chess Expert** - Ask chess-related questions to the expert
+- **q: Quit** - Exit the application
+
+### Option 2: Docker Compose (Web UI - Recommended)
 
 1. **Start Docker Desktop**
    ```powershell
@@ -101,7 +132,7 @@ Chess-ai-app/
    docker-compose down
    ```
 
-### Option 2: Manual Setup (Engine + UI Separately)
+### Option 3: Manual Setup (Engine + UI Separately)
 
 **Terminal 1: Start the Engine**
 ```powershell
@@ -117,7 +148,7 @@ python -m http.server 8080
 ```
 UI runs on: `http://localhost:8080`
 
-### Option 3: VS Code Live Server
+### Option 4: VS Code Live Server
 
 1. Install the **Live Server** extension in VS Code
 2. Right-click on `ui/index.html`
@@ -137,6 +168,8 @@ UI runs on: `http://localhost:8080`
 - **Move History**: See all moves played in the game
 
 ### Accessing the Interface
+
+To view the chessboard in the browser, the URL is **`http://localhost:8080/`**
 
 | Method | URL | Steps |
 |--------|-----|-------|
@@ -204,6 +237,7 @@ All games are logged to `logs/games/` with complete game information:
 - All strategy selections are recorded in the game log file
 - The FEN notation indicates whose turn it is and the board state after the previous move
 - When both players are AI, use the White/Black buttons to make sequential moves
+- You can play via command-line or use the web interface depending on your preference
 
 ---
 
