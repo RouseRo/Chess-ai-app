@@ -3,5 +3,5 @@
     "smtp_port": "587",
     "smtp_username": "robert.k.rouse@gmail.com",
     "smtp_password": "",
-    "from_email": "chess-app@yourdomain.com"
+    "from_email": "robert.k.rouse@gmail.com"
 }

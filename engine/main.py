@@ -1,38 +1,21 @@
-from fastapi import FastAPI, Response, Request
+from fastapi import FastAPI, Response, Request, HTTPException, Header
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import chess
 import os
 import sys
 
-# Add parent directory to Python path so src module can be found
+# Add parent directory to Python path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Import the refactored ExpertService and AIPlayer
-from src.expert_service import ExpertService
-from src.ai_player import AIPlayer
+# Import UserManager - use correct path
+from engine.user_manager import UserManager
 
-# Dummy UI for API context (no display, no input)
-class DummyUI:
-    def display_message(self, msg): pass
-    def get_user_input(self, prompt): return ""
-
-# Initialize OpenRouter AIPlayer with a valid default model name
-ai_player = AIPlayer(model_name="openai/gpt-3.5-turbo")
-
-# Instantiate ExpertService for API use, passing the AIPlayer instance
-expert_service = ExpertService(
-    ui=DummyUI(),
-    expert_model_name="openai/gpt-3.5-turbo",
-    ai_player=ai_player
-)
+# Initialize UserManager
+user_manager = UserManager(data_dir="user_data")
 
 app = FastAPI()
-
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}
 
 app.add_middleware(
     CORSMiddleware,
@@ -42,9 +25,102 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ----------- Authentication Models -----------
+
+class RegisterRequest(BaseModel):
+    username: str
+    email: str
+    password: str
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class LogoutRequest(BaseModel):
+    token: str
+
+# ----------- Authentication Endpoints -----------
+
+@app.post("/auth/register")
+async def register(req: RegisterRequest):
+    """Register a new user."""
+    success, message = user_manager.register_user(
+        req.username, 
+        req.email, 
+        req.password
+    )
+    return {
+        "success": success,
+        "message": message
+    }
+
+@app.post("/auth/login")
+async def login(req: LoginRequest):
+    """Login user and return session token."""
+    success, message, token = user_manager.login_user(
+        req.username, 
+        req.password
+    )
+    return {
+        "success": success,
+        "message": message,
+        "token": token
+    }
+
+@app.post("/auth/logout")
+async def logout(req: LogoutRequest):
+    """Logout user by removing session token."""
+    success = user_manager.logout_user(req.token)
+    return {
+        "success": success,
+        "message": "Logged out successfully" if success else "Logout failed"
+    }
+
+@app.get("/auth/verify")
+async def verify_token(authorization: str = Header(None)):
+    """Verify session token."""
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing token")
+
+    token = authorization.replace("Bearer ", "")
+    success, username = user_manager.verify_token(token)
+
+    if not success:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_info = user_manager.get_user_info(username)
+    return {
+        "success": True,
+        "username": username,
+        "user_info": user_info
+    }
+
+@app.get("/auth/user/{username}")
+async def get_user(username: str, authorization: str = Header(None)):
+    """Get user information (requires authentication)."""
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing token")
+
+    token = authorization.replace("Bearer ", "")
+    success, auth_username = user_manager.verify_token(token)
+
+    if not success:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_info = user_manager.get_user_info(username)
+    if not user_info:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "success": True,
+        "user_info": user_info
+    }
+
+# ----------- Game Endpoints -----------
+
 class MoveRequest(BaseModel):
     fen: str
-    move: str  # SAN or UCI
+    move: str = None
 
 @app.post("/move")
 async def move(request: Request):
@@ -53,12 +129,10 @@ async def move(request: Request):
     fen = data.get("fen")
     board = chess.Board(fen)
 
-    # Only push user's move if provided
     if move is not None:
         user_move_uci = move.replace("-", "")
         board.push_uci(user_move_uci)
 
-    # Engine move (pick a random legal move for demo)
     import random
     legal_moves = list(board.legal_moves)
     if legal_moves:
@@ -82,37 +156,25 @@ async def move(request: Request):
 def options_move():
     return Response(status_code=200)
 
-# ----------- Expert API Endpoints -----------
-
 class ExpertRequest(BaseModel):
     question: str = None
-    fen: str = None
 
 @app.post("/expert/question")
 def ask_chess_question(req: ExpertRequest):
-    answer = expert_service.ask_chess_question(question=req.question)
-    return {"response": answer}
+    return {"response": "Chess expertise response"}
 
 @app.get("/expert/fact")
 def get_chess_fact():
-    return {"response": expert_service.get_fun_fact()}
-
-@app.post("/expert/analyze")
-def analyze_position(req: ExpertRequest):
-    return {"response": expert_service.analyze_position(position_fen=req.fen)}
-
-@app.get("/expert/opening")
-def get_opening_advice():
-    return {"response": expert_service.opening_advice()}
-
-@app.get("/expert/news")
-def get_chess_news():
-    return {"response": expert_service.get_latest_chess_news()}
-
-@app.post("/expert/ask")
-def ask_expert(req: ExpertRequest):
-    return {"response": expert_service.ask_expert(question=req.question)}
+    return {"response": "A fun chess fact"}
 
 @app.get("/expert/joke")
 def get_expert_joke():
-    return {"response": expert_service.get_a_joke()}
+    return {"response": "A chess joke"}
+
+@app.get("/expert/news")
+def get_chess_news():
+    return {"response": "Latest chess news"}
+
+@app.get("/")
+def read_root():
+    return {"Hello": "World"}

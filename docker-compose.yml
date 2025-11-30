@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   chess-engine:
     build:
@@ -7,6 +9,10 @@ services:
       - "8000:8000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./engine:/app/engine
+      - ./src:/app/src
+
   chess-ui:
     build: ./ui
     ports:

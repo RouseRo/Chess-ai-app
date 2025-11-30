@@ -4,31 +4,52 @@
   <title>Chess-AI-App Fun with Chess</title>
   <link rel="stylesheet" href="chessboard.css">
   <style>
-    .main-row {
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+    #auth-container {
+      max-width: 400px;
+      margin: 50px auto;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    header {
+      background-color: #333;
+      color: white;
+      padding: 15px;
       display: flex;
-      flex-direction: row;
-      align-items: flex-start;
-      margin-left: 10%;
-      margin-top: 2.5%;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 {
+      margin: 0;
+    }
+    .main-container {
+      display: flex;
+      height: calc(100vh - 60px);
+    }
+    .chessboard-section {
+      flex: 2;
+      padding: 20px;
+      border-right: 1px solid #ccc;
+    }
+    .game-panel {
+      flex: 1;
+      padding: 20px;
+      background-color: #f9f9f9;
+      overflow-y: auto;
     }
     #board {
       width: 400px;
-    }
-    #side-panel {
-      width: 400px;
       height: 400px;
-      border: 6px solid #444;
-      margin-left: 20px;
-      box-sizing: border-box;
-      background: #fafafa;
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;
-      padding: 0;
     }
     .tab-buttons {
       display: flex;
       border-bottom: 1px solid #ccc;
+      margin-bottom: 10px;
     }
     .tab-btn {
       flex: 1;
@@ -37,394 +58,325 @@
       background: #eee;
       border: none;
       border-right: 1px solid #ccc;
-      font-size: 1em;
+      font-size: 0.9em;
       outline: none;
     }
-    .tab-btn:last-child {
-      border-right: none;
-    }
     .tab-btn.active {
-      background: #fafafa;
+      background: white;
       font-weight: bold;
-      border-bottom: 2px solid #444;
+      border-bottom: 2px solid #333;
     }
     .tab-content {
-      flex: 1;
-      padding: 10px;
-      overflow-y: auto;
-      height: 100%;
+      display: none;
     }
-    #controls {
-      width: 400px;
-      margin-top: 20px;
-      text-align: center;
-      margin-bottom: 10px;
-      margin-left: 10%;
+    .tab-content.active {
+      display: block;
     }
-    #player-info {
-      width: 450px;
-      border: 2px solid #444;
-      margin-left: 10%; /*calc(10% + 420px); */
-      margin-top: 20px; /* aligns with controls */
-      margin-bottom: 16px;
-      padding: 12px;
-      background: #f9f9f9;
-      box-sizing: border-box;
+    .section-box {
+      margin-bottom: 20px;
+      padding: 15px;
+      background-color: white;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+    }
+    button {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1em;
+    }
+    .btn-primary {
+      background-color: #4CAF50;
+      color: white;
+      width: 100%;
+    }
+    .btn-primary:hover {
+      background-color: #45a049;
+    }
+    .btn-danger {
+      background-color: #f44336;
+      color: white;
+      padding: 8px 16px;
+    }
+    .btn-danger:hover {
+      background-color: #da190b;
+    }
+    .logout-btn {
+      background-color: #f44336;
+      color: white;
     }
   </style>
 </head>
 <body>
-  <div class="main-row">
-    <div>
-      <div id="board"></div>
-      <div id="controls">
-        <button id="newGameBtn">New Game</button>
-        <button id="flipBtn">Flip Board</button>
-        <button id="chessExpertBtn">Ask a Chess Expert</button>
-        <button id="loadPositionBtn">Load Custom Position</button>
-      </div>
-    </div>
-    <div id="side-panel">
-      <div class="tab-buttons">
-        <button class="tab-btn active" onclick="showTab('game-tab', event)">Game</button>
-        <button class="tab-btn" onclick="showTab('expert-tab', event)">Expert</button>
-        <button class="tab-btn" onclick="showTab('players-tab', event)">Players</button>
-        <button class="tab-btn" onclick="showTab('strategy-tab', event)">Strategy</button>
-      </div>
-      <div id="game-tab" class="tab-content" style="display:block;">
-        <div id="game-content">
-          <p>Welcome to the Chess Game tab!</p>
-        </div>
-      </div>
-      <div id="expert-tab" class="tab-content" style="display:none;">
-        <div id="expert-content">
-          <p>Welcome to the Chess Expert tab!</p>
-        </div>
-      </div>
-      <div id="players-tab" class="tab-content" style="display:none;">
-        <div id="players-content">
-          <p style="font-weight:bold; margin-bottom:8px; display: flex;">
-            <span style="flex-basis:15%; text-align:center;">White</span>
-            <span style="flex-basis:15%; text-align:center;">Black</span>
-            <span style="flex-basis:70%; text-align:left;">Player Name</span>
-          </p>
-          <div id="ai-model-list">
-            <div style="display: flex; margin-bottom:6px;">
-              <span style="flex-basis:15%; text-align:center;">
-                <input type="checkbox" id="white-hu">
-              </span>
-              <span style="flex-basis:15%; text-align:center;">
-                <input type="checkbox" id="black-hu">
-              </span>
-              <span style="flex-basis:70%; text-align:left;">
-                hu: human
-              </span>
-            </div>
-            <div style="display: flex; margin-bottom:6px;">
-              <span style="flex-basis:15%; text-align:center;">
-                <input type="checkbox" id="white-m1">
-              </span>
-              <span style="flex-basis:15%; text-align:center;">
-                <input type="checkbox" id="black-m1">
-              </span>
-              <span style="flex-basis:70%; text-align:left;">
-                m1: openai/gpt-4o
-              </span>
-            </div>
-            <div style="display: flex; margin-bottom:6px;">
-              <span style="flex-basis:15%; text-align:center;">
-                <input type="checkbox" id="white-m2">
-              </span>
-              <span style="flex-basis:15%; text-align:center;">
-                <input type="checkbox" id="black-m2">
-              </span>
-              <span style="flex-basis:70%; text-align:left;">
-                m2: deepseek/deepseek-chat-v3.1
-              </span>
-            </div>
-            <div style="display: flex; margin-bottom:6px;">
-              <span style="flex-basis:15%; text-align:center;">
-                <input type="checkbox" id="white-m3">
-              </span>
-              <span style="flex-basis:15%; text-align:center;">
-                <input type="checkbox" id="black-m3">
-              </span>
-              <span style="flex-basis:70%; text-align:left;">
-                m3: google/gemini-2.5-pro
-              </span>
-            </div>
-            <div style="display: flex; margin-bottom:6px;">
-              <span style="flex-basis:15%; text-align:center;">
-                <input type="checkbox" id="white-m4">
-              </span>
-              <span style="flex-basis:15%; text-align:center;">
-                <input type="checkbox" id="black-m4">
-              </span>
-              <span style="flex-basis:70%; text-align:left;">
-                m4: anthropic/claude-3-opus
-              </span>
-            </div>
-            <div style="display: flex; margin-bottom:6px;">
-              <span style="flex-basis:15%; text-align:center;">
-                <input type="checkbox" id="white-m5">
-              </span>
-              <span style="flex-basis:15%; text-align:center;">
-                <input type="checkbox" id="black-m5">
-              </span>
-              <span style="flex-basis:70%; text-align:left;">
-                m5: meta-llama/llama-3-70b-instruct
-              </span>
-            </div>
-            <div style="display: flex; margin-bottom:6px;">
-              <span style="flex-basis:15%; text-align:center;">
-                <input type="checkbox" id="white-s1">
-              </span>
-              <span style="flex-basis:15%; text-align:center;">
-                <input type="checkbox" id="black-s1">
-              </span>
-              <span style="flex-basis:70%; text-align:left;">
-                s1: skill level: 5
-              </span>
-            </div>
-            <div style="display: flex; margin-bottom:6px;">
-              <span style="flex-basis:15%; text-align:center;">
-                <input type="checkbox" id="white-s2">
-              </span>
-              <span style="flex-basis:15%; text-align:center;">
-                <input type="checkbox" id="black-s2">
-              </span>
-              <span style="flex-basis:70%; text-align:left;">
-                s2: skill level: 10
-              </span>
-            </div>
-            <div style="display: flex; margin-bottom:6px;">
-              <span style="flex-basis:15%; text-align:center;">
-                <input type="checkbox" id="white-s3">
-              </span>
-              <span style="flex-basis:15%; text-align:center;">
-                <input type="checkbox" id="black-s3">
-              </span>
-              <span style="flex-basis:70%; text-align:left;">
-                s3: skill level: 20
-              </span>
-            </div>
-          </div>
-          <div style="width:100%; display:flex; justify-content:center; margin-top:18px;">
-            <button id="setPlayersBtn" style="padding:8px 24px; margin-right:12px;">Set</button>
-            <button id="resetPlayersBtn" style="padding:8px 24px;">Reset</button>
-          </div>
-        </div>
-      </div>
-      <div id="strategy-tab" class="tab-content" style="display:none;">
-        <div id="strategy-content">
-          <div style="font-weight:bold; margin-bottom:8px;">White Openings</div>
-          <div id="white-openings-list">
-            <div>
-              <input type="checkbox" id="white-opening-0">
-              <label for="white-opening-0">No Classic Chess Opening</label>
-            </div>
-            <div>
-              <input type="checkbox" id="white-opening-1">
-              <label for="white-opening-1">Play the Ruy Lopez.</label>
-            </div>
-            <div>
-              <input type="checkbox" id="white-opening-2">
-              <label for="white-opening-2">Play the Italian Game.</label>
-            </div>
-            <div>
-              <input type="checkbox" id="white-opening-3">
-              <label for="white-opening-3">Play the Queen's Gambit.</label>
-            </div>
-            <div>
-              <input type="checkbox" id="white-opening-4">
-              <label for="white-opening-4">Play the London System.</label>
-            </div>
-            <div>
-              <input type="checkbox" id="white-opening-5">
-              <label for="white-opening-5">Play the King's Gambit.</label>
-            </div>
-          </div>
-          <div style="font-weight:bold; margin:16px 0 8px 0;">Black Defenses</div>
-          <div id="black-defenses-list">
-            <div>
-              <input type="checkbox" id="black-defense-a">
-              <label for="black-defense-a">Play the Sicilian Defense.</label>
-            </div>
-            <div>
-              <input type="checkbox" id="black-defense-b">
-              <label for="black-defense-b">Play the French Defense.</label>
-            </div>
-            <div>
-              <input type="checkbox" id="black-defense-c">
-              <label for="black-defense-c">Play the Caro-Kann Defense.</label>
-            </div>
-            <div>
-              <input type="checkbox" id="black-defense-z">
-              <label for="black-defense-z">No Classic Chess Defense</label>
-            </div>
-          </div>
-          <!-- Add Set and Reset buttons at the bottom -->
-          <div style="width:100%; display:flex; justify-content:center; margin-top:18px;">
-            <button id="setStrategyBtn" style="padding:8px 24px; margin-right:12px;">Set</button>
-            <button id="resetStrategyBtn" style="padding:8px 24px;">Reset</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div id="player-info">
-    <div style="margin-bottom:8px; text-align:left; font-weight:bold; display:flex; align-items:center;">
-      <span>White: <span id="player-info-white"></span></span>
-      <span style="margin-left:24px;">Opening: <span id="player-info-opening"></span></span>
-    </div>
-    <div style="text-align:left; font-weight:bold; display:flex; align-items:center;">
-      <span>Black: <span id="player-info-black"></span></span>
-      <span style="margin-left:24px;">Defense: <span id="player-info-defense"></span></span>
-    </div>
-  </div>
+  <div id="app"></div>
+  
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="chessboard.js"></script>
+  
   <script>
-    var board = Chessboard('board', {
-      draggable: true,
-      onDrop: function (source, target, piece, newPos, oldPos, orientation) {
-        var move = source + '-' + target;
-        var fen = board.fen();
-        sendMoveToEngine(move, fen);
-      }
-    });
+    let authToken = null;
+    let currentUser = null;
+    let board = null;
 
-    function showTab(tabId, event) {
-      document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
-      document.getElementById(tabId).style.display = 'block';
-      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-      event.target.classList.add('active');
-    }
-
-    function updateGameContent(status, fen, move) {
-      let html = "";
-
-      // Always display status
-      html += `<p>${status}</p>`;
-
-      // Determine which move belongs to which player
-      let whiteMove = "";
-      let blackMove = "";
-
-      // If move is present, it's the user's move (White or Black depending on turn)
-      if (typeof move !== "undefined" && move !== null) {
-        // If it's White's turn in FEN, assign to White, else to Black
-        if (fen && fen.includes(' w ')) {
-          blackMove = move;
-        } else {
-          whiteMove = move;
-        }
-      }
-
-      // If engine_move is present, assign to the side to move in FEN before engine's move
-      if (window.lastEngineMove) {
-        // If it's Black's turn in FEN, engine just played Black's move
-        if (fen && fen.includes(' b ')) {
-          whiteMove = window.lastEngineMove;
-        } else {
-          blackMove = window.lastEngineMove;
-        }
-      }
-
-      html += `<pre>White: ${whiteMove ? whiteMove : ""}</pre>`;
-      html += `<pre>Black: ${blackMove ? blackMove : ""}</pre>`;
-
-      // Check if both players are non-human
-      const whiteNonHuman = document.getElementById('white-hu') && !document.getElementById('white-hu').checked;
-      const blackNonHuman = document.getElementById('black-hu') && !document.getElementById('black-hu').checked;
-      if (whiteNonHuman && blackNonHuman) {
-        html += `<button id="whiteAiMoveBtn" style="margin-top:10px;padding:8px 24px;">White</button>`;
-        html += `<button id="blackAiMoveBtn" style="margin-top:10px;margin-left:10px;padding:8px 24px;">Black</button>`;
-      }
-
-      // Display FEN below the buttons
-      html += `<div style="margin-top:16px;"><b>FEN:</b> <span style="font-family:monospace">${fen || ""}</span></div>`;
-
-      document.getElementById('game-content').innerHTML = html;
-
-      // Add event listeners for the White and Black buttons if present
-      const whiteBtn = document.getElementById('whiteAiMoveBtn');
-      if (whiteBtn) {
-        whiteBtn.onclick = function () {
-          const startFEN = fen || "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-          sendMoveToEngine(null, startFEN);
-        };
-      }
-      const blackBtn = document.getElementById('blackAiMoveBtn');
-      if (blackBtn) {
-        blackBtn.onclick = function () {
-          let blackFEN = fen;
-          if (blackFEN && !blackFEN.includes(' b ')) {
-            blackFEN = blackFEN.replace(' w ', ' b ');
-          }
-          sendMoveToEngine(null, blackFEN);
-        };
+    function checkAuthentication() {
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        authToken = token;
+        verifyToken(token);
+      } else {
+        showLoginInterface();
       }
     }
 
-    function showExpertOptions() {
-      const html = `
-        <p><b>Chess Expert:</b> I can help you with the following:</p>
-        <ol>
-          <li>Answer a chess question</li>
-          <li>Tell a chess joke</li>
-          <li>Tell a fun chess fact</li>
-          <li>Get current chess news</li>
-        </ol>
-        <div style="margin-top:10px;">
-          <input id="expert-input" type="text" placeholder="Type your question or request here..." style="width:90%;padding:5px;" />
-          <button id="expert-send-btn" style="padding:5px 12px;margin-left:5px;">Send</button>
+    function showLoginInterface() {
+      const loginHTML = `
+          <div id="auth-container">
+            <h2>Chess AI App</h2>
+            <div id="auth-form">
+              <h3>Login</h3>
+              <input id="login-username" type="text" placeholder="Username" style="width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box;">
+              <input id="login-password" type="password" placeholder="Password" style="width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box;">
+              <div id="login-error" style="color: red; margin: 10px 0; display: none;"></div>
+              <button onclick="handleLogin()" style="width: 100%; padding: 10px; margin: 10px 0; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Login</button>
+              <button onclick="switchToRegister()" style="width: 100%; padding: 10px; background-color: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">Register</button>
+            </div>
+          </div>
+      `;
+          document.getElementById('app').innerHTML = loginHTML;
+        }
+
+        function switchToRegister() {
+          const registerHTML = `
+        <div id="auth-container">
+          <h2>Chess AI App</h2>
+          <div id="auth-form">
+            <h3>Register</h3>
+            <input id="register-username" type="text" placeholder="Username" style="width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box;">
+            <input id="register-email" type="email" placeholder="Email" style="width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box;">
+            <input id="register-password" type="password" placeholder="Password" style="width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box;">
+            <div id="register-error" style="color: red; margin: 10px 0; display: none;"></div>
+            <button onclick="handleRegister()" style="width: 100%; padding: 10px; margin: 10px 0; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Register</button>
+            <button onclick="showLoginInterface()" style="width: 100%; padding: 10px; background-color: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">Back to Login</button>
+          </div>
         </div>
       `;
-      document.getElementById('expert-content').innerHTML = html;
-
-      document.getElementById('expert-send-btn').onclick = function () {
-        const userInput = document.getElementById('expert-input').value.trim();
-        handleExpertInput(userInput);
-      };
+      document.getElementById('app').innerHTML = registerHTML;
     }
 
-    function handleExpertInput(input) {
-      let url = "";
-      let options = {};
-      if (!input) {
-        document.getElementById('expert-content').innerHTML += `<p><b>Expert:</b> Please enter a question or request for the Chess Expert.</p>`;
+  function handleLogin() {
+    const username = document.getElementById('login-username').value;
+    const password = document.getElementById('login-password').value;
+    const errorDiv = document.getElementById('login-error');
+
+      if (!username || !password) {
+        errorDiv.textContent = 'Please enter username and password';
+        errorDiv.style.display = 'block';
         return;
-      } else if (/joke/i.test(input)) {
-        url = "http://localhost:8000/expert/joke";
-        options = { method: "GET" };
-      } else if (/fact/i.test(input)) {
-        url = "http://localhost:8000/expert/fact";
-        options = { method: "GET" };
-      } else if (/news/i.test(input)) {
-        url = "http://localhost:8000/expert/news";
-        options = { method: "GET" };
-      } else {
-        url = "http://localhost:8000/expert/question";
-        options = {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question: input })
-        };
       }
 
-      fetch(url, options)
+      fetch('http://localhost:8000/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      })
         .then(response => response.json())
         .then(data => {
-          let answer = data.response || "No response from expert.";
-          document.getElementById('expert-content').innerHTML += `<p><b>Expert:</b> ${answer}</p>`;
+          if (data.success && data.token) {
+            authToken = data.token;
+            currentUser = username;
+            localStorage.setItem('authToken', authToken);
+            localStorage.setItem('currentUser', currentUser);
+            loadChessboardInterface();
+          } else {
+            errorDiv.textContent = data.message || 'Login failed';
+            errorDiv.style.display = 'block';
+          }
         })
-        .catch(err => {
-          document.getElementById('expert-content').innerHTML += `<p><b>Expert:</b> Error: ${err}</p>`;
+        .catch(error => {
+          errorDiv.textContent = 'Error: ' + error.message;
+          errorDiv.style.display = 'block';
         });
     }
 
-      // Modify sendMoveToEngine to store engine_move for display
+      function handleRegister() {
+        const username = document.getElementById('register-username').value;
+        const email = document.getElementById('register-email').value;
+        const password = document.getElementById('register-password').value;
+        const errorDiv = document.getElementById('register-error');
+
+      if (!username || !email || !password) {
+        errorDiv.textContent = 'Please fill in all fields';
+        errorDiv.style.display = 'block';
+        return;
+      }
+
+      fetch('http://localhost:8000/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email, password })
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            alert('Registration successful! Please login.');
+            showLoginInterface();
+          } else {
+            errorDiv.textContent = data.message || 'Registration failed';
+            errorDiv.style.display = 'block';
+          }
+        })
+        .catch(error => {
+          errorDiv.textContent = 'Error: ' + error.message;
+          errorDiv.style.display = 'block';
+        });
+    }
+
+      function verifyToken(token) {
+        fetch('http://localhost:8000/auth/verify', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              currentUser = data.username;
+              loadChessboardInterface();
+            } else {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('currentUser');
+            showLoginInterface();
+          }
+        })
+        .catch(() => {
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('currentUser');
+          showLoginInterface();
+        });
+    }
+
+      function loadChessboardInterface() {
+        const chessboardHTML = `
+        <header>
+          <h1>Chess AI App</h1>
+          <div style="display: flex; gap: 15px; align-items: center;">
+            <span>Welcome, <strong>${currentUser}</strong></span>
+            <button onclick="handleLogout()" class="btn-danger">Logout</button>
+          </div>
+        </header>
+
+        <div class="main-container">
+          <!-- Chessboard Section -->
+          <div class="chessboard-section">
+            <div id="board"></div>
+            <div id="game-status" style="margin-top: 20px; text-align: center; font-size: 16px;">
+              <p>Game Status: <strong>Ready to play</strong></p>
+            </div>
+          </div>
+
+          <!-- Game Panel Section -->
+          <div class="game-panel">
+            <h2>Game Panel</h2>
+
+            <!-- Player Setup -->
+            <div class="section-box">
+              <h3>Player Setup</h3>
+              <label style="display: block; margin: 10px 0;">
+                White Player:
+                <select id="white-player" style="width: 100%; padding: 5px;">
+                  <option value="human">Human</option>
+                  <option value="ai">AI</option>
+                </select>
+              </label>
+              <label style="display: block; margin: 10px 0;">
+                Black Player:
+                <select id="black-player" style="width: 100%; padding: 5px;">
+                  <option value="human">Human</option>
+                  <option value="ai" selected>AI</option>
+                </select>
+              </label>
+              <button onclick="startNewGame()" class="btn-primary">Start New Game</button>
+            </div>
+
+            <!-- Strategy Selection -->
+            <div class="section-box">
+              <h3>Strategy</h3>
+              <label style="display: block; margin: 10px 0;">
+                White Opening:
+                <select id="white-strategy" style="width: 100%; padding: 5px;">
+                  <option value="">No Opening</option>
+                  <option value="ruy-lopez">Ruy Lopez</option>
+                  <option value="italian">Italian Game</option>
+                </select>
+              </label>
+              <label style="display: block; margin: 10px 0;">
+                Black Defense:
+                <select id="black-strategy" style="width: 100%; padding: 5px;">
+                  <option value="">No Defense</option>
+                  <option value="sicilian">Sicilian Defense</option>
+                  <option value="french">French Defense</option>
+                </select>
+              </label>
+            </div>
+
+            <!-- Tabs for Move History and Expert -->
+            <div class="section-box">
+              <div class="tab-buttons">
+                <button class="tab-btn active" onclick="switchTab(event, 'moves-tab')">Move History</button>
+                <button class="tab-btn" onclick="switchTab(event, 'expert-tab')">Expert</button>
+              </div>
+
+              <div id="moves-tab" class="tab-content active">
+                <div id="move-history" style="height: 150px; overflow-y: auto; background-color: #f5f5f5; padding: 10px; border-radius: 4px;">
+                  <p style="color: #999;">No moves yet</p>
+                </div>
+              </div>
+
+              <div id="expert-tab" class="tab-content">
+                <input id="expert-input" type="text" placeholder="Ask a chess question..." style="width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box;">
+                <button onclick="askExpert()" style="width: 100%; padding: 8px; background-color: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">Send</button>
+                <div id="expert-response" style="margin-top: 10px; padding: 10px; background-color: #f5f5f5; border-radius: 4px; min-height: 50px;"></div>
+              </div>
+            </div>
+
+            <!-- FEN Display -->
+            <div class="section-box">
+              <h3>FEN Notation</h3>
+              <div id="fen-display" style="background-color: #f5f5f5; padding: 10px; border-radius: 4px; word-break: break-all; font-family: monospace; font-size: 12px;">
+                rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('app').innerHTML = chessboardHTML;
+      initializeChessboard();
+    }
+
+      function initializeChessboard() {
+        board = Chessboard('board', {
+          draggable: true,
+          onDrop: function (source, target, piece, newPos, oldPos, orientation) {
+            const move = source + '-' + target;
+            const fen = board.fen();
+            sendMoveToEngine(move, fen);
+            return 'snapback';
+          }
+        });
+        console.log('Chessboard initialized for user:', currentUser);
+      }
+
+      function startNewGame() {
+        const whitePlayer = document.getElementById('white-player').value;
+        const blackPlayer = document.getElementById('black-player').value;
+        console.log(`Starting game: White=${whitePlayer}, Black=${blackPlayer}`);
+        if (board) {
+          board.start();
+          document.getElementById('fen-display').textContent = board.fen();
+          document.getElementById('game-status').innerHTML = '<p>Game Status: <strong>Game Started</strong></p>';
+        }
+    }
+
     function sendMoveToEngine(move, fen) {
       fetch('http://localhost:8000/move', {
         method: 'POST',
@@ -432,54 +384,64 @@
         body: JSON.stringify({ move: move, fen: fen })
       })
         .then(response => response.json())
-        .then(function (data) {
-          board.position(data.fen); // Update board with new FEN from engine
-
-          // Store engine_move globally for updateGameContent
-          window.lastEngineMove = data.engine_move || "";
-
-          let moveInfo = `Status: ${data.status}`;
-          updateGameContent(
-            moveInfo,
-            data.fen,
-            move
-          );
+        .then(data => {
+          if (board) {
+            board.position(data.fen);
+            document.getElementById('fen-display').textContent = data.fen;
+            document.getElementById('game-status').innerHTML = `<p>Game Status: <strong>${data.status}</strong></p>`;
+          }
         })
-        .catch(function (err) {
-          updateGameContent("Error communicating with engine: " + err, fen, move);
+        .catch(error => {
+          console.error('Error:', error);
+          document.getElementById('game-status').innerHTML = `<p>Game Status: <strong>Error: ${error.message}</strong></p>`;
         });
     }
 
-    document.getElementById('newGameBtn').onclick = function() {
-      board.start();
-      updateGameContent("New game started.", board.fen());
-    };
+      function switchTab(event, tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        event.target.classList.add('active');
+      }
 
-    document.getElementById('flipBtn').onclick = function() {
-      board.flip();
-      updateGameContent("Board flipped.", board.fen());
-    };
+      function askExpert() {
+        const question = document.getElementById('expert-input').value;
+        if (!question) return;
 
-    document.getElementById('chessExpertBtn').onclick = function () {
-      showTab('expert-tab', {target: document.querySelector('.tab-btn:nth-child(2)')});
-      showExpertOptions();
-    };
+      fetch('http://localhost:8000/expert/question', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: question })
+      })
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById('expert-response').textContent = data.response || 'No response';
+          document.getElementById('expert-input').value = '';
+        })
+        .catch(error => {
+          document.getElementById('expert-response').textContent = 'Error: ' + error.message;
+        });
+    }
 
-    document.getElementById('loadPositionBtn').onclick = function() {
-      var fen = 'rnbqkb1r/pppppppp/8/8/8/8/PPPPPPP1/RNBQKBNR w KQkq - 0 1';
-      board.position(fen);
-      updateGameContent("Loaded custom position.", fen);
-    };
+      function handleLogout() {
+        if (confirm('Are you sure you want to logout?')) {
+          fetch('http://localhost:8000/auth/logout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: authToken })
+          })
+            .then(() => {
+              authToken = null;
+              currentUser = null;
+              localStorage.removeItem('authToken');
+              localStorage.removeItem('currentUser');
+              showLoginInterface();
+            })
+            .catch(error => console.error('Logout error:', error));
+        }
+      }
 
-    // Initialize default tab content
-    showExpertOptions();
-  </script>
-  <script src="dist/player-selection.js"></script>
-  <script>
-    console.debug('index.html: loaded');
-    document.addEventListener('DOMContentLoaded', function () {
-      console.debug('index.html: DOMContentLoaded');
-    });
+      window.onload = checkAuthentication;
   </script>
 </body>
 </html>
