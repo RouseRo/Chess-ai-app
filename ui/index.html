@@ -62,9 +62,9 @@
       margin-left: 10%;
     }
     #player-info {
-      width: 400px;
+      width: 450px;
       border: 2px solid #444;
-      margin-left: calc(10% + 420px);
+      margin-left: 10%; /*calc(10% + 420px); */
       margin-top: 20px; /* aligns with controls */
       margin-bottom: 16px;
       padding: 12px;
@@ -302,14 +302,69 @@
     }
 
     function updateGameContent(status, fen, move) {
-      let html = `<p>${status}</p>`;
-      if (typeof move !== "undefined") {
-        html += `<pre>Move: ${move}</pre>`;
+      let html = "";
+
+      // Always display status
+      html += `<p>${status}</p>`;
+
+      // Determine which move belongs to which player
+      let whiteMove = "";
+      let blackMove = "";
+
+      // If move is present, it's the user's move (White or Black depending on turn)
+      if (typeof move !== "undefined" && move !== null) {
+        // If it's White's turn in FEN, assign to White, else to Black
+        if (fen && fen.includes(' w ')) {
+          blackMove = move;
+        } else {
+          whiteMove = move;
+        }
       }
-      if (typeof fen !== "undefined") {
-        html += `<pre>FEN: ${fen}</pre>`;
+
+      // If engine_move is present, assign to the side to move in FEN before engine's move
+      if (window.lastEngineMove) {
+        // If it's Black's turn in FEN, engine just played Black's move
+        if (fen && fen.includes(' b ')) {
+          whiteMove = window.lastEngineMove;
+        } else {
+          blackMove = window.lastEngineMove;
+        }
       }
+
+      html += `<pre>White: ${whiteMove ? whiteMove : ""}</pre>`;
+      html += `<pre>Black: ${blackMove ? blackMove : ""}</pre>`;
+
+      // Check if both players are non-human
+      const whiteNonHuman = document.getElementById('white-hu') && !document.getElementById('white-hu').checked;
+      const blackNonHuman = document.getElementById('black-hu') && !document.getElementById('black-hu').checked;
+      if (whiteNonHuman && blackNonHuman) {
+        html += `<button id="whiteAiMoveBtn" style="margin-top:10px;padding:8px 24px;">White</button>`;
+        html += `<button id="blackAiMoveBtn" style="margin-top:10px;margin-left:10px;padding:8px 24px;">Black</button>`;
+      }
+
+      // Display FEN below the buttons
+      html += `<div style="margin-top:16px;"><b>FEN:</b> <span style="font-family:monospace">${fen || ""}</span></div>`;
+
       document.getElementById('game-content').innerHTML = html;
+
+      // Add event listeners for the White and Black buttons if present
+      const whiteBtn = document.getElementById('whiteAiMoveBtn');
+      if (whiteBtn) {
+        whiteBtn.onclick = function () {
+          const startFEN = fen || "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+          sendMoveToEngine(null, startFEN);
+        };
+      }
+      const blackBtn = document.getElementById('blackAiMoveBtn');
+      if (blackBtn) {
+        blackBtn.onclick = function () {
+          let blackFEN = fen;
+          if (blackFEN && !blackFEN.includes(' b ')) {
+            blackFEN = blackFEN.replace(' w ', ' b ');
+          }
+          sendMoveToEngine(null, blackFEN);
+        };
+      }
     }
 
     function showExpertOptions() {
@@ -369,6 +424,7 @@
         });
     }
 
+      // Modify sendMoveToEngine to store engine_move for display
     function sendMoveToEngine(move, fen) {
       fetch('http://localhost:8000/move', {
         method: 'POST',
@@ -379,18 +435,10 @@
         .then(function (data) {
           board.position(data.fen); // Update board with new FEN from engine
 
-          // Display move response details and new FEN on the game tab panel
-          let moveInfo = `Status: ${data.status}`;
-          if (data.engine_move) {
-            moveInfo += `<br>Engine Move: ${data.engine_move}`;
-          }
-          if (data.source) {
-            moveInfo += `<br>Source: ${data.source}`;
-          } else {
-            moveInfo += `<br>Source: chess-engine-1`;
-          }
-          moveInfo += `<br>New FEN: ${data.fen}`; // Show new FEN value
+          // Store engine_move globally for updateGameContent
+          window.lastEngineMove = data.engine_move || "";
 
+          let moveInfo = `Status: ${data.status}`;
           updateGameContent(
             moveInfo,
             data.fen,

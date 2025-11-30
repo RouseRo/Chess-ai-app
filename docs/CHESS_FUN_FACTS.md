@@ -40,3 +40,9 @@ This occurred because the fourth World Champion, Alexander Alekhine, died in 194
 
 ---
 
+### 7. 2025-11-30 01:38:47 UTC
+
+For centuries, a pawn could only be promoted to a piece that had already been captured. This meant a player could never possess two Queens, for example. If no pieces were available for promotion, the pawn would have to remain a pawn on the final rank until a piece was captured. The modern rule allowing promotion to any desired piece was not standardized until the 19th century.
+
+---
+

@@ -4,6 +4,10 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 import chess
 import os
+import sys
+
+# Add parent directory to Python path so src module can be found
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import the refactored ExpertService and AIPlayer
 from src.expert_service import ExpertService
@@ -32,7 +36,7 @@ def read_root():
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Or specify your frontend's URL
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -49,10 +53,12 @@ async def move(request: Request):
     fen = data.get("fen")
     board = chess.Board(fen)
 
-    user_move_uci = move.replace("-", "")
-    board.push_uci(user_move_uci)
+    # Only push user's move if provided
+    if move is not None:
+        user_move_uci = move.replace("-", "")
+        board.push_uci(user_move_uci)
 
-    # Pick a legal engine move (random for demo)
+    # Engine move (pick a random legal move for demo)
     import random
     legal_moves = list(board.legal_moves)
     if legal_moves:
