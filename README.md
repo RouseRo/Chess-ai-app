@@ -8,6 +8,7 @@ A web-based chess application supporting human and AI players, with classic ches
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
 - [Running the Application](#running-the-application)
+- [User Authentication](#user-authentication)
 - [Viewing the Chessboard Interface](#viewing-the-chessboard-interface)
 - [API Endpoints](#api-endpoints)
 - [Configuration](#configuration)
@@ -23,6 +24,7 @@ A web-based chess application supporting human and AI players, with classic ches
 - **Chess Expert**: Ask chess-related questions to an integrated expert assistant
 - **Interactive UI**: Drag-and-drop chessboard with real-time game updates
 - **Command-line Interface**: Play chess directly from the terminal
+- **User Authentication**: Secure login and registration system with password hashing
 
 ## Project Structure
 
@@ -30,10 +32,11 @@ A web-based chess application supporting human and AI players, with classic ches
 Chess-ai-app/
 ├── engine/              # Chess engine (FastAPI backend)
 │   ├── main.py         # API endpoints
+│   ├── user_manager.py # User authentication
 │   ├── game_service.py # Game management
 │   └── requirements.txt # Python dependencies
 ├── ui/                 # Web interface
-│   ├── index.html      # Main UI
+│   ├── index.html      # Main UI with login/chessboard
 │   ├── chessboard.js   # Chessboard library
 │   └── chessboard.css  # Styling
 ├── src/                # Core application logic
@@ -41,6 +44,9 @@ Chess-ai-app/
 │   ├── chess_game.py   # Game logic
 │   ├── expert_service.py # Expert AI service
 │   └── config.json     # Configuration
+├── user_data/          # User database
+│   ├── users.json      # Registered users
+│   └── sessions.json   # Active sessions
 ├── docker-compose.yml  # Docker orchestration
 └── README.md          # This file
 ```
@@ -153,7 +159,98 @@ UI runs on: `http://localhost:8080`
 1. Install the **Live Server** extension in VS Code
 2. Right-click on `ui/index.html`
 3. Select **"Open with Live Server"**
-4. The chessboard will open in your default browser
+4. The login interface will open in your default browser
+
+## User Authentication
+
+### Login & Registration
+
+The application includes a secure user authentication system. Users must login or register before accessing the chessboard.
+
+**Features:**
+- **Secure Password Storage**: Passwords are hashed using PBKDF2-HMAC-SHA256 with salt
+- **Session Tokens**: Users receive JWT-like tokens valid for 7 days
+- **Persistent Login**: Session tokens are stored locally to keep users logged in
+- **Account Registration**: New users can register with username, email, and password
+
+### Login Screen
+
+When you open the application at `http://localhost` or `http://localhost:8080`, you'll see:
+
+1. **Login Form**
+   - Enter your username
+   - Enter your password
+   - Click "Login" button
+
+2. **Register Form**
+   - Click "Register" button on login screen
+   - Enter a username (minimum 3 characters)
+   - Enter your email address
+   - Enter a password (minimum 6 characters)
+   - Click "Register" button
+   - Login with your new credentials
+
+### Authentication Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/auth/register` | POST | Create a new user account |
+| `/auth/login` | POST | Authenticate user and receive token |
+| `/auth/logout` | POST | End user session |
+| `/auth/verify` | GET | Verify current session token |
+| `/auth/user/{username}` | GET | Retrieve user information |
+
+**Request Examples:**
+
+**Register:**
+```json
+POST /auth/register
+{
+  "username": "chessmaster",
+  "email": "chessmaster@example.com",
+  "password": "SecurePassword123"
+}
+```
+
+**Login:**
+```json
+POST /auth/login
+{
+  "username": "chessmaster",
+  "password": "SecurePassword123"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+### User Data Storage
+
+User information is stored in `user_data/users.json`:
+
+```json
+{
+  "chessmaster": {
+    "email": "chessmaster@example.com",
+    "password": "salt$hash_hex",
+    "created_at": "2025-11-30T17:14:47.123456",
+    "games_played": 5
+  }
+}
+```
+
+**Security Notes:**
+- Passwords are never stored in plain text
+- Each password uses a unique salt
+- Session tokens expire after 7 days
+- Tokens are stored in browser's localStorage
+- Use HTTPS in production environments
 
 ## Viewing the Chessboard Interface
 
@@ -167,9 +264,19 @@ UI runs on: `http://localhost:8080`
 - **Expert Panel**: Ask chess questions and get advice
 - **Move History**: See all moves played in the game
 
-### Accessing the Interface
+### Accessing the Chessboard
 
-To view the chessboard in the browser, the URL is **`http://localhost:8080/`**
+After successful login, you'll be taken to the chessboard interface featuring:
+
+- **Centered Chessboard**: 400x400px interactive board
+- **Game Status**: Real-time game state updates
+- **Player Setup Panel**: Select human or AI players
+- **Strategy Selection**: Choose openings and defenses
+- **Move History**: Track all moves in the game
+- **FEN Notation**: View board state in standard notation
+- **Expert Assistant**: Ask chess questions
+- **User Info**: Username displayed in header
+- **Logout Button**: Safely end your session
 
 | Method | URL | Steps |
 |--------|-----|-------|
@@ -178,6 +285,13 @@ To view the chessboard in the browser, the URL is **`http://localhost:8080/`**
 | **Live Server** | Auto-opens | Right-click `index.html` → "Open with Live Server" |
 
 ## API Endpoints
+
+### Authentication Endpoints
+- **`POST /auth/register`** - Register new user account
+- **`POST /auth/login`** - Login and receive session token
+- **`POST /auth/logout`** - Logout and end session
+- **`GET /auth/verify`** - Verify session token validity
+- **`GET /auth/user/{username}`** - Get user information
 
 ### Move Management
 - **`POST /move`**  
@@ -238,6 +352,8 @@ All games are logged to `logs/games/` with complete game information:
 - The FEN notation indicates whose turn it is and the board state after the previous move
 - When both players are AI, use the White/Black buttons to make sequential moves
 - You can play via command-line or use the web interface depending on your preference
+- User sessions persist for 7 days; after that, you'll need to login again
+- For development, user data is stored in plain JSON files; use a proper database in production
 
 ---
 

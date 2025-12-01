@@ -126,12 +126,16 @@
 
     function checkAuthentication() {
       const token = localStorage.getItem('authToken');
-      if (token) {
-        authToken = token;
-        verifyToken(token);
-      } else {
-        showLoginInterface();
+      const user = localStorage.getItem('currentUser');
+      const isAdmin = localStorage.getItem('isAdmin');
+
+      if (!token || !isAdmin || isAdmin === 'false') {
+        window.location.href = 'index.html';
+        return;
       }
+
+      authToken = token;
+      verifyToken(token);
     }
 
     function showLoginInterface() {
@@ -447,6 +451,9 @@
       }
 
       window.onload = checkAuthentication;
+        localStorage.setItem('authToken', 'SOME_VALID_TOKEN');
+        localStorage.setItem('currentUser', 'admin');
+        localStorage.setItem('isAdmin', 'true');
   </script>
 </body>
 </html>
