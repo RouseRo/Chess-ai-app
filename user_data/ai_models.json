@@ -1,0 +1,25 @@
+{
+  "models": [
+    {
+      "id": "stockfish",
+      "name": "Stockfish",
+      "type": "local",
+      "skill_level": 10,
+      "enabled": true
+    },
+    {
+      "id": "openai_gpt4",
+      "name": "OpenAI GPT-4",
+      "type": "api",
+      "provider": "OpenAI",
+      "enabled": false
+    },
+    {
+      "id": "deepseek",
+      "name": "DeepSeek",
+      "type": "api",
+      "provider": "DeepSeek",
+      "enabled": false
+    }
+  ]
+}
