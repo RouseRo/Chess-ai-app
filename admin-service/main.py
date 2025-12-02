@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 import sys
 import os
 from typing import Optional
@@ -41,6 +41,8 @@ class DemoteUserRequest(BaseModel):
     username: str
 
 class AddModelRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+    
     model_id: str
     name: str
     type: str
@@ -48,9 +50,13 @@ class AddModelRequest(BaseModel):
     skill_level: Optional[int] = None
 
 class RemoveModelRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+    
     model_id: str
 
 class UpdateModelRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+    
     model_id: str
     updates: dict
 
