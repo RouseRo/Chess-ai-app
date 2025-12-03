@@ -3,13 +3,60 @@ services:
     build:
       context: .
       dockerfile: engine/Dockerfile
+    container_name: chess-engine
     ports:
       - "8000:8000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./engine:/app/engine
+      - ./src:/app/src
+      - ./user_data:/app/user_data
+    networks:
+      - chess-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  admin-service:
+    build:
+      context: .
+      dockerfile: admin-service/Dockerfile
+    container_name: chess-admin-service
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./admin-service:/app/admin-service
+      - ./engine:/app/engine
+      - ./user_data:/app/user_data
+    depends_on:
+      chess-engine:
+        condition: service_healthy
+    networks:
+      - chess-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
   chess-ui:
     build: ./ui
+    container_name: chess-ui
     ports:
       - "8080:80"
     volumes:
       - ./ui:/usr/share/nginx/html
+    depends_on:
+      - chess-engine
+      - admin-service
+    networks:
+      - chess-network
+
+networks:
+  chess-network:
+    driver: bridge

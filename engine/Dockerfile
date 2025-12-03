@@ -1,32 +1,31 @@
 FROM python:3.12-slim
+
 WORKDIR /app
 
+# Install curl for health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
 COPY engine/requirements.txt .
-COPY engine/main.py .
-COPY src ./src
 
-# Install system dependencies and Stockfish 17.1 binary for Ubuntu AVX2
-RUN apt-get update && \
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt && \
+    apt-get update && \
     apt-get install -y wget tar && \
-    wget https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-ubuntu-x86-64-avx2.tar && \
-    tar -xf stockfish-ubuntu-x86-64-avx2.tar && \
-    ls -l stockfish && \
-    mkdir -p /usr/local/bin && \
-    mv stockfish/stockfish* /usr/local/bin/stockfish && \
-    chmod +x /usr/local/bin/stockfish && \
-    rm -rf stockfish-ubuntu-x86-64-avx2.tar stockfish
+    pip install --no-cache-dir stockfish
 
-RUN pip install --no-cache-dir stockfish && \
-    python -c "import stockfish; print('stockfish Python package is installed and importable')" && \
-    pip install --no-cache-dir python-dotenv && \
-    pip install --no-cache-dir -r requirements.txt && \
-    python -c "import dotenv; print('python-dotenv is installed and importable')"
+# Copy the entire engine directory
+COPY engine ./engine
 
-ENV PYTHONPATH="${PYTHONPATH}:/app/src"
+# Copy shared user_data directory
+COPY user_data ./user_data
 
-# Diagnostics: show /app dir and main.py after copy
-RUN echo "Listing /app directory after COPY:" && ls -l /app && \
-    echo "Showing first 20 lines of /app/main.py after COPY:" && head -20 /app/main.py
-
+# Expose port
 EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/ || exit 1
+
+# Run the application
+CMD ["uvicorn", "engine.main:app", "--host", "0.0.0.0", "--port", "8000"]
