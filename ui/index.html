@@ -129,14 +129,16 @@
     function checkAuthentication() {
       const token = localStorage.getItem('authToken');
       const user = localStorage.getItem('currentUser');
-      const isAdmin = localStorage.getItem('isAdmin');
 
-      if (!token || !isAdmin || isAdmin === 'false') {
-        window.location.href = 'index.html';
+      // If no token, show login interface
+      if (!token) {
+        showLoginInterface();
         return;
       }
 
+      // Token exists, verify it
       authToken = token;
+      currentUser = user;
       verifyToken(token);
     }
 
@@ -154,11 +156,11 @@
             </div>
           </div>
       `;
-          document.getElementById('app').innerHTML = loginHTML;
-        }
+      document.getElementById('app').innerHTML = loginHTML;
+    }
 
-        function switchToRegister() {
-          const registerHTML = `
+      function switchToRegister() {
+        const registerHTML = `
         <div id="auth-container">
           <h2>Chess AI App</h2>
           <div id="auth-form">
@@ -175,10 +177,10 @@
       document.getElementById('app').innerHTML = registerHTML;
     }
 
-  function handleLogin() {
-    const username = document.getElementById('login-username').value;
-    const password = document.getElementById('login-password').value;
-    const errorDiv = document.getElementById('login-error');
+      function handleLogin() {
+        const username = document.getElementById('login-username').value;
+        const password = document.getElementById('login-password').value;
+        const errorDiv = document.getElementById('login-error');
 
       if (!username || !password) {
         errorDiv.textContent = 'Please enter username and password';
@@ -186,7 +188,7 @@
         return;
       }
 
-      fetch('http://localhost:8000/auth/login', {
+      fetch('http://localhost:8002/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
@@ -198,7 +200,14 @@
             currentUser = username;
             localStorage.setItem('authToken', authToken);
             localStorage.setItem('currentUser', currentUser);
-            loadChessboardInterface();
+            localStorage.setItem('isAdmin', data.is_admin ? 'true' : 'false');
+
+            // Redirect admin users to admin dashboard
+            if (data.is_admin) {
+              window.location.href = 'admin.html';
+            } else {
+              loadChessboardInterface();
+            }
           } else {
             errorDiv.textContent = data.message || 'Login failed';
             errorDiv.style.display = 'block';
@@ -222,7 +231,7 @@
         return;
       }
 
-      fetch('http://localhost:8000/auth/register', {
+      fetch('http://localhost:8002/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email, password })
@@ -244,23 +253,32 @@
     }
 
       function verifyToken(token) {
-        fetch('http://localhost:8000/auth/verify', {
-          headers: { 'Authorization': 'Bearer ' + token }
-        })
-          .then(response => response.json())
-          .then(data => {
-            if (data.success) {
-              currentUser = data.username;
-              loadChessboardInterface();
+      fetch('http://localhost:8002/auth/verify', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            currentUser = data.username;
+            localStorage.setItem('isAdmin', data.is_admin ? 'true' : 'false');
+
+            // Redirect admins to admin dashboard
+            if (data.is_admin) {
+              window.location.href = 'admin.html';
             } else {
+              loadChessboardInterface();
+            }
+          } else {
             localStorage.removeItem('authToken');
             localStorage.removeItem('currentUser');
+            localStorage.removeItem('isAdmin');
             showLoginInterface();
           }
         })
         .catch(() => {
           localStorage.removeItem('authToken');
           localStorage.removeItem('currentUser');
+          localStorage.removeItem('isAdmin');
           showLoginInterface();
         });
     }
@@ -436,7 +454,7 @@
 
       function handleLogout() {
         if (confirm('Are you sure you want to logout?')) {
-          fetch('http://localhost:8000/auth/logout', {
+          fetch('http://localhost:8002/auth/logout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ token: authToken })
@@ -446,6 +464,7 @@
               currentUser = null;
               localStorage.removeItem('authToken');
               localStorage.removeItem('currentUser');
+              localStorage.removeItem('isAdmin');
               showLoginInterface();
             })
             .catch(error => console.error('Logout error:', error));

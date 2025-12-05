@@ -21,6 +21,31 @@ services:
       retries: 3
       start_period: 10s
 
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
+    container_name: chess-auth-service
+    ports:
+      - "8002:8002"
+    environment:
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-chess-ai-secret-key-change-in-production}
+    volumes:
+      - ./auth-service:/app/auth-service
+      - ./engine:/app/engine
+      - ./user_data:/app/user_data
+    depends_on:
+      chess-engine:
+        condition: service_healthy
+    networks:
+      - chess-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
   admin-service:
     build:
       context: .
@@ -33,7 +58,7 @@ services:
       - ./engine:/app/engine
       - ./user_data:/app/user_data
     depends_on:
-      chess-engine:
+      auth-service:
         condition: service_healthy
     networks:
       - chess-network
@@ -53,6 +78,7 @@ services:
       - ./ui:/usr/share/nginx/html
     depends_on:
       - chess-engine
+      - auth-service
       - admin-service
     networks:
       - chess-network
