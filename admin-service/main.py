@@ -64,6 +64,14 @@ class ChangePasswordRequest(BaseModel):
     old_password: str
     new_password: str
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+
 # ========== Helper Functions ==========
 
 def get_admin_user(authorization: str = Header(None)) -> str:
@@ -241,6 +249,21 @@ async def change_password(req: ChangePasswordRequest, authorization: str = Heade
     return {
         "success": success,
         "message": message
+    }
+
+# ========== Auth Endpoints ==========
+
+@app.post("/auth/login", response_model=TokenResponse)
+async def login(req: LoginRequest):
+    """Admin login."""
+    success, token = user_manager.authenticate_admin(req.username, req.password)
+    
+    if not success:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    
+    return {
+        "access_token": token,
+        "token_type": "bearer"
     }
 
 # ========== Static Files ==========

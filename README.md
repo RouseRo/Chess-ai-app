@@ -9,10 +9,12 @@ A web-based chess application supporting human and AI players, with classic ches
 - [Getting Started](#getting-started)
 - [Running the Application](#running-the-application)
 - [User Authentication](#user-authentication)
-- [Viewing the Chessboard Interface](#viewing-the-chessboard-interface)
-- [API Endpoints](#api-endpoints)
+- [Admin Dashboard](#admin-dashboard)
+- [API Services](#api-services)
+- [User Management](#user-management)
 - [Configuration](#configuration)
 - [Game Logging](#game-logging)
+- [Troubleshooting](#troubleshooting)
 - [Notes](#notes)
 
 ## Features
@@ -24,31 +26,46 @@ A web-based chess application supporting human and AI players, with classic ches
 - **Chess Expert**: Ask chess-related questions to an integrated expert assistant
 - **Interactive UI**: Drag-and-drop chessboard with real-time game updates
 - **Command-line Interface**: Play chess directly from the terminal
-- **User Authentication**: Secure login and registration system with password hashing
+- **User Authentication**: Secure JWT-based authentication with bcrypt password hashing
+- **Admin Dashboard**: Manage users, AI models, and system settings
+- **Microservices Architecture**: Separate services for auth, admin, engine, and UI
 
 ## Project Structure
 
 ```
 Chess-ai-app/
-├── engine/              # Chess engine (FastAPI backend)
-│   ├── main.py         # API endpoints
-│   ├── user_manager.py # User authentication
-│   ├── game_service.py # Game management
-│   └── requirements.txt # Python dependencies
-├── ui/                 # Web interface
-│   ├── index.html      # Main UI with login/chessboard
-│   ├── chessboard.js   # Chessboard library
-│   └── chessboard.css  # Styling
-├── src/                # Core application logic
-│   ├── main.py         # Command-line entry point
-│   ├── chess_game.py   # Game logic
+├── engine/                 # Chess engine (FastAPI backend)
+│   ├── main.py            # API endpoints
+│   ├── user_manager.py    # User data management
+│   ├── game_service.py    # Game management
+│   ├── Dockerfile         # Engine container config
+│   └── requirements.txt   # Python dependencies
+├── auth-service/          # Authentication service
+│   ├── main.py           # Auth API endpoints
+│   ├── Dockerfile        # Auth container config
+│   └── requirements.txt  # Python dependencies
+├── admin-service/         # Admin dashboard service
+│   ├── main.py           # Admin API endpoints
+│   ├── static/           # Admin UI files
+│   ├── Dockerfile        # Admin container config
+│   └── requirements.txt  # Python dependencies
+├── ui/                    # Web interface
+│   ├── index.html        # Main UI with login/chessboard
+│   ├── js/               # JavaScript files
+│   ├── css/              # Stylesheets
+│   ├── img/              # Chess piece images
+│   └── nginx.conf        # Nginx configuration
+├── src/                   # Core application logic
+│   ├── main.py           # Command-line entry point
+│   ├── chess_game.py     # Game logic
 │   ├── expert_service.py # Expert AI service
-│   └── config.json     # Configuration
-├── user_data/          # User database
-│   ├── users.json      # Registered users
-│   └── sessions.json   # Active sessions
-├── docker-compose.yml  # Docker orchestration
-└── README.md          # This file
+│   └── config.json       # Configuration
+├── user_data/            # User database
+│   └── users/            # Individual user JSON files
+├── docker-compose.yml    # Docker orchestration
+├── add_user.py          # User management script
+├── reset_admin.py       # Admin password reset script
+└── README.md            # This file
 ```
 
 ## Getting Started
@@ -57,7 +74,6 @@ Chess-ai-app/
 
 - **Python 3.12+** with virtual environment
 - **Docker Desktop** (for containerized deployment)
-- **Node.js** (optional, for frontend development)
 - **Web Browser** (Chrome, Firefox, Safari, Edge)
 
 ### Installation
@@ -79,17 +95,48 @@ Chess-ai-app/
    pip install -r engine/requirements.txt
    ```
 
-4. **Configure the application**
-   - Edit `src/config.json` to add or modify AI models and openings/defenses
+4. **Configure environment variables**
+   Create a `.env` file in the project root:
+   ```env
+   OPENAI_API_KEY=your_openai_api_key
+   JWT_SECRET_KEY=your_secret_key_here
+   ```
 
 ## Running the Application
 
-### Option 1: Command-line Version
+### Option 1: Docker Compose (Recommended)
+
+1. **Start Docker Desktop**
+   ```powershell
+   docker --version
+   ```
+
+2. **Build and run the application**
+   ```powershell
+   cd Chess-ai-app
+   docker-compose build --no-cache
+   docker-compose up
+   ```
+
+3. **Access the services**
+   | Service | URL | Description |
+   |---------|-----|-------------|
+   | Chess UI | http://localhost:8080 | Main web interface |
+   | Auth Service | http://localhost:8002 | Authentication API |
+   | Admin Service | http://localhost:8001 | Admin dashboard |
+   | Chess Engine | http://localhost:8000 | Game engine API |
+
+4. **Stop the application**
+   ```powershell
+   docker-compose down
+   ```
+
+### Option 2: Command-line Version
 
 Run the application directly from the terminal:
 
 ```powershell
-cd C:\Users\rober\Source\Repos\Chess-ai-app
+cd Chess-ai-app
 python -m src.main
 ```
 
@@ -105,220 +152,597 @@ This will display the main menu:
 Enter your choice:
 ```
 
-**Menu Options:**
-- **1: Play a New Game** - Start a new chess game with player and strategy selection
-- **2: Load a Saved Game** - Load a previously saved game from logs
-- **3: Load a Practice Position** - Load a specific chess position to practice
-- **4: View Player Stats** - View statistics for configured players
-- **?: Ask a Chess Expert** - Ask chess-related questions to the expert
-- **q: Quit** - Exit the application
-
-### Option 2: Docker Compose (Web UI - Recommended)
-
-1. **Start Docker Desktop**
-   ```powershell
-   # Verify Docker is running
-   docker --version
-   ```
-
-2. **Run the application**
-   ```powershell
-   cd C:\Users\rober\Source\Repos\Chess-ai-app
-   docker-compose build --no-cache
-   docker-compose up
-   ```
-
-3. **Open in browser**
-   ```
-   http://localhost
-   ```
-
-4. **Stop the application**
-   ```powershell
-   docker-compose down
-   ```
-
-### Option 3: Manual Setup (Engine + UI Separately)
+### Option 3: Manual Setup (Development)
 
 **Terminal 1: Start the Engine**
 ```powershell
-cd C:\Users\rober\Source\Repos\Chess-ai-app
-uvicorn engine.main:app --reload
+cd Chess-ai-app
+uvicorn engine.main:app --reload --port 8000
 ```
-Engine runs on: `http://localhost:8000`
 
-**Terminal 2: Serve the UI**
+**Terminal 2: Start Auth Service**
 ```powershell
-cd C:\Users\rober\Source\Repos\Chess-ai-app\ui
+cd Chess-ai-app
+uvicorn auth-service.main:app --reload --port 8002
+```
+
+**Terminal 3: Start Admin Service**
+```powershell
+cd Chess-ai-app
+uvicorn admin-service.main:app --reload --port 8001
+```
+
+**Terminal 4: Serve the UI**
+```powershell
+cd Chess-ai-app/ui
 python -m http.server 8080
 ```
-UI runs on: `http://localhost:8080`
-
-### Option 4: VS Code Live Server
-
-1. Install the **Live Server** extension in VS Code
-2. Right-click on `ui/index.html`
-3. Select **"Open with Live Server"**
-4. The login interface will open in your default browser
 
 ## User Authentication
 
-### Login & Registration
+### Default Admin Account
 
-The application includes a secure user authentication system. Users must login or register before accessing the chessboard.
+After first deployment, create an admin user:
 
-**Features:**
-- **Secure Password Storage**: Passwords are hashed using PBKDF2-HMAC-SHA256 with salt
-- **Session Tokens**: Users receive JWT-like tokens valid for 7 days
-- **Persistent Login**: Session tokens are stored locally to keep users logged in
-- **Account Registration**: New users can register with username, email, and password
-
-### Login Screen
-
-When you open the application at `http://localhost` or `http://localhost:8080`, you'll see:
-
-1. **Login Form**
-   - Enter your username
-   - Enter your password
-   - Click "Login" button
-
-2. **Register Form**
-   - Click "Register" button on login screen
-   - Enter a username (minimum 3 characters)
-   - Enter your email address
-   - Enter a password (minimum 6 characters)
-   - Click "Register" button
-   - Login with your new credentials
-
-### Authentication Endpoints
-
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/auth/register` | POST | Create a new user account |
-| `/auth/login` | POST | Authenticate user and receive token |
-| `/auth/logout` | POST | End user session |
-| `/auth/verify` | GET | Verify current session token |
-| `/auth/user/{username}` | GET | Retrieve user information |
-
-**Request Examples:**
-
-**Register:**
-```json
-POST /auth/register
-{
-  "username": "chessmaster",
-  "email": "chessmaster@example.com",
-  "password": "SecurePassword123"
-}
+```powershell
+python add_user.py -u admin -e admin@chess.local -p admin123 --admin
 ```
 
-**Login:**
-```json
-POST /auth/login
-{
-  "username": "chessmaster",
-  "password": "SecurePassword123"
-}
+Or reset the admin password:
+```powershell
+python reset_admin.py
+```
+
+### Login & Registration
+
+**Login via API:**
+```powershell
+Invoke-RestMethod -Uri "http://localhost:8002/auth/login" -Method Post -ContentType "application/json" -Body '{"username":"admin","password":"admin123"}'
 ```
 
 **Response:**
 ```json
 {
   "success": true,
-  "message": "Login successful",
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "username": "admin",
+  "email": "admin@chess.local",
+  "is_admin": true
 }
+```
+
+### Authentication Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/auth/register` | POST | Create new user account |
+| `/auth/login` | POST | Authenticate and receive JWT token |
+| `/auth/logout` | POST | End user session |
+| `/auth/verify` | POST | Verify JWT token validity |
+| `/auth/refresh` | POST | Refresh JWT token |
+| `/auth/change-password` | POST | Change user password |
+
+## Admin Dashboard
+
+Access the admin dashboard at http://localhost:8001
+
+### Admin Features
+
+- **User Management**: View, create, delete, promote/demote users
+- **AI Model Management**: Add, remove, configure AI models
+- **System Statistics**: View game stats and system health
+- **Service Health**: Monitor all microservices
+
+### Admin API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/admin/users` | GET | List all users |
+| `/admin/users/delete` | POST | Delete a user |
+| `/admin/users/promote` | POST | Promote user to admin |
+| `/admin/users/demote` | POST | Demote admin to user |
+| `/admin/models` | GET | List AI models |
+| `/admin/models/add` | POST | Add new AI model |
+| `/admin/models/remove` | POST | Remove AI model |
+| `/admin/stats` | GET | Get system statistics |
+
+## API Services
+
+### Chess Engine (Port 8000)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Health check |
+| `/move` | POST | Submit a chess move |
+| `/ai/suggest` | GET | Get AI move suggestion |
+| `/expert/question` | POST | Ask chess expert |
+| `/expert/joke` | GET | Get chess joke |
+| `/expert/fact` | GET | Get chess fact |
+
+**Example Move Request:**
+```powershell
+$token = "your_jwt_token"
+Invoke-RestMethod -Uri "http://localhost:8000/move" -Method Post -ContentType "application/json" -Headers @{Authorization="Bearer $token"} -Body '{"move":"e2e4","fen":"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"}'
+```
+
+## UI-Server Communication Architecture
+
+This section explains how the frontend UI communicates with the backend microservices, including the authentication token flow.
+
+### Architecture Overview
+
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│                 │     │                  │     │                 │
+│   Chess UI      │────▶│   Auth Service   │     │  Chess Engine   │
+│  (Port 8080)    │     │   (Port 8002)    │     │   (Port 8000)   │
+│                 │     │                  │     │                 │
+└────────┬────────┘     └──────────────────┘     └────────▲────────┘
+         │                                                │
+         │              ┌──────────────────┐              │
+         │              │                  │              │
+         └─────────────▶│  Admin Service   │──────────────┘
+                        │   (Port 8001)    │
+                        │                  │
+                        └──────────────────┘
+```
+
+### Authentication Token Flow
+
+The application uses **JWT (JSON Web Tokens)** for secure authentication. Here's the complete flow:
+
+#### Step 1: User Login
+
+```
+┌─────────┐                              ┌──────────────┐
+│   UI    │                              │ Auth Service │
+└────┬────┘                              └──────┬───────┘
+     │                                          │
+     │  POST /auth/login                        │
+     │  {username, password}                    │
+     │─────────────────────────────────────────▶│
+     │                                          │
+     │                                          │ Verify credentials
+     │                                          │ Generate JWT token
+     │                                          │
+     │  {success: true, token: "eyJ..."}        │
+     │◀─────────────────────────────────────────│
+     │                                          │
+     │  Store token in localStorage             │
+     │                                          │
+```
+
+**Login Request:**
+```javascript
+// UI sends login request
+fetch('http://localhost:8002/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+        username: 'admin', 
+        password: 'admin123' 
+    })
+})
+.then(response => response.json())
+.then(data => {
+    if (data.success) {
+        // Store token for future requests
+        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('username', data.username);
+        localStorage.setItem('isAdmin', data.is_admin);
+    }
+});
+```
+
+**Login Response:**
+```json
+{
+    "success": true,
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwiaXNfYWRtaW4iOnRydWUsImV4cCI6MTc2NDk5OTEwMywiaWF0IjoxNzY0OTEyNzAzfQ.I7JmcH5dDI3Ui76RhlWFs9Fchx6y6d2IP2LrsfAAtAI",
+    "username": "admin",
+    "email": "admin@chess.local",
+    "is_admin": true
+}
+```
+
+#### Step 2: JWT Token Structure
+
+The JWT token contains three parts separated by dots (`.`):
+
+```
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.    <- Header (base64)
+eyJ1c2VybmFtZSI6ImFkbWluIiwiaXNfYWRtaW4i... <- Payload (base64)
+I7JmcH5dDI3Ui76RhlWFs9Fchx6y6d2IP2LrsfAAtAI <- Signature
+```
+
+**Decoded Payload:**
+```json
+{
+    "username": "admin",
+    "is_admin": true,
+    "exp": 1764999103,    // Expiration timestamp (24 hours from creation)
+    "iat": 1764912703     // Issued at timestamp
+}
+```
+
+#### Step 3: Authenticated API Requests
+
+All subsequent requests to protected endpoints must include the token in the `Authorization` header:
+
+```
+┌─────────┐                              ┌──────────────┐
+│   UI    │                              │ Chess Engine │
+└────┬────┘                              └──────┬───────┘
+     │                                          │
+     │  POST /move                              │
+     │  Headers: Authorization: Bearer eyJ...   │
+     │  Body: {move, fen}                       │
+     │─────────────────────────────────────────▶│
+     │                                          │
+     │                                          │ Validate token
+     │                                          │ Process move
+     │                                          │
+     │  {success: true, newFen: "..."}          │
+     │◀─────────────────────────────────────────│
+     │                                          │
+```
+
+**Authenticated Request Example:**
+```javascript
+// Get stored token
+const token = localStorage.getItem('authToken');
+
+// Make authenticated request to chess engine
+fetch('http://localhost:8000/move', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`  // Include token
+    },
+    body: JSON.stringify({
+        move: 'e2e4',
+        fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+    })
+})
+.then(response => {
+    if (response.status === 401) {
+        // Token expired or invalid - redirect to login
+        window.location.href = '/login';
+        return;
+    }
+    return response.json();
+})
+.then(data => {
+    // Update chessboard with new position
+    updateBoard(data.newFen);
+});
+```
+
+### Request/Response Flow by Service
+
+#### Auth Service (Port 8002)
+
+| Flow | Description |
+|------|-------------|
+| `UI → Auth` | Login, register, logout, token refresh |
+| `Auth → UI` | JWT token, user info, success/error |
+
+**Endpoints:**
+```
+POST /auth/login      - Returns JWT token on success
+POST /auth/register   - Creates user, returns success
+POST /auth/verify     - Validates token, returns user info
+POST /auth/refresh    - Returns new JWT token
+POST /auth/logout     - Invalidates session (client-side)
+POST /auth/change-password - Updates password
+```
+
+#### Chess Engine (Port 8000)
+
+| Flow | Description |
+|------|-------------|
+| `UI → Engine` | Game moves, AI suggestions, expert questions |
+| `Engine → UI` | New board state, AI moves, answers |
+
+**All requests require `Authorization: Bearer <token>` header.**
+
+**Request Flow:**
+```javascript
+// 1. User makes a move on the UI
+const move = 'e2e4';
+const currentFen = game.fen();
+
+// 2. UI sends move to engine
+const response = await fetch('http://localhost:8000/move', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({ move, fen: currentFen })
+});
+
+// 3. Engine validates move and returns new state
+const data = await response.json();
+// { success: true, newFen: "...", aiMove: "e7e5" }
+
+// 4. UI updates the board
+game.load(data.newFen);
+board.position(data.newFen);
+```
+
+#### Admin Service (Port 8001)
+
+| Flow | Description |
+|------|-------------|
+| `UI → Admin` | User management, model config, stats |
+| `Admin → UI` | User lists, system stats, config data |
+
+**Admin endpoints require `Authorization: Bearer <token>` with `is_admin: true`.**
+
+### Token Validation Process
+
+When a protected endpoint receives a request:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Token Validation Flow                     │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │ Extract token   │
+                    │ from header     │
+                    └────────┬────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+              No    │ Token present?  │
+           ┌────────│                 │
+           │        └────────┬────────┘
+           │                 │ Yes
+           ▼                 ▼
+    ┌──────────────┐ ┌─────────────────┐
+    │ 401 Missing  │ │ Decode JWT with │
+    │ authorization│ │ secret key      │
+    └──────────────┘ └────────┬────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+              No    │ Signature valid?│
+           ┌────────│                 │
+           │        └────────┬────────┘
+           │                 │ Yes
+           ▼                 ▼
+    ┌──────────────┐ ┌─────────────────┐
+    │ 401 Invalid  │ │ Check expiration│
+    │ token        │ │ (exp claim)     │
+    └──────────────┘ └────────┬────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+              No    │ Token expired?  │
+           ┌────────│                 │
+           │        └────────┬────────┘
+           │                 │ Yes
+           ▼                 ▼
+    ┌──────────────┐ ┌──────────────┐
+    │ Process      │ │ 401 Token    │
+    │ request ✓    │ │ expired      │
+    └──────────────┘ └──────────────┘
+```
+
+**Server-side validation code (Python):**
+```python
+def verify_token(token: str) -> tuple[bool, Optional[str], Optional[bool]]:
+    """Verify JWT token and return (success, username, is_admin)."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        username = payload.get("username")
+        is_admin = payload.get("is_admin", False)
+        
+        if username is None:
+            return False, None, None
+        
+        return True, username, is_admin
+    except jwt.ExpiredSignatureError:
+        return False, None, None  # Token expired
+    except jwt.InvalidTokenError:
+        return False, None, None  # Invalid token
+```
+
+### CORS (Cross-Origin Resource Sharing)
+
+Since the UI runs on a different port than the backend services, CORS is configured to allow cross-origin requests:
+
+```python
+# Each service includes CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],           # Allow all origins (restrict in production)
+    allow_credentials=True,
+    allow_methods=["*"],           # Allow all HTTP methods
+    allow_headers=["*"],           # Allow all headers including Authorization
+)
+```
+
+**Browser Request Flow with CORS:**
+```
+┌─────────┐                              ┌──────────────┐
+│ Browser │                              │    Server    │
+└────┬────┘                              └──────┬───────┘
+     │                                          │
+     │  OPTIONS /move (preflight)               │
+     │  Origin: http://localhost:8080           │
+     │─────────────────────────────────────────▶│
+     │                                          │
+     │  Access-Control-Allow-Origin: *          │
+     │  Access-Control-Allow-Methods: POST      │
+     │  Access-Control-Allow-Headers: Auth...   │
+     │◀─────────────────────────────────────────│
+     │                                          │
+     │  POST /move (actual request)             │
+     │  Authorization: Bearer eyJ...            │
+     │─────────────────────────────────────────▶│
+     │                                          │
+     │  Response with data                      │
+     │◀─────────────────────────────────────────│
+```
+
+### Token Storage & Security
+
+| Storage Method | Pros | Cons |
+|----------------|------|------|
+| `localStorage` | Persists across sessions | Vulnerable to XSS |
+| `sessionStorage` | Cleared on tab close | Lost on refresh |
+| `httpOnly Cookie` | Protected from XSS | Requires CSRF protection |
+
+**Current Implementation (localStorage):**
+```javascript
+// Store token after login
+localStorage.setItem('authToken', token);
+
+// Retrieve token for requests
+const token = localStorage.getItem('authToken');
+
+// Clear token on logout
+localStorage.removeItem('authToken');
+```
+
+### Error Handling
+
+The UI should handle authentication errors gracefully:
+
+```javascript
+async function makeAuthenticatedRequest(url, options = {}) {
+    const token = localStorage.getItem('authToken');
+    
+    if (!token) {
+        redirectToLogin();
+        return null;
+    }
+    
+    const response = await fetch(url, {
+        ...options,
+        headers: {
+            ...options.headers,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        }
+    });
+    
+    switch (response.status) {
+        case 401:
+            // Token expired or invalid
+            localStorage.removeItem('authToken');
+            redirectToLogin();
+            return null;
+        case 403:
+            // Forbidden - user lacks permission
+            showError('You do not have permission for this action');
+            return null;
+        case 200:
+            return response.json();
+        default:
+            showError('An error occurred');
+            return null;
+    }
+}
+```
+
+### Complete Request Lifecycle Example
+
+Here's a complete example of a chess move from UI to response:
+
+```
+1. USER ACTION
+   └─▶ User drags piece from e2 to e4 on chessboard
+
+2. UI PROCESSING
+   └─▶ JavaScript captures move: "e2e4"
+   └─▶ Gets current FEN: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+   └─▶ Retrieves token from localStorage
+
+3. HTTP REQUEST
+   └─▶ POST http://localhost:8000/move
+       Headers:
+         Content-Type: application/json
+         Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+       Body:
+         {"move": "e2e4", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"}
+
+4. SERVER PROCESSING (Chess Engine)
+   └─▶ Extract token from Authorization header
+   └─▶ Validate JWT signature and expiration
+   └─▶ Parse move and validate legality
+   └─▶ Update board state
+   └─▶ (If vs AI) Calculate AI response move
+
+5. HTTP RESPONSE
+   └─▶ 200 OK
+       {
+         "success": true,
+         "newFen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+         "aiMove": "e7e5",
+         "message": "Move accepted"
+       }
+
+6. UI UPDATE
+   └─▶ Update internal game state with new FEN
+   └─▶ Animate piece movement on board
+   └─▶ Update move history display
+   └─▶ Check for game end conditions
+```
+
+## User Management
+
+### Add Users via Script
+
+**Interactive mode:**
+```powershell
+python add_user.py
+```
+
+**Command line:**
+```powershell
+# Add regular user
+python add_user.py -u johndoe -e john@example.com -p mypassword123
+
+# Add admin user
+python add_user.py -u newadmin -e admin2@example.com -p adminpass123 --admin
+
+# List all users
+python add_user.py --list
 ```
 
 ### User Data Storage
 
-User information is stored in `user_data/users.json`:
+Users are stored as individual JSON files in `user_data/users/`:
 
 ```json
 {
-  "chessmaster": {
-    "email": "chessmaster@example.com",
-    "password": "salt$hash_hex",
-    "created_at": "2025-11-30T17:14:47.123456",
-    "games_played": 5
-  }
+  "username": "johndoe",
+  "email": "john@example.com",
+  "password_hash": "$2b$12$...",
+  "is_admin": false,
+  "created_at": "2025-12-05T12:00:00.000000+00:00",
+  "games_played": 0
 }
 ```
 
-**Security Notes:**
-- Passwords are never stored in plain text
-- Each password uses a unique salt
-- Session tokens expire after 7 days
-- Tokens are stored in browser's localStorage
-- Use HTTPS in production environments
-
-## Viewing the Chessboard Interface
-
-### Web Interface Features
-
-- **Interactive Board**: Drag pieces to make moves
-- **Game Panel**: View status, moves, and FEN in real-time
-- **AI Controls**: White/Black buttons for AI vs AI games
-- **Player Setup**: Configure players and strategies
-- **Strategy Tab**: Choose openings and defenses
-- **Expert Panel**: Ask chess questions and get advice
-- **Move History**: See all moves played in the game
-
-### Accessing the Chessboard
-
-After successful login, you'll be taken to the chessboard interface featuring:
-
-- **Centered Chessboard**: 400x400px interactive board
-- **Game Status**: Real-time game state updates
-- **Player Setup Panel**: Select human or AI players
-- **Strategy Selection**: Choose openings and defenses
-- **Move History**: Track all moves in the game
-- **FEN Notation**: View board state in standard notation
-- **Expert Assistant**: Ask chess questions
-- **User Info**: Username displayed in header
-- **Logout Button**: Safely end your session
-
-| Method | URL | Steps |
-|--------|-----|-------|
-| **Docker Compose** | `http://localhost` | Run `docker-compose up` |
-| **Manual Setup** | `http://localhost:8080` | Start engine & serve UI |
-| **Live Server** | Auto-opens | Right-click `index.html` → "Open with Live Server" |
-
-## API Endpoints
-
-### Authentication Endpoints
-- **`POST /auth/register`** - Register new user account
-- **`POST /auth/login`** - Login and receive session token
-- **`POST /auth/logout`** - Logout and end session
-- **`GET /auth/verify`** - Verify session token validity
-- **`GET /auth/user/{username}`** - Get user information
-
-### Move Management
-- **`POST /move`**  
-  Submit a chess move and get the updated board state
-  ```json
-  Request: { "move": "e2-e4", "fen": "..." }
-  Response: { "status": "Move accepted", "fen": "...", "engine_move": "e7e5" }
-  ```
-
-### Expert Services
-- **`POST /expert/question`** - Ask chess questions
-- **`GET /expert/joke`** - Get a chess joke
-- **`GET /expert/fact`** - Get a fun chess fact
-- **`GET /expert/news`** - Get latest chess news
-- **`POST /expert/analyze`** - Analyze a position
-- **`GET /expert/opening`** - Get opening advice
-
 ## Configuration
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `OPENAI_API_KEY` | OpenAI API key for AI models | - |
+| `JWT_SECRET_KEY` | Secret key for JWT tokens | `chess-ai-secret-key-change-in-production` |
+
+### Game Configuration
 
 Edit `src/config.json` to customize:
 
-- **AI Models**: Add or modify OpenRouter API integrations
-- **Stockfish Settings**: Configure engine skill levels and parameters
-- **Openings**: Define white opening strategies
-- **Defenses**: Define black defense strategies
-
-Example config snippet:
 ```json
 {
   "ai_models": {
@@ -328,6 +752,10 @@ Example config snippet:
   "openings": [
     "Play the Ruy Lopez.",
     "Play the Italian Game."
+  ],
+  "defenses": [
+    "Play the Sicilian Defense.",
+    "Play the French Defense."
   ]
 }
 ```
@@ -337,24 +765,79 @@ Example config snippet:
 All games are logged to `logs/games/` with complete game information:
 
 ```
-2025-09-16 13:01:24,818 - New Game Started
-2025-09-16 13:01:24,818 - White: Stockfish (Skill: 10)
-2025-09-16 13:01:24,818 - Black: Stockfish (Skill: 20)
-2025-09-16 13:01:24,818 - White Strategy: Play the Ruy Lopez.
-2025-09-16 13:01:24,818 - Black Strategy: Play the Sicilian Defense.
-2025-09-16 13:01:24,818 - Initial FEN: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+2025-12-05 13:01:24,818 - New Game Started
+2025-12-05 13:01:24,818 - White: Stockfish (Skill: 10)
+2025-12-05 13:01:24,818 - Black: Human
+2025-12-05 13:01:24,818 - White Strategy: Play the Ruy Lopez.
+2025-12-05 13:01:24,818 - Initial FEN: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**1. Auth service fails to start (bcrypt error)**
+```
+AttributeError: module 'bcrypt' has no attribute '__about__'
+```
+Solution: The auth-service uses bcrypt directly instead of passlib. Rebuild:
+```powershell
+docker-compose build --no-cache
+docker-compose up
+```
+
+**2. Login fails with "Invalid username or password"**
+- Ensure user exists: `python add_user.py --list`
+- Reset admin password inside container:
+```powershell
+docker exec chess-auth-service python -c "import json; import bcrypt; pw=bcrypt.hashpw(b'admin123', bcrypt.gensalt()).decode(); data={'username':'admin','email':'admin@chess.local','password_hash':pw,'is_admin':True,'created_at':'2025-12-05T00:00:00','games_played':0}; json.dump(data, open('/app/user_data/users/admin.json','w'), indent=2); print('Done')"
+```
+
+**3. 401 Unauthorized on /move endpoint**
+- Ensure you're sending the JWT token in the Authorization header
+- Token format: `Authorization: Bearer <token>`
+
+**4. Container not seeing updated files**
+```powershell
+docker-compose down
+docker-compose build --no-cache
+docker-compose up
+```
+
+### Health Checks
+
+Check service health:
+```powershell
+# Auth Service
+Invoke-RestMethod -Uri "http://localhost:8002/health"
+
+# Admin Service
+Invoke-RestMethod -Uri "http://localhost:8001/health"
+
+# Chess Engine
+Invoke-RestMethod -Uri "http://localhost:8000/"
+```
+
+### View Container Logs
+
+```powershell
+# All services
+docker-compose logs
+
+# Specific service
+docker logs chess-auth-service
+docker logs chess-engine
+docker logs chess-admin-service
 ```
 
 ## Notes
 
-- If no opening/defense is selected, logs will show "No Classic Chess Opening"/"No Classic Chess Defense"
-- All strategy selections are recorded in the game log file
-- The FEN notation indicates whose turn it is and the board state after the previous move
-- When both players are AI, use the White/Black buttons to make sequential moves
-- You can play via command-line or use the web interface depending on your preference
-- User sessions persist for 7 days; after that, you'll need to login again
-- For development, user data is stored in plain JSON files; use a proper database in production
+- JWT tokens expire after 24 hours
+- Passwords must be between 6-72 characters (bcrypt limitation)
+- User data is stored in JSON files; use a proper database in production
+- For production, change `JWT_SECRET_KEY` to a secure random value
+- Use HTTPS in production environments
 
 ---
 
-Enjoy playing and analyzing chess with AI!
+Enjoy playing and analyzing chess with AI! ♟️

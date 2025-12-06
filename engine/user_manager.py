@@ -4,6 +4,18 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional, Tuple, List, Dict
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
 
 class UserManager:
     def __init__(self, data_dir: str = "user_data"):
@@ -377,3 +389,13 @@ class UserManager:
             "total_ai_models": len(models.get('models', [])),
             "enabled_models": len([m for m in models.get('models', []) if m.get('enabled', False)])
         }
+
+@app.post("/auth/login", response_model=TokenResponse)
+async def login(req: LoginRequest):
+    um = UserManager()
+    success, message, token = um.login_user(req.username, req.password)
+    
+    if not success:
+        return {"error": message}
+    
+    return {"access_token": token, "token_type": "bearer"}
