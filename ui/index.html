@@ -53,6 +53,32 @@
       height: 400px;
       margin: 0 auto;
     }
+    #status-box {
+      width: 400px;
+      margin: 15px auto;
+      padding: 12px;
+      background-color: #f5f5f5;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 14px;
+      min-height: 60px;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+    #status-box .status-success {
+      color: #2e7d32;
+    }
+    #status-box .status-error {
+      color: #c62828;
+    }
+    #status-box .status-info {
+      color: #1565c0;
+    }
+    #status-box .status-time {
+      color: #757575;
+      font-size: 12px;
+    }
     .tab-buttons {
       display: flex;
       border-bottom: 1px solid #ccc;
@@ -120,23 +146,24 @@
   
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="chessboard.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
   
   <script>
     let authToken = null;
     let currentUser = null;
     let board = null;
+      let game = null;
+      let moveHistory = [];
 
     function checkAuthentication() {
       const token = localStorage.getItem('authToken');
       const user = localStorage.getItem('currentUser');
 
-      // If no token, show login interface
       if (!token) {
         showLoginInterface();
         return;
       }
 
-      // Token exists, verify it
       authToken = token;
       currentUser = user;
       verifyToken(token);
@@ -202,14 +229,13 @@
             localStorage.setItem('currentUser', currentUser);
             localStorage.setItem('isAdmin', data.is_admin ? 'true' : 'false');
 
-            // Redirect admin users to admin dashboard
             if (data.is_admin) {
               window.location.href = 'admin.html';
             } else {
               loadChessboardInterface();
             }
           } else {
-            errorDiv.textContent = data.message || 'Login failed';
+            errorDiv.textContent = data.detail || data.message || 'Login failed';
             errorDiv.style.display = 'block';
           }
         })
@@ -242,7 +268,7 @@
             alert('Registration successful! Please login.');
             showLoginInterface();
           } else {
-            errorDiv.textContent = data.message || 'Registration failed';
+            errorDiv.textContent = data.detail || data.message || 'Registration failed';
             errorDiv.style.display = 'block';
           }
         })
@@ -254,6 +280,7 @@
 
       function verifyToken(token) {
       fetch('http://localhost:8002/auth/verify', {
+        method: 'POST',
         headers: { 'Authorization': 'Bearer ' + token }
       })
         .then(response => response.json())
@@ -262,7 +289,6 @@
             currentUser = data.username;
             localStorage.setItem('isAdmin', data.is_admin ? 'true' : 'false');
 
-            // Redirect admins to admin dashboard
             if (data.is_admin) {
               window.location.href = 'admin.html';
             } else {
@@ -283,6 +309,42 @@
         });
     }
 
+      function updateStatusBox(message, type = 'info') {
+        const statusBox = document.getElementById('status-box');
+        if (!statusBox) return;
+
+        const timestamp = new Date().toLocaleTimeString();
+        const statusClass = `status-${type}`;
+
+        const newMessage = `<div><span class="status-time">[${timestamp}]</span> <span class="${statusClass}">${message}</span></div>`;
+
+        statusBox.innerHTML = newMessage + statusBox.innerHTML;
+
+        const messages = statusBox.querySelectorAll('div');
+        if (messages.length > 10) {
+          for (let i = 10; i < messages.length; i++) {
+            messages[i].remove();
+          }
+        }
+      }
+
+      function updateMoveHistory(move, isAI = false) {
+        const player = isAI ? 'AI' : 'You';
+        moveHistory.push({ move, player });
+
+        const historyDiv = document.getElementById('move-history');
+        if (historyDiv) {
+          let html = '';
+          for (let i = 0; i < moveHistory.length; i += 2) {
+            const moveNum = Math.floor(i / 2) + 1;
+            const whiteMove = moveHistory[i] ? `${moveHistory[i].player}: ${moveHistory[i].move}` : '';
+            const blackMove = moveHistory[i + 1] ? `${moveHistory[i + 1].player}: ${moveHistory[i + 1].move}` : '';
+            html += `<div>${moveNum}. ${whiteMove} ${blackMove}</div>`;
+          }
+          historyDiv.innerHTML = html || '<p style="color: #999;">No moves yet</p>';
+        }
+      }
+
       function loadChessboardInterface() {
         const chessboardHTML = `
         <header>
@@ -294,19 +356,21 @@
         </header>
 
         <div class="main-container">
-          <!-- Chessboard Section -->
           <div class="chessboard-section">
             <div id="board"></div>
-            <div id="game-status" style="margin-top: 20px; text-align: center; font-size: 16px;">
+
+            <div id="status-box">
+              <div><span class="status-time">[${new Date().toLocaleTimeString()}]</span> <span class="status-info">Ready to play. Start a new game or make a move.</span></div>
+            </div>
+            
+            <div id="game-status" style="margin-top: 10px; text-align: center; font-size: 16px;">
               <p>Game Status: <strong>Ready to play</strong></p>
             </div>
           </div>
 
-          <!-- Game Panel Section -->
           <div class="game-panel">
             <h2>Game Panel</h2>
 
-            <!-- Player Setup -->
             <div class="section-box">
               <h3>Player Setup</h3>
               <label style="display: block; margin: 10px 0;">
@@ -323,10 +387,22 @@
                   <option value="ai" selected>AI</option>
                 </select>
               </label>
+              <label style="display: block; margin: 10px 0;">
+                AI Type:
+                <select id="ai-type" style="width: 100%; padding: 5px;">
+                  <option value="stockfish" selected>Stockfish</option>
+                  <option value="openai">OpenAI GPT</option>
+                  <option value="deepseek">DeepSeek</option>
+                  <option value="claude">Claude</option>
+                </select>
+              </label>
+              <label style="display: block; margin: 10px 0;">
+                Skill Level (1-20):
+                <input type="number" id="skill-level" value="10" min="1" max="20" style="width: 100%; padding: 5px;">
+              </label>
               <button onclick="startNewGame()" class="btn-primary">Start New Game</button>
             </div>
 
-            <!-- Strategy Selection -->
             <div class="section-box">
               <h3>Strategy</h3>
               <label style="display: block; margin: 10px 0;">
@@ -347,7 +423,6 @@
               </label>
             </div>
 
-            <!-- Tabs for Move History and Expert -->
             <div class="section-box">
               <div class="tab-buttons">
                 <button class="tab-btn active" onclick="switchTab(event, 'moves-tab')">Move History</button>
@@ -367,7 +442,6 @@
               </div>
             </div>
 
-            <!-- FEN Display -->
             <div class="section-box">
               <h3>FEN Notation</h3>
               <div id="fen-display" style="background-color: #f5f5f5; padding: 10px; border-radius: 4px; word-break: break-all; font-family: monospace; font-size: 12px;">
@@ -383,46 +457,202 @@
     }
 
       function initializeChessboard() {
-        board = Chessboard('board', {
-          draggable: true,
-          onDrop: function (source, target, piece, newPos, oldPos, orientation) {
-            const move = source + '-' + target;
-            const fen = board.fen();
-            sendMoveToEngine(move, fen);
-            return 'snapback';
+      game = new Chess();
+      
+      board = Chessboard('board', {
+        draggable: true,
+        position: 'start',
+        pieceTheme: 'img/chesspieces/wikipedia/{piece}.png',
+        onDragStart: onDragStart,
+        onDrop: onDrop,
+        onSnapEnd: onSnapEnd
+      });
+
+            console.log('Chessboard initialized for user:', currentUser);
+            updateStatusBox('Chessboard initialized successfully', 'success');
+            updateFenDisplay();
           }
-        });
-        console.log('Chessboard initialized for user:', currentUser);
-      }
+
+          function onDragStart(source, piece, position, orientation) {
+            if (game.game_over()) {
+              updateStatusBox('Game is over!', 'error');
+              return false;
+            }
+
+            if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
+              (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
+              return false;
+            }
+
+            return true;
+          }
+
+          function onDrop(source, target) {
+            const move = game.move({
+              from: source,
+              to: target,
+              promotion: 'q'
+            });
+
+            if (move === null) {
+              updateStatusBox(`Invalid move: ${source} → ${target}`, 'error');
+              return 'snapback';
+            }
+
+    updateStatusBox(`You played: ${move.san}`, 'info');
+    updateMoveHistory(move.san, false);
+    updateFenDisplay();
+
+    // Check if we need AI to respond
+    const blackPlayer = document.getElementById('black-player').value;
+    const whitePlayer = document.getElementById('white-player').value;
+    const needsAI = (game.turn() === 'b' && blackPlayer === 'ai') ||
+      (game.turn() === 'w' && whitePlayer === 'ai');
+
+    // Send move to engine
+    sendMoveToEngine(source + target, game.fen(), needsAI);
+
+    checkGameStatus();
+  }
+
+  function onSnapEnd() {
+    board.position(game.fen());
+  }
+
+  function updateFenDisplay() {
+    const fenDisplay = document.getElementById('fen-display');
+    if (fenDisplay && game) {
+      fenDisplay.textContent = game.fen();
+    }
+  }
+
+  function checkGameStatus() {
+    const statusDiv = document.getElementById('game-status');
+    let status = '';
+
+    if (game.in_checkmate()) {
+      status = game.turn() === 'w' ? 'Black wins by checkmate!' : 'White wins by checkmate!';
+      updateStatusBox(status, 'success');
+    } else if (game.in_draw()) {
+      status = 'Game drawn!';
+      updateStatusBox(status, 'info');
+    } else if (game.in_check()) {
+      status = game.turn() === 'w' ? 'White is in check' : 'Black is in check';
+      updateStatusBox(status, 'info');
+    } else {
+      status = game.turn() === 'w' ? "White's turn" : "Black's turn";
+    }
+
+    if (statusDiv) {
+      statusDiv.innerHTML = `<p>Game Status: <strong>${status}</strong></p>`;
+    }
+  }
 
       function startNewGame() {
         const whitePlayer = document.getElementById('white-player').value;
         const blackPlayer = document.getElementById('black-player').value;
-        console.log(`Starting game: White=${whitePlayer}, Black=${blackPlayer}`);
-        if (board) {
-          board.start();
-          document.getElementById('fen-display').textContent = board.fen();
-          document.getElementById('game-status').innerHTML = '<p>Game Status: <strong>Game Started</strong></p>';
-        }
+
+      game = new Chess();
+      moveHistory = [];
+
+      if (board) {
+        board.start();
+      }
+
+      document.getElementById('move-history').innerHTML = '<p style="color: #999;">No moves yet</p>';
+      updateFenDisplay();
+      checkGameStatus();
+      updateStatusBox(`New game started: White=${whitePlayer}, Black=${blackPlayer}`, 'success');
     }
 
-    function sendMoveToEngine(move, fen) {
+      function sendMoveToEngine(move, fen, requestAiMove) {
+        const aiType = document.getElementById('ai-type').value;
+        const skillLevel = parseInt(document.getElementById('skill-level').value) || 10;
+
+        console.log('[UI] Sending to engine:', { move, fen, requestAiMove, aiType, skillLevel });
+    
       fetch('http://localhost:8000/move', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ move: move, fen: fen })
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + authToken
+        },
+        body: JSON.stringify({
+          move: move,
+          fen: fen,
+          request_ai_move: requestAiMove,
+          ai_type: aiType,
+          skill_level: skillLevel
+        })
       })
-        .then(response => response.json())
+        .then(response => {
+          console.log('[UI] Response status:', response.status);
+          if (response.status === 401) {
+            updateStatusBox('Authentication failed. Please login again.', 'error');
+            handleLogout();
+            throw new Error('Unauthorized');
+          }
+          return response.json();
+        })
         .then(data => {
-          if (board) {
-            board.position(data.fen);
-            document.getElementById('fen-display').textContent = data.fen;
-            document.getElementById('game-status').innerHTML = `<p>Game Status: <strong>${data.status}</strong></p>`;
+          console.log('[UI] Response data:', data);
+
+          if (data.error) {
+            updateStatusBox(`Server error: ${data.error}`, 'error');
+            return;
+          }
+
+          updateStatusBox(`Move confirmed by server`, 'success');
+
+          // Handle AI move response
+          if (data.ai_move) {
+            console.log('[UI] AI move received:', data.ai_move);
+
+            // Parse the AI move (format: "e7e5" or "e7e5q" for promotion)
+            const from = data.ai_move.substring(0, 2);
+            const to = data.ai_move.substring(2, 4);
+            const promotion = data.ai_move.length > 4 ? data.ai_move[4] : undefined;
+
+            console.log('[UI] Parsed AI move:', { from, to, promotion });
+
+            // Apply the AI move to our local game
+            const aiMoveResult = game.move({
+              from: from,
+              to: to,
+              promotion: promotion || 'q'
+            });
+
+            console.log('[UI] AI move result:', aiMoveResult);
+
+            if (aiMoveResult) {
+              // Update the board display
+              board.position(game.fen());
+
+              // Update move history with SAN notation
+              const sanMove = data.ai_move_san || aiMoveResult.san;
+              updateMoveHistory(sanMove, true);
+              updateFenDisplay();
+              updateStatusBox(`AI played: ${sanMove} (${data.ai_type})`, 'info');
+              checkGameStatus();
+            } else {
+              console.error('[UI] Failed to apply AI move:', data.ai_move);
+              updateStatusBox(`Failed to apply AI move: ${data.ai_move}`, 'error');
+
+              // Try to sync with server FEN
+              if (data.fen) {
+                game.load(data.fen);
+                board.position(data.fen);
+                updateFenDisplay();
+                updateStatusBox(`Board synced with server`, 'info');
+              }
+            }
           }
         })
         .catch(error => {
-          console.error('Error:', error);
-          document.getElementById('game-status').innerHTML = `<p>Game Status: <strong>Error: ${error.message}</strong></p>`;
+          if (error.message !== 'Unauthorized') {
+            console.error('[UI] Error:', error);
+            updateStatusBox(`Connection error: ${error.message}`, 'error');
+          }
         });
     }
 
@@ -435,20 +665,44 @@
 
       function askExpert() {
         const question = document.getElementById('expert-input').value;
-        if (!question) return;
+      if (!question) {
+        updateStatusBox('Please enter a question', 'error');
+        return;
+      }
+
+      updateStatusBox(`Asking expert: "${question}"`, 'info');
 
       fetch('http://localhost:8000/expert/question', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: question })
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + authToken
+        },
+        body: JSON.stringify({ question: question, fen: game.fen() })
       })
-        .then(response => response.json())
+        .then(response => {
+          if (response.status === 401) {
+            updateStatusBox('Authentication failed. Please login again.', 'error');
+            handleLogout();
+            throw new Error('Unauthorized');
+          }
+          return response.json();
+        })
         .then(data => {
-          document.getElementById('expert-response').textContent = data.response || 'No response';
-          document.getElementById('expert-input').value = '';
+          if (data.error) {
+            document.getElementById('expert-response').textContent = 'Error: ' + data.error;
+            updateStatusBox(`Expert error: ${data.error}`, 'error');
+          } else {
+            document.getElementById('expert-response').textContent = data.response || 'No response';
+            document.getElementById('expert-input').value = '';
+            updateStatusBox('Expert response received', 'success');
+          }
         })
         .catch(error => {
-          document.getElementById('expert-response').textContent = 'Error: ' + error.message;
+          if (error.message !== 'Unauthorized') {
+            document.getElementById('expert-response').textContent = 'Error: ' + error.message;
+            updateStatusBox(`Expert connection error: ${error.message}`, 'error');
+          }
         });
     }
 

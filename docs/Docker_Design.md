@@ -371,3 +371,536 @@ You can serve the static files using a simple web server (Node.js/Express, Pytho
 
 **Note:**  
 chessboard.js is a flexible JavaScript chessboard component that does not include chess logic or a chess engine. It is designed to be used alongside other libraries (such as chess.js) or your backend API for full chess functionality. For more information, see [chessboardjs.com](http://chessboardjs.com) and the [README](https://github.com/oakmac/chessboardjs/blob/master/README.md).
+
+## API Services
+
+### Chess Engine (Port 8000)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Health check |
+| `/move` | POST | Submit a chess move |
+| `/ai/suggest` | GET | Get AI move suggestion |
+| `/expert/question` | POST | Ask chess expert |
+| `/expert/joke` | GET | Get chess joke |
+| `/expert/fact` | GET | Get chess fact |
+
+**Example Move Request:**
+```powershell
+$token = "your_jwt_token"
+Invoke-RestMethod -Uri "http://localhost:8000/move" -Method Post -ContentType "application/json" -Headers @{Authorization="Bearer $token"} -Body '{"move":"e2e4","fen":"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"}'
+```
+
+## UI-Server Communication Architecture
+
+This section explains how the frontend UI communicates with the backend microservices, including the authentication token flow.
+
+### Architecture Overview
+
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│                 │     │                  │     │                 │
+│   Chess UI      │────▶│   Auth Service   │     │  Chess Engine   │
+│  (Port 8080)    │     │   (Port 8002)    │     │   (Port 8000)   │
+│                 │     │                  │     │                 │
+└────────┬────────┘     └──────────────────┘     └────────▲────────┘
+         │                                                │
+         │              ┌──────────────────┐              │
+         │              │                  │              │
+         └─────────────▶│  Admin Service   │──────────────┘
+                        │   (Port 8001)    │
+                        │                  │
+                        └──────────────────┘
+```
+
+### Authentication Token Flow
+
+The application uses **JWT (JSON Web Tokens)** for secure authentication. Here's the complete flow:
+
+#### Step 1: User Login
+
+```
+┌─────────┐                              ┌──────────────┐
+│   UI    │                              │ Auth Service │
+└────┬────┘                              └──────┬───────┘
+     │                                          │
+     │  POST /auth/login                        │
+     │  {username, password}                    │
+     │─────────────────────────────────────────▶│
+     │                                          │
+     │                                          │ Verify credentials
+     │                                          │ Generate JWT token
+     │                                          │
+     │  {success: true, token: "eyJ..."}        │
+     │◀─────────────────────────────────────────│
+     │                                          │
+     │  Store token in localStorage             │
+     │                                          │
+```
+
+**Login Request:**
+```javascript
+// UI sends login request
+fetch('http://localhost:8002/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+        username: 'admin', 
+        password: 'admin123' 
+    })
+})
+.then(response => response.json())
+.then(data => {
+    if (data.success) {
+        // Store token for future requests
+        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('username', data.username);
+        localStorage.setItem('isAdmin', data.is_admin);
+    }
+});
+```
+
+**Login Response:**
+```json
+{
+    "success": true,
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwiaXNfYWRtaW4iOnRydWUsImV4cCI6MTc2NDk5OTEwMywiaWF0IjoxNzY0OTEyNzAzfQ.I7JmcH5dDI3Ui76RhlWFs9Fchx6y6d2IP2LrsfAAtAI",
+    "username": "admin",
+    "email": "admin@chess.local",
+    "is_admin": true
+}
+```
+
+#### Step 2: JWT Token Structure
+
+The JWT token contains three parts separated by dots (`.`):
+
+```
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.    <- Header (base64)
+eyJ1c2VybmFtZSI6ImFkbWluIiwiaXNfYWRtaW4i... <- Payload (base64)
+I7JmcH5dDI3Ui76RhlWFs9Fchx6y6d2IP2LrsfAAtAI <- Signature
+```
+
+**Decoded Payload:**
+```json
+{
+    "username": "admin",
+    "is_admin": true,
+    "exp": 1764999103,    // Expiration timestamp (24 hours from creation)
+    "iat": 1764912703     // Issued at timestamp
+}
+```
+
+#### Step 3: Authenticated API Requests
+
+All subsequent requests to protected endpoints must include the token in the `Authorization` header:
+
+```
+┌─────────┐                              ┌──────────────┐
+│   UI    │                              │ Chess Engine │
+└────┬────┘                              └──────┬───────┘
+     │                                          │
+     │  POST /move                              │
+     │  Headers: Authorization: Bearer eyJ...   │
+     │  Body: {move, fen}                       │
+     │─────────────────────────────────────────▶│
+     │                                          │
+     │                                          │ Validate token
+     │                                          │ Process move
+     │                                          │
+     │  {success: true, newFen: "..."}          │
+     │◀─────────────────────────────────────────│
+     │                                          │
+```
+
+**Authenticated Request Example:**
+```javascript
+// Get stored token
+const token = localStorage.getItem('authToken');
+
+// Make authenticated request to chess engine
+fetch('http://localhost:8000/move', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`  // Include token
+    },
+    body: JSON.stringify({
+        move: 'e2e4',
+        fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+    })
+})
+.then(response => {
+    if (response.status === 401) {
+        // Token expired or invalid - redirect to login
+        window.location.href = '/login';
+        return;
+    }
+    return response.json();
+})
+.then(data => {
+    // Update chessboard with new position
+    updateBoard(data.newFen);
+});
+```
+
+### Request/Response Flow by Service
+
+#### Auth Service (Port 8002)
+
+| Flow | Description |
+|------|-------------|
+| `UI → Auth` | Login, register, logout, token refresh |
+| `Auth → UI` | JWT token, user info, success/error |
+
+**Endpoints:**
+```
+POST /auth/login      - Returns JWT token on success
+POST /auth/register   - Creates user, returns success
+POST /auth/verify     - Validates token, returns user info
+POST /auth/refresh    - Returns new JWT token
+POST /auth/logout     - Invalidates session (client-side)
+POST /auth/change-password - Updates password
+```
+
+#### Chess Engine (Port 8000)
+
+| Flow | Description |
+|------|-------------|
+| `UI → Engine` | Game moves, AI suggestions, expert questions |
+| `Engine → UI` | New board state, AI moves, answers |
+
+**All requests require `Authorization: Bearer <token>` header.**
+
+**Request Flow:**
+```javascript
+// 1. User makes a move on the UI
+const move = 'e2e4';
+const currentFen = game.fen();
+
+// 2. UI sends move to engine
+const response = await fetch('http://localhost:8000/move', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({ move, fen: currentFen })
+});
+
+// 3. Engine validates move and returns new state
+const data = await response.json();
+// { success: true, newFen: "...", aiMove: "e7e5" }
+
+// 4. UI updates the board
+game.load(data.newFen);
+board.position(data.newFen);
+```
+
+#### Admin Service (Port 8001)
+
+| Flow | Description |
+|------|-------------|
+| `UI → Admin` | User management, model config, stats |
+| `Admin → UI` | User lists, system stats, config data |
+
+**Admin endpoints require `Authorization: Bearer <token>` with `is_admin: true`.**
+
+### Token Validation Process
+
+When a protected endpoint receives a request:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Token Validation Flow                     │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │ Extract token   │
+                    │ from header     │
+                    └────────┬────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+              No    │ Token present?  │
+           ┌────────│                 │
+           │        └────────┬────────┘
+           │                 │ Yes
+           ▼                 ▼
+    ┌──────────────┐ ┌─────────────────┐
+    │ 401 Missing  │ │ Decode JWT with │
+    │ authorization│ │ secret key      │
+    └──────────────┘ └────────┬────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+              No    │ Signature valid?│
+           ┌────────│                 │
+           │        └────────┬────────┘
+           │                 │ Yes
+           ▼                 ▼
+    ┌──────────────┐ ┌─────────────────┐
+    │ 401 Invalid  │ │ Check expiration│
+    │ token        │ │ (exp claim)     │
+    └──────────────┘ └────────┬────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+              No    │ Token expired?  │
+           ┌────────│                 │
+           │        └────────┬────────┘
+           │                 │ Yes
+           ▼                 ▼
+    ┌──────────────┐ ┌──────────────┐
+    │ Process      │ │ 401 Token    │
+    │ request ✓    │ │ expired      │
+    └──────────────┘ └──────────────┘
+```
+
+**Server-side validation code (Python):**
+```python
+def verify_token(token: str) -> tuple[bool, Optional[str], Optional[bool]]:
+    """Verify JWT token and return (success, username, is_admin)."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        username = payload.get("username")
+        is_admin = payload.get("is_admin", False)
+        
+        if username is None:
+            return False, None, None
+        
+        return True, username, is_admin
+    except jwt.ExpiredSignatureError:
+        return False, None, None  # Token expired
+    except jwt.InvalidTokenError:
+        return False, None, None  # Invalid token
+```
+
+### CORS (Cross-Origin Resource Sharing)
+
+Since the UI runs on a different port than the backend services, CORS is configured to allow cross-origin requests:
+
+```python
+# Each service includes CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],           # Allow all origins (restrict in production)
+    allow_credentials=True,
+    allow_methods=["*"],           # Allow all HTTP methods
+    allow_headers=["*"],           # Allow all headers including Authorization
+)
+```
+
+**Browser Request Flow with CORS:**
+```
+┌─────────┐                              ┌──────────────┐
+│ Browser │                              │    Server    │
+└────┬────┘                              └──────┬───────┘
+     │                                          │
+     │  OPTIONS /move (preflight)               │
+     │  Origin: http://localhost:8080           │
+     │─────────────────────────────────────────▶│
+     │                                          │
+     │  Access-Control-Allow-Origin: *          │
+     │  Access-Control-Allow-Methods: POST      │
+     │  Access-Control-Allow-Headers: Auth...   │
+     │◀─────────────────────────────────────────│
+     │                                          │
+     │  POST /move (actual request)             │
+     │  Authorization: Bearer eyJ...            │
+     │─────────────────────────────────────────▶│
+     │                                          │
+     │  Response with data                      │
+     │◀─────────────────────────────────────────│
+```
+
+### Token Storage & Security
+
+| Storage Method | Pros | Cons |
+|----------------|------|------|
+| `localStorage` | Persists across sessions | Vulnerable to XSS |
+| `sessionStorage` | Cleared on tab close | Lost on refresh |
+| `httpOnly Cookie` | Protected from XSS | Requires CSRF protection |
+
+**Current Implementation (localStorage):**
+```javascript
+// Store token after login
+localStorage.setItem('authToken', token);
+
+// Retrieve token for requests
+const token = localStorage.getItem('authToken');
+
+// Clear token on logout
+localStorage.removeItem('authToken');
+```
+
+### Error Handling
+
+The UI should handle authentication errors gracefully:
+
+```javascript
+async function makeAuthenticatedRequest(url, options = {}) {
+    const token = localStorage.getItem('authToken');
+    
+    if (!token) {
+        redirectToLogin();
+        return null;
+    }
+    
+    const response = await fetch(url, {
+        ...options,
+        headers: {
+            ...options.headers,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        }
+    });
+    
+    switch (response.status) {
+        case 401:
+            // Token expired or invalid
+            localStorage.removeItem('authToken');
+            redirectToLogin();
+            return null;
+        case 403:
+            // Forbidden - user lacks permission
+            showError('You do not have permission for this action');
+            return null;
+        case 200:
+            return response.json();
+        default:
+            showError('An error occurred');
+            return null;
+    }
+}
+```
+
+### Complete Request Lifecycle Example
+
+Here's a complete example of a chess move from UI to response:
+
+```
+1. USER ACTION
+   └─▶ User drags piece from e2 to e4 on chessboard
+
+2. UI PROCESSING
+   └─▶ JavaScript captures move: "e2e4"
+   └─▶ Gets current FEN: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+   └─▶ Retrieves token from localStorage
+
+3. HTTP REQUEST
+   └─▶ POST http://localhost:8000/move
+       Headers:
+         Content-Type: application/json
+         Authorization: Bearer eyJ...
+
+4. SERVER PROCESSING (Chess Engine)
+   └─▶ Extract token from Authorization header
+   └─▶ Validate JWT signature and expiration
+   └─▶ Parse move and validate legality
+   └─▶ Update board state
+   └─▶ (If vs AI) Calculate AI response move
+
+5. HTTP RESPONSE
+   └─▶ 200 OK
+       {
+         "success": true,
+         "newFen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+         "aiMove": "e7e5",
+         "message": "Move accepted"
+       }
+
+6. UI UPDATE
+   └─▶ Update internal game state with new FEN
+   └─▶ Animate piece movement on board
+   └─▶ Update move history display
+   └─▶ Check for game end conditions
+```
+
+## User Management
+
+- **Admin Panel:**  
+  Accessible at `/admin`, protected by JWT auth (admin role required).  
+  Manage users, view stats, configure models, etc.
+
+- **User Roles:**  
+  - Admin: Full access
+  - User: Limited access (play games, view stats)
+
+- **Endpoints:**
+  - `GET /admin/users`: List users
+  - `POST /admin/user`: Create user
+  - `PUT /admin/user/{id}`: Update user
+  - `DELETE /admin/user/{id}`: Delete user
+
+**Admin Login Example:**
+```javascript
+// Admin login (stores token with is_admin claim)
+fetch('http://localhost:8002/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+        username: 'admin', 
+        password: 'admin123' 
+    })
+})
+.then(response => response.json())
+.then(data => {
+    if (data.success) {
+        // Store token and admin status
+        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('isAdmin', data.is_admin);
+    }
+});
+```
+
+**Access Control Example:**
+```javascript
+// Check if user is admin
+const isAdmin = localStorage.getItem('isAdmin') === 'true';
+
+if (isAdmin) {
+    // Show admin features
+} else {
+    // Hide admin features
+}
+```
+
+**Admin Route Example (Python FastAPI):**
+```python
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from . import crud, models, schemas
+from .dependencies import get_db, get_current_user
+
+router = APIRouter()
+
+@router.get("/users", response_model=List[schemas.User])
+def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+    users = crud.get_users(db, skip=skip, limit=limit)
+    return users
+```
+
+### Admin UI Mockup
+
+- **User Management Page:**
+  - Table of users (ID, username, email, role)
+  - Actions: Edit, Delete, Reset Password
+  - Pagination and search
+
+- **Stats Dashboard:**
+  - Total users, active games, etc.
+  - Recent activity log
+
+- **Model Configuration:**
+  - List of available models
+  - Enable/disable models
+  - Set default model
+
+---
+
+**Note:**  
+The admin features and user management are optional and can be added in later phases. The initial focus is on the core chess functionality.
