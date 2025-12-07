@@ -34,7 +34,7 @@
       height: calc(100vh - 60px);
     }
     .chessboard-section {
-      flex: 2;
+      flex: 1;
       padding: 20px;
       border-right: 1px solid #ccc;
       display: flex;
@@ -43,10 +43,133 @@
       justify-content: flex-start;
     }
     .game-panel {
-      flex: 1;
+      flex: 1.5;
       padding: 20px;
       background-color: #f9f9f9;
       overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    /* Grid layout - remove to make tab-panel full width */
+    .panel-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    
+    .panel-grid .section-box {
+      margin-bottom: 0;
+    }
+    
+    /* New grid layout for Strategy + TabPanel side by side */
+    .game-content-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    
+    .game-content-grid .section-box {
+      margin-bottom: 0;
+    }
+    
+    /* TabPanel styling - now half width */
+    .tab-panel {
+      display: flex;
+      flex-direction: column;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background-color: white;
+      overflow: hidden;
+    }
+    .tab-panel-list {
+      display: flex;
+      border-bottom: 2px solid #333;
+      background-color: #f5f5f5;
+    }
+    .tab-panel-button {
+      flex: 1;
+      padding: 12px;
+      cursor: pointer;
+      border: none;
+      background: #f5f5f5;
+      font-size: 0.95em;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      outline: none;
+    }
+    .tab-panel-button:hover {
+      background-color: #efefef;
+    }
+    .tab-panel-button.active {
+      background-color: white;
+      border-bottom: 3px solid #2196F3;
+      margin-bottom: -2px;
+      color: #2196F3;
+    }
+    .tab-panel-content {
+      padding: 15px;
+      flex: 1;
+      overflow-y: auto;
+    }
+    /* Move history styling */
+    #move-history {
+      min-height: 120px;
+      font-size: 0.95em;
+      line-height: 1.6;
+    }
+    #move-history div {
+      padding: 4px 0;
+    }
+    /* Expert section styling */
+    .expert-input-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    #expert-input {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+    .expert-send-btn {
+      padding: 8px 16px;
+      background-color: #2196F3;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background-color 0.2s ease;
+    }
+    .expert-send-btn:hover {
+      background-color: #1976D2;
+    }
+    #expert-response {
+      min-height: 80px;
+      padding: 10px;
+      background-color: #f5f5f5;
+      border-radius: 4px;
+      font-size: 0.9em;
+      line-height: 1.5;
+      overflow-y: auto;
+    }
+    /* Make Strategy panel span full width */
+    .strategy-box {
+      grid-column: 1 / -1;
+    }
+    /* Make FEN panel span full width */
+    .fen-box {
+      grid-column: 1 / -1;
+    }
+    .section-box {
+      padding: 15px;
+      background-color: white;
+      border-radius: 4px;
+      border: 1px solid #ddd;
     }
     #board {
       width: 400px;
@@ -79,39 +202,6 @@
       color: #757575;
       font-size: 12px;
     }
-    .tab-buttons {
-      display: flex;
-      border-bottom: 1px solid #ccc;
-      margin-bottom: 10px;
-    }
-    .tab-btn {
-      flex: 1;
-      padding: 10px;
-      cursor: pointer;
-      background: #eee;
-      border: none;
-      border-right: 1px solid #ccc;
-      font-size: 0.9em;
-      outline: none;
-    }
-    .tab-btn.active {
-      background: white;
-      font-weight: bold;
-      border-bottom: 2px solid #333;
-    }
-    .tab-content {
-      display: none;
-    }
-    .tab-content.active {
-      display: block;
-    }
-    .section-box {
-      margin-bottom: 20px;
-      padding: 15px;
-      background-color: white;
-      border-radius: 4px;
-      border: 1px solid #ddd;
-    }
     button {
       padding: 10px 16px;
       border: none;
@@ -135,9 +225,15 @@
     .btn-danger:hover {
       background-color: #da190b;
     }
-    .logout-btn {
-      background-color: #f44336;
-      color: white;
+    #fen-display {
+      background-color: #f5f5f5;
+      padding: 10px;
+      border-radius: 4px;
+      word-break: break-all;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 80px;
+      overflow-y: auto;
     }
   </style>
 </head>
@@ -171,17 +267,17 @@
 
     function showLoginInterface() {
       const loginHTML = `
-          <div id="auth-container">
-            <h2>Chess AI App</h2>
-            <div id="auth-form">
-              <h3>Login</h3>
-              <input id="login-username" type="text" placeholder="Username" style="width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box;">
-              <input id="login-password" type="password" placeholder="Password" style="width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box;">
-              <div id="login-error" style="color: red; margin: 10px 0; display: none;"></div>
-              <button onclick="handleLogin()" style="width: 100%; padding: 10px; margin: 10px 0; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Login</button>
-              <button onclick="switchToRegister()" style="width: 100%; padding: 10px; background-color: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">Register</button>
-            </div>
+        <div id="auth-container">
+          <h2>Chess AI App</h2>
+          <div id="auth-form">
+            <h3>Login</h3>
+            <input id="login-username" type="text" placeholder="Username" style="width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box;">
+            <input id="login-password" type="password" placeholder="Password" style="width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box;">
+            <div id="login-error" style="color: red; margin: 10px 0; display: none;"></div>
+            <button onclick="handleLogin()" style="width: 100%; padding: 10px; margin: 10px 0; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Login</button>
+            <button onclick="switchToRegister()" style="width: 100%; padding: 10px; background-color: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">Register</button>
           </div>
+        </div>
       `;
       document.getElementById('app').innerHTML = loginHTML;
     }
@@ -345,6 +441,27 @@
         }
       }
 
+                          function switchTab(tabName) {
+                            // Hide all tab panels
+                            document.querySelectorAll('.tab-panel-content').forEach(panel => {
+                              panel.style.display = 'none';
+                            });
+
+                            // Remove active class from all buttons
+                            document.querySelectorAll('.tab-panel-button').forEach(btn => {
+                              btn.classList.remove('active');
+                            });
+
+                            // Show selected tab
+                            const selectedPanel = document.getElementById(tabName);
+                            if (selectedPanel) {
+                              selectedPanel.style.display = 'block';
+                            }
+
+                            // Highlight active button
+                            event.target.classList.add('active');
+                          }
+
       function loadChessboardInterface() {
         const chessboardHTML = `
         <header>
@@ -359,8 +476,9 @@
           <div class="chessboard-section">
             <div id="board"></div>
 
-            <div id="status-box">
-              <div><span class="status-time">[${new Date().toLocaleTimeString()}]</span> <span class="status-info">Ready to play. Start a new game or make a move.</span></div>
+            <!-- FEN Notation (Moved from game-panel to here) -->
+            <div id="fen-notation-box" style="width: 400px; margin: 15px auto; padding: 10px; background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 12px;">
+              <strong>FEN:</strong> <span id="fen-display">rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1</span>
             </div>
             
             <div id="game-status" style="margin-top: 10px; text-align: center; font-size: 16px;">
@@ -371,81 +489,98 @@
           <div class="game-panel">
             <h2>Game Panel</h2>
 
-            <div class="section-box">
-              <h3>Player Setup</h3>
-              <label style="display: block; margin: 10px 0;">
-                White Player:
-                <select id="white-player" style="width: 100%; padding: 5px;">
-                  <option value="human">Human</option>
-                  <option value="ai">AI</option>
-                </select>
-              </label>
-              <label style="display: block; margin: 10px 0;">
-                Black Player:
-                <select id="black-player" style="width: 100%; padding: 5px;">
-                  <option value="human">Human</option>
-                  <option value="ai" selected>AI</option>
-                </select>
-              </label>
-              <label style="display: block; margin: 10px 0;">
-                AI Type:
-                <select id="ai-type" style="width: 100%; padding: 5px;">
-                  <option value="stockfish" selected>Stockfish</option>
-                  <option value="openai">OpenAI GPT</option>
-                  <option value="deepseek">DeepSeek</option>
-                  <option value="claude">Claude</option>
-                </select>
-              </label>
-              <label style="display: block; margin: 10px 0;">
-                Skill Level (1-20):
-                <input type="number" id="skill-level" value="10" min="1" max="20" style="width: 100%; padding: 5px;">
-              </label>
-              <button onclick="startNewGame()" class="btn-primary">Start New Game</button>
-            </div>
-
-            <div class="section-box">
-              <h3>Strategy</h3>
-              <label style="display: block; margin: 10px 0;">
-                White Opening:
-                <select id="white-strategy" style="width: 100%; padding: 5px;">
-                  <option value="">No Opening</option>
-                  <option value="ruy-lopez">Ruy Lopez</option>
-                  <option value="italian">Italian Game</option>
-                </select>
-              </label>
-              <label style="display: block; margin: 10px 0;">
-                Black Defense:
-                <select id="black-strategy" style="width: 100%; padding: 5px;">
-                  <option value="">No Defense</option>
-                  <option value="sicilian">Sicilian Defense</option>
-                  <option value="french">French Defense</option>
-                </select>
-              </label>
-            </div>
-
-            <div class="section-box">
-              <div class="tab-buttons">
-                <button class="tab-btn active" onclick="switchTab(event, 'moves-tab')">Move History</button>
-                <button class="tab-btn" onclick="switchTab(event, 'expert-tab')">Expert</button>
-              </div>
-
-              <div id="moves-tab" class="tab-content active">
-                <div id="move-history" style="height: 150px; overflow-y: auto; background-color: #f5f5f5; padding: 10px; border-radius: 4px;">
-                  <p style="color: #999;">No moves yet</p>
+            <!-- Grid Layout: Status box and TabPanel side by side -->
+            <div class="game-content-grid">
+              <!-- Status Box (Left) -->
+              <div class="section-box">
+                <h3>Game Log</h3>
+                <div id="status-box-left">
+                  <div><span class="status-time">[${new Date().toLocaleTimeString()}]</span> <span class="status-info">Ready to play. Start a new game or make a move.</span></div>
                 </div>
               </div>
 
-              <div id="expert-tab" class="tab-content">
-                <input id="expert-input" type="text" placeholder="Ask a chess question..." style="width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box;">
-                <button onclick="askExpert()" style="width: 100%; padding: 8px; background-color: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">Send</button>
-                <div id="expert-response" style="margin-top: 10px; padding: 10px; background-color: #f5f5f5; border-radius: 4px; min-height: 50px;"></div>
-              </div>
-            </div>
+              <!-- TabPanel: Player Setup, Move History, Ask Expert & Strategy (Right) -->
+              <div class="tab-panel">
+                <div class="tab-panel-list">
+                  <button class="tab-panel-button active" onclick="switchTab('player-setup-panel')">Player Setup</button>
+                  <button class="tab-panel-button" onclick="switchTab('move-history-panel')">Move History</button>
+                  <button class="tab-panel-button" onclick="switchTab('expert-panel')">Ask Expert</button>
+                  <button class="tab-panel-button" onclick="switchTab('strategy-panel')">Strategy</button>
+                </div>
 
-            <div class="section-box">
-              <h3>FEN Notation</h3>
-              <div id="fen-display" style="background-color: #f5f5f5; padding: 10px; border-radius: 4px; word-break: break-all; font-family: monospace; font-size: 12px;">
-                rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+                <!-- Player Setup Tab -->
+                <div id="player-setup-panel" class="tab-panel-content" style="display: block;">
+                  <h3 style="margin-top: 0;">Player Setup</h3>
+                  <label style="display: block; margin: 10px 0;">
+                    White Player:
+                    <select id="white-player" style="width: 100%; padding: 5px;">
+                      <option value="human">Human</option>
+                      <option value="ai">AI</option>
+                    </select>
+                  </label>
+                  <label style="display: block; margin: 10px 0;">
+                    Black Player:
+                    <select id="black-player" style="width: 100%; padding: 5px;">
+                      <option value="human">Human</option>
+                      <option value="ai" selected>AI</option>
+                    </select>
+                  </label>
+                  <label style="display: block; margin: 10px 0;">
+                    AI Type:
+                    <select id="ai-type" style="width: 100%; padding: 5px;">
+                      <option value="stockfish" selected>Stockfish</option>
+                      <option value="openai">OpenAI GPT</option>
+                      <option value="deepseek">DeepSeek</option>
+                      <option value="claude">Claude</option>
+                    </select>
+                  </label>
+                  <label style="display: block; margin: 10px 0;">
+                    Skill Level (1-20):
+                    <input type="number" id="skill-level" value="10" min="1" max="20" style="width: 100%; padding: 5px;">
+                  </label>
+                  <button onclick="startNewGame()" class="btn-primary">Start New Game</button>
+                </div>
+
+                <!-- Move History Tab -->
+                <div id="move-history-panel" class="tab-panel-content">
+                  <h3 style="margin-top: 0;">Move History</h3>
+                  <div id="move-history">
+                    <p style="color: #999;">No moves yet</p>
+                  </div>
+                </div>
+
+                <!-- Expert Tab -->
+                <div id="expert-panel" class="tab-panel-content">
+                  <h3 style="margin-top: 0;">Ask Expert</h3>
+                  <div class="expert-input-group">
+                    <input id="expert-input" type="text" placeholder="Ask a chess question...">
+                    <button class="expert-send-btn" onclick="askExpert()">Send</button>
+                  </div>
+                  <div id="expert-response">
+                    <p style="color: #999;">Ask a question and get expert chess advice</p>
+                  </div>
+                </div>
+
+                <!-- Strategy Tab -->
+                <div id="strategy-panel" class="tab-panel-content">
+                  <h3 style="margin-top: 0;">Strategy</h3>
+                  <label style="display: block; margin: 10px 0;">
+                    White Opening:
+                    <select id="white-strategy" style="width: 100%; padding: 5px;">
+                      <option value="">No Opening</option>
+                      <option value="ruy-lopez">Ruy Lopez</option>
+                      <option value="italian">Italian Game</option>
+                    </select>
+                  </label>
+                  <label style="display: block; margin: 10px 0;">
+                    Black Defense:
+                    <select id="black-strategy" style="width: 100%; padding: 5px;">
+                      <option value="">No Defense</option>
+                      <option value="sicilian">Sicilian Defense</option>
+                      <option value="french">French Defense</option>
+                    </select>
+                  </label>
+                </div>
               </div>
             </div>
           </div>
@@ -468,10 +603,10 @@
         onSnapEnd: onSnapEnd
       });
 
-            console.log('Chessboard initialized for user:', currentUser);
-            updateStatusBox('Chessboard initialized successfully', 'success');
-            updateFenDisplay();
-          }
+        console.log('Chessboard initialized for user:', currentUser);
+        updateStatusBox('Chessboard initialized successfully', 'success');
+        updateFenDisplay();
+      }
 
           function onDragStart(source, piece, position, orientation) {
             if (game.game_over()) {
@@ -499,54 +634,54 @@
               return 'snapback';
             }
 
-    updateStatusBox(`You played: ${move.san}`, 'info');
-    updateMoveHistory(move.san, false);
-    updateFenDisplay();
+            updateStatusBox(`You played: ${move.san}`, 'info');
+            updateMoveHistory(move.san, false);
+            updateFenDisplay();
 
-    // Check if we need AI to respond
-    const blackPlayer = document.getElementById('black-player').value;
-    const whitePlayer = document.getElementById('white-player').value;
-    const needsAI = (game.turn() === 'b' && blackPlayer === 'ai') ||
-      (game.turn() === 'w' && whitePlayer === 'ai');
+            // Check if we need AI to respond
+            const blackPlayer = document.getElementById('black-player').value;
+            const whitePlayer = document.getElementById('white-player').value;
+            const needsAI = (game.turn() === 'b' && blackPlayer === 'ai') ||
+              (game.turn() === 'w' && whitePlayer === 'ai');
 
-    // Send move to engine
-    sendMoveToEngine(source + target, game.fen(), needsAI);
+            // Send move to engine
+            sendMoveToEngine(source + target, game.fen(), needsAI);
 
-    checkGameStatus();
-  }
+            checkGameStatus();
+          }
 
-  function onSnapEnd() {
-    board.position(game.fen());
-  }
+                          function onSnapEnd() {
+                            board.position(game.fen());
+                          }
 
-  function updateFenDisplay() {
-    const fenDisplay = document.getElementById('fen-display');
-    if (fenDisplay && game) {
-      fenDisplay.textContent = game.fen();
-    }
-  }
+                          function updateFenDisplay() {
+                            const fenDisplay = document.getElementById('fen-display');
+                            if (fenDisplay && game) {
+                              fenDisplay.textContent = game.fen();
+                            }
+                          }
 
-  function checkGameStatus() {
-    const statusDiv = document.getElementById('game-status');
-    let status = '';
+                          function checkGameStatus() {
+                            const statusDiv = document.getElementById('game-status');
+                            let status = '';
 
-    if (game.in_checkmate()) {
-      status = game.turn() === 'w' ? 'Black wins by checkmate!' : 'White wins by checkmate!';
-      updateStatusBox(status, 'success');
-    } else if (game.in_draw()) {
-      status = 'Game drawn!';
-      updateStatusBox(status, 'info');
-    } else if (game.in_check()) {
-      status = game.turn() === 'w' ? 'White is in check' : 'Black is in check';
-      updateStatusBox(status, 'info');
-    } else {
-      status = game.turn() === 'w' ? "White's turn" : "Black's turn";
-    }
+                          if (game.in_checkmate()) {
+                            status = game.turn() === 'w' ? 'Black wins by checkmate!' : 'White wins by checkmate!';
+                            updateStatusBox(status, 'success');
+                          } else if (game.in_draw()) {
+                            status = 'Game drawn!';
+                            updateStatusBox(status, 'info');
+                          } else if (game.in_check()) {
+                            status = game.turn() === 'w' ? 'White is in check' : 'Black is in check';
+                            updateStatusBox(status, 'info');
+                          } else {
+                            status = game.turn() === 'w' ? "White's turn" : "Black's turn";
+                          }
 
-    if (statusDiv) {
-      statusDiv.innerHTML = `<p>Game Status: <strong>${status}</strong></p>`;
-    }
-  }
+                          if (statusDiv) {
+                            statusDiv.innerHTML = `<p>Game Status: <strong>${status}</strong></p>`;
+                          }
+                        }
 
       function startNewGame() {
         const whitePlayer = document.getElementById('white-player').value;
@@ -578,7 +713,7 @@
           'Authorization': 'Bearer ' + authToken
         },
         body: JSON.stringify({
-          move: move,
+          move: move, 
           fen: fen,
           request_ai_move: requestAiMove,
           ai_type: aiType,
@@ -656,13 +791,6 @@
         });
     }
 
-      function switchTab(event, tabId) {
-        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-        document.getElementById(tabId).classList.add('active');
-        event.target.classList.add('active');
-      }
-
       function askExpert() {
         const question = document.getElementById('expert-input').value;
       if (!question) {
@@ -693,7 +821,7 @@
             document.getElementById('expert-response').textContent = 'Error: ' + data.error;
             updateStatusBox(`Expert error: ${data.error}`, 'error');
           } else {
-            document.getElementById('expert-response').textContent = data.response || 'No response';
+            document.getElementById('expert-response').innerHTML = data.response || 'No response';
             document.getElementById('expert-input').value = '';
             updateStatusBox('Expert response received', 'success');
           }

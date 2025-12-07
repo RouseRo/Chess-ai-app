@@ -302,15 +302,87 @@ async def ask_expert(request_data: dict, authorization: str = Header(None)):
     if not question:
         raise HTTPException(status_code=400, detail="Missing question")
     
+    print(f"[EXPERT] Received question: '{question}', FEN: {fen[:30] if fen else 'None'}...")
+    
     try:
-        from src.expert_service import ExpertService
-        expert = ExpertService()
-        response = expert.ask_question(question, fen)
-        return {"success": True, "question": question, "response": response}
-    except ImportError:
-        return {"success": True, "question": question, "response": "Chess expert service is currently unavailable."}
+        # Try to import and use ExpertService
+        try:
+            from src.expert_service import ExpertService
+            print("[EXPERT] ExpertService imported successfully")
+            
+            expert = ExpertService()
+            response = expert.ask_question(question, fen)
+            
+            print(f"[EXPERT] Response received: {response[:100] if response else 'None'}...")
+            
+            # Validate response
+            if not response or response.strip() == "":
+                print("[EXPERT] Warning: Expert returned empty response")
+                return {
+                    "success": False,
+                    "question": question,
+                    "error": "Expert service returned empty response"
+                }
+            
+            return {
+                "success": True,
+                "question": question,
+                "response": response
+            }
+            
+        except ImportError as e:
+            print(f"[EXPERT] ExpertService import failed: {e}")
+            print("[EXPERT] Attempting fallback...")
+            
+            # Fallback: Basic chess advice without expert service
+            fallback_response = generate_fallback_response(question, fen)
+            return {
+                "success": True,
+                "question": question,
+                "response": fallback_response,
+                "source": "fallback"
+            }
+    
     except Exception as e:
-        return {"success": False, "question": question, "error": str(e)}
+        print(f"[EXPERT] Unexpected error: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return {
+            "success": False,
+            "question": question,
+            "error": f"Expert service error: {str(e)}"
+        }
+
+
+def generate_fallback_response(question: str, fen: str = None) -> str:
+    """Generate basic chess advice when ExpertService is unavailable."""
+    print(f"[EXPERT FALLBACK] Generating response for: '{question}'")
+    
+    question_lower = question.lower()
+    
+    # Basic chess opening advice
+    if "opening" in question_lower or "start" in question_lower:
+        return "For strong openings, consider: 1.e4 (Open Game), 1.d4 (Closed Game), or 1.c4 (English Opening). Each leads to different types of positions."
+    
+    # Endgame advice
+    if "endgame" in question_lower or "endgame" in question_lower:
+        return "Key endgame principles: Activate your king, push passed pawns, and create threats. Practice fundamental endgames like K+P vs K and Rook endgames."
+    
+    # Tactical advice
+    if "tactic" in question_lower or "combination" in question_lower or "pin" in question_lower or "fork" in question_lower:
+        return "Tactical motifs: Look for pins, forks, skewers, and discovered attacks. Always check if your opponent has threats and look for forcing moves (checks, captures, threats)."
+    
+    # Strategy advice
+    if "strateg" in question_lower or "plan" in question_lower:
+        return "Strategic principles: Control the center, develop pieces quickly, ensure king safety, and create a coherent plan. Improve your worst-placed piece."
+    
+    # Move evaluation
+    if "best move" in question_lower or "should i" in question_lower:
+        return "To find the best move: 1) Look for forcing moves (checks, captures, threats), 2) Evaluate resulting positions, 3) Consider opponent's best responses, 4) Compare candidate moves."
+    
+    # Default helpful response
+    return "Chess tip: Always look for forcing moves (checks, captures, threats), consider your opponent's threats, and improve your worst-placed piece. Study classic games and positions!"
 
 # ========== Admin Endpoints ==========
 
