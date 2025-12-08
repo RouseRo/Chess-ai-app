@@ -1,0 +1,10 @@
+{
+  "admin": {
+    "email": "admin@chessai.app",
+    "password": "305536138ff389cc985cec84b7760065$c342f4971a03fd76a5e6437a8b6203c5b0db8902ffdfad53354a61a1b0c8dad1",
+    "is_admin": true,
+    "created_at": "2025-12-07T20:01:56.680217",
+    "games_played": 0,
+    "last_login": null
+  }
+}

@@ -41,7 +41,13 @@ class ChessApp:
         self.chess_expert_model = ""
 
         # Add user management components
-        self.user_manager = UserManager(data_dir="user_data", dev_mode=True)  # Set dev_mode=True
+        # Point to user_data/users directory
+        USER_DATA_DIR = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
+            "user_data", 
+            "users"
+        )
+        self.user_manager = UserManager(data_dir=USER_DATA_DIR)
         self.auth_ui = AuthUI()
         self.session_token = None
         self.current_user = None
@@ -66,7 +72,7 @@ class ChessApp:
             self.ai_models,
             self.stockfish_configs,
             self.file_manager,
-            self.game_log_manager  # <-- now included
+            self.game_log_manager
         )
         self.in_game_menu_handlers = InGameMenuHandlers(
             self.ui,
@@ -76,7 +82,7 @@ class ChessApp:
             self.stockfish_configs,
             self.expert_service,
             self.game_manager,
-            self.game_log_manager  # <-- add this argument
+            self.game_log_manager
         )
         self.chess_expert_menu = ChessExpertMenu(self.ui, self.expert_service)
         self.menu_handlers = MenuHandlers(self.ui, self.chess_expert_menu)
@@ -102,9 +108,18 @@ class ChessApp:
             self.ui.display_message("Please ensure the file exists and is a valid JSON.")
             sys.exit(1)
 
+    def _save_session(self):
+        """Save the current session token to a file."""
+        if self.session_token:
+            os.makedirs(os.path.join("user_data", "users"), exist_ok=True)
+            session_file = os.path.join("user_data", "users", "current_session.txt")
+
+            with open(session_file, 'w') as f:
+                f.write(self.session_token)
+
     def _load_session(self):
         """Attempt to load a saved session if it exists."""
-        session_file = os.path.join("user_data", "current_session.txt")
+        session_file = os.path.join("user_data", "users", "current_session.txt")
         if os.path.exists(session_file):
             try:
                 with open(session_file, 'r') as f:
@@ -115,12 +130,16 @@ class ChessApp:
                 if user_data:
                     self.session_token = saved_token
                     self.current_user = user_data
-                    print(f"Welcome back, {user_data['username']}!")
+                    self.ui.display_message(f"Welcome back, {user_data['username']}!")
             except Exception as e:
-                print(f"Error loading saved session: {e}")
+                self.ui.display_message(f"Error loading saved session: {e}")
 
     def _handle_authentication(self):
-        """Handle user authentication flow. Return True if authenticated."""
+        """
+        Handle user authentication flow. Return True if authenticated.
+        CLI supports only regular user login/registration (no admin actions).
+        Admin actions are handled via the Admin Dashboard at http://localhost:8001
+        """
         # If already authenticated, return True immediately
         if self.current_user:
             return True
@@ -137,6 +156,15 @@ class ChessApp:
                     self.session_token = token
                     self.current_user = self.user_manager.get_current_user(token)
                     self._save_session()
+                    
+                    # Check if user is admin and display message
+                    if self.current_user.get('is_admin', False):
+                        self.auth_ui.display_message(
+                            "\n[INFO] Admin account detected.\n"
+                            "Use the Admin Dashboard at http://localhost:8001 for admin functions.\n"
+                            "CLI is available for standard gameplay only."
+                        )
+                    
                     return True
 
             elif choice == '2':  # Register
@@ -147,10 +175,12 @@ class ChessApp:
 
                     self.auth_ui.display_message(message)
                     if success:
-                        if self.user_manager.dev_mode:
+                        # Check if UserManager has dev_mode attribute
+                        if hasattr(self.user_manager, 'dev_mode') and self.user_manager.dev_mode:
                             # In dev mode, show a special message about verification
-                            print("In development mode, verification tokens are displayed in the console.")
-                            print("You can use the token shown above to verify your account.")
+                            self.ui.display_message(
+                                "In development mode, verification tokens are displayed in the console."
+                            )
 
                         # Ask for verification token
                         verify_now = input("Would you like to enter your verification code now? (y/n): ").lower() == 'y'
@@ -161,7 +191,7 @@ class ChessApp:
 
                             # If verification was successful, try to auto-login
                             if success:
-                                print("Attempting automatic login after verification...")
+                                self.ui.display_message("Attempting automatic login after verification...")
                                 success, message, token = self.user_manager.login(username, password)
                                 if success:
                                     self.session_token = token
@@ -172,17 +202,29 @@ class ChessApp:
             elif choice == 'q':  # Quit
                 return False
 
-        return True  # Already authenticated
+        return True
 
     def _save_session(self):
         """Save the current session token to a file."""
         if self.session_token:
-            os.makedirs("user_data", exist_ok=True)
-            session_file = os.path.join("user_data", "current_session.txt")
+            os.makedirs(os.path.join("user_data", "users"), exist_ok=True)
+            session_file = os.path.join("user_data", "users", "current_session.txt")
 
             with open(session_file, 'w') as f:
                 f.write(self.session_token)
 
+    def _logout(self):
+        """Log out the current user and clear session."""
+        if self.session_token:
+            session_file = os.path.join("user_data", "users", "current_session.txt")
+            if os.path.exists(session_file):
+                os.remove(session_file)
+        
+        self.session_token = None
+        self.current_user = None
+        self.ui.display_message("You have been logged out.")
+
+    @staticmethod
     def get_password(prompt="Password: "):
         """Get password with or without masking based on environment"""
         # Check if we're in test mode
@@ -198,7 +240,7 @@ class ChessApp:
         """Main function to run the chess application."""
         # Handle authentication first
         if not self._handle_authentication():
-            print("Exiting application.")
+            self.ui.display_message("Exiting application.")
             return
 
         game = None
@@ -280,6 +322,15 @@ class ChessApp:
                                 self.ui.display_game_start_message(game)
                         elif choice == '4':
                             self.player_stats_manager.view_player_stats()
+                        elif choice == '5':
+                            # Logout option
+                            confirm = self.ui.get_user_input("Are you sure you want to logout? (y/n): ").lower()
+                            if confirm == 'y':
+                                self._logout()
+                                # Re-authenticate
+                                if not self._handle_authentication():
+                                    self.ui.display_message("Exiting application.")
+                                    sys.exit(0)
                         elif choice == 'q':
                             self.ui.display_message("Exiting application.")
                             sys.exit(0)

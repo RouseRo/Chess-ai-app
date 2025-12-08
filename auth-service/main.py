@@ -9,11 +9,6 @@ import bcrypt
 import json
 from datetime import datetime, timedelta
 
-# Add parent directory to Python path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from engine.user_manager import UserManager
-
 app = FastAPI(
     title="Chess AI Auth Service",
     description="Authentication and authorization service for Chess AI App",
@@ -28,8 +23,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize UserManager with shared user_data directory
-user_manager = UserManager(data_dir="user_data")
+# User data directory - consistent across all services
+USER_DATA_DIR = "/app/user_data/users"
+
+print(f"[DEBUG] Auth Service USER_DATA_DIR: {USER_DATA_DIR}")
+print(f"[DEBUG] Directory exists: {os.path.exists(USER_DATA_DIR)}")
+print(f"[DEBUG] Profiles dir: {os.path.join(USER_DATA_DIR, 'profiles')}")
 
 # JWT Configuration
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "chess-ai-secret-key-change-in-production")
@@ -64,13 +63,57 @@ class LogoutRequest(BaseModel):
 
 # ========== Helper Functions ==========
 
-def get_user_with_password(username: str) -> Optional[dict]:
-    """Get user data directly from file, including password hash."""
-    user_file = os.path.join("user_data", "users", f"{username}.json")
+def get_user_file_path(username: str) -> str:
+    """Get the file path for a user profile."""
+    return os.path.join(USER_DATA_DIR, "profiles", f"{username}.json")
+
+def get_user(username: str) -> Optional[dict]:
+    """Get user data from file."""
+    user_file = get_user_file_path(username)
     if os.path.exists(user_file):
-        with open(user_file, 'r') as f:
-            return json.load(f)
+        try:
+            with open(user_file, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"Error reading user file: {e}")
+            return None
     return None
+
+def list_all_users() -> list:
+    """List all users."""
+    users = []
+    profiles_dir = os.path.join(USER_DATA_DIR, "profiles")
+    
+    if not os.path.exists(profiles_dir):
+        return users
+    
+    try:
+        for filename in os.listdir(profiles_dir):
+            if filename.endswith('.json'):
+                try:
+                    with open(os.path.join(profiles_dir, filename), 'r') as f:
+                        user_data = json.load(f)
+                        users.append(user_data)
+                except (json.JSONDecodeError, IOError):
+                    continue
+    except Exception as e:
+        print(f"Error listing users: {e}")
+    
+    return users
+
+def save_user(username: str, user_data: dict) -> bool:
+    """Save user data to file."""
+    try:
+        profiles_dir = os.path.join(USER_DATA_DIR, "profiles")
+        os.makedirs(profiles_dir, exist_ok=True)
+        
+        user_file = get_user_file_path(username)
+        with open(user_file, 'w') as f:
+            json.dump(user_data, f, indent=2)
+        return True
+    except IOError as e:
+        print(f"Error saving user: {e}")
+        return False
 
 def create_access_token(username: str, is_admin: bool) -> str:
     """Create JWT token for user."""
@@ -100,13 +143,13 @@ def verify_token(token: str) -> tuple[bool, Optional[str], Optional[bool]]:
         return False, None, None
 
 def hash_password(password: str) -> str:
-    """Hash password using bcrypt directly."""
+    """Hash password using bcrypt."""
     password_bytes = password.encode('utf-8')
     hashed = bcrypt.hashpw(password_bytes, bcrypt.gensalt())
     return hashed.decode('utf-8')
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify plain password against hashed password using bcrypt directly."""
+    """Verify plain password against hashed password."""
     if not hashed_password or hashed_password == '':
         return plain_password == ''
     
@@ -116,7 +159,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return bcrypt.checkpw(password_bytes, hash_bytes)
     except Exception as e:
         print(f"Password verification error: {e}")
-        # Fallback to plain text comparison for legacy users
         return plain_password == hashed_password
 
 # ========== Health Check ==========
@@ -153,11 +195,11 @@ async def register(req: RegisterRequest):
     if len(req.password) > 72:
         raise HTTPException(status_code=400, detail="Password must be less than 72 characters")
     
-    users = user_manager.list_all_users()
-    if any(user['username'] == req.username for user in users):
+    users = list_all_users()
+    if any(user.get('username') == req.username for user in users):
         raise HTTPException(status_code=409, detail="Username already exists")
     
-    if any(user['email'] == req.email for user in users):
+    if any(user.get('email') == req.email for user in users):
         raise HTTPException(status_code=409, detail="Email already registered")
     
     hashed_password = hash_password(req.password)
@@ -168,21 +210,20 @@ async def register(req: RegisterRequest):
         "password_hash": hashed_password,
         "created_at": datetime.utcnow().isoformat(),
         "is_admin": False,
-        "games_played": 0
+        "verified": True,
+        "games": []
     }
     
-    success, message = user_manager.create_user(req.username, user_data)
-    
-    if not success:
-        raise HTTPException(status_code=400, detail=message)
-    
-    return {
-        "success": True,
-        "message": "User registered successfully",
-        "username": req.username,
-        "email": req.email,
-        "is_admin": False
-    }
+    if save_user(req.username, user_data):
+        return {
+            "success": True,
+            "message": "User registered successfully",
+            "username": req.username,
+            "email": req.email,
+            "is_admin": False
+        }
+    else:
+        raise HTTPException(status_code=400, detail="Failed to register user")
 
 @app.post("/auth/login", response_model=TokenResponse)
 async def login(req: LoginRequest):
@@ -190,8 +231,7 @@ async def login(req: LoginRequest):
     if not req.username or not req.password:
         raise HTTPException(status_code=400, detail="Username and password required")
     
-    # Get user directly from file to include password_hash
-    user = get_user_with_password(req.username)
+    user = get_user(req.username)
     
     if not user:
         raise HTTPException(status_code=401, detail="Invalid username or password")
@@ -223,8 +263,7 @@ async def verify(authorization: str = Header(None)):
     if not success:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     
-    users = user_manager.list_all_users()
-    user = next((u for u in users if u['username'] == username), None)
+    user = get_user(username)
     
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -277,8 +316,7 @@ async def change_password(req: ChangePasswordRequest, authorization: str = Heade
     if not success:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     
-    users = user_manager.list_all_users()
-    user = next((u for u in users if u['username'] == username), None)
+    user = get_user(username)
     
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -299,15 +337,13 @@ async def change_password(req: ChangePasswordRequest, authorization: str = Heade
     if 'password' in user:
         del user['password']
     
-    success, message = user_manager.update_user(username, user)
-    
-    if not success:
-        raise HTTPException(status_code=400, detail=message)
-    
-    return {
-        "success": True,
-        "message": "Password changed successfully"
-    }
+    if save_user(username, user):
+        return {
+            "success": True,
+            "message": "Password changed successfully"
+        }
+    else:
+        raise HTTPException(status_code=400, detail="Failed to change password")
 
 if __name__ == "__main__":
     import uvicorn
