@@ -1,15 +1,36 @@
+"""Input handler utilities."""
+
 import os
+import sys
 import getpass
 
 
-def get_password(prompt="Password: "):
-    if os.environ.get("CHESS_APP_TEST_MODE") == "1":
-        print(prompt, end="", flush=True)
-        import builtins
+def get_input(prompt: str = "") -> str:
+    """
+    Get input from user.
 
-        return builtins.input()
-    else:
-        return getpass.getpass(prompt)
+    Args:
+        prompt: Optional prompt to display
+
+    Returns:
+        User input string
+    """
+    if prompt:
+        print(prompt, end="", flush=True)
+    return input()
+
+
+def get_password(prompt: str = "Password: ") -> str:
+    """
+    Get password input (hidden).
+
+    Args:
+        prompt: Prompt to display
+
+    Returns:
+        Password string
+    """
+    return getpass.getpass(prompt)
 
 
 def authenticate_user():

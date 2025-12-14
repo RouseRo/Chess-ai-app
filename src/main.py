@@ -221,15 +221,9 @@ class ChessApp:
 
     @staticmethod
     def get_password(prompt="Password: "):
-        """Get password with or without masking based on environment"""
-        # Check if we're in test mode
-        if os.environ.get("CHESS_APP_TEST_MODE") == "1":
-            # In test mode, accept password input directly without masking
-            return input(prompt)
-        else:
-            # In normal mode, use getpass for secure password input
-            import getpass
-            return getpass.getpass(prompt)
+        """Get password with secure masking."""
+        import getpass
+        return getpass.getpass(prompt)
 
     def run(self):
         """Main function to run the chess application."""
@@ -337,21 +331,18 @@ class ChessApp:
     def parse_log_header(self, lines, all_player_keys, debug=False):
         return self.game_log_manager.parse_log_header(lines, all_player_keys, debug)
 
+
 def main():
+    """Main entry point for the chess application."""
     try:
-        if os.environ.get("CHESS_APP_TEST_MODE") == "1":
-            app = ChessApp()
-            app.current_user = {"username": "TestUser"}
-            app.run()
-        else:
-            app = ChessApp()
-            app.run()
-    except (KeyboardInterrupt):
+        app = ChessApp()
+        app.run()
+    except KeyboardInterrupt:
         print("\n[INFO] Application interrupted or exited. Exiting gracefully.")
         sys.exit(0)
 
+
 if __name__ == "__main__":
-    setup_logging()
     main()
 
 def setup_stockfish(config_path="src/config.json"):
