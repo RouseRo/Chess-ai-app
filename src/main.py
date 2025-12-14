@@ -40,14 +40,9 @@ class ChessApp:
         self.stockfish_configs = {}
         self.chess_expert_model = ""
 
-        # Add user management components
-        # Point to user_data/users directory
-        USER_DATA_DIR = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-            "user_data", 
-            "users"
-        )
-        self.user_manager = UserManager(data_dir=USER_DATA_DIR)
+        # Add user management components - now uses auth-service API
+        auth_service_url = os.environ.get("AUTH_SERVICE_URL", "http://localhost:8002")
+        self.user_manager = UserManager(auth_service_url=auth_service_url)
         self.auth_ui = AuthUI()
         self.session_token = None
         self.current_user = None

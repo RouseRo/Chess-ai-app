@@ -1,6 +1,6 @@
 # Chess AI App
 
-A web-based chess application supporting human and AI players, with Stockfish engine integration, interactive chessboard, real-time game updates, and comprehensive microservices architecture.
+A web-based and CLI chess application supporting human and AI players, with Stockfish engine integration, interactive chessboard, real-time game updates, and comprehensive microservices architecture.
 
 ## Table of Contents
 
@@ -21,6 +21,7 @@ A web-based chess application supporting human and AI players, with Stockfish en
 ## Features
 
 - **Interactive Web UI**: Drag-and-drop chessboard with real-time updates
+- **Command-Line Interface (CLI)**: Full-featured terminal-based chess game
 - **Multiple AI Engines**: 
   - Stockfish (local, fast, strong)
   - OpenAI GPT models
@@ -33,6 +34,7 @@ A web-based chess application supporting human and AI players, with Stockfish en
 - **Status Box**: Live feed of moves and engine responses
 - **FEN Notation**: View and track game state
 - **User Authentication**: Secure JWT-based authentication with bcrypt hashing
+- **Unified User Storage**: Single SQLite database shared across all clients
 - **Admin Dashboard**: Manage users and system settings
 - **Microservices Architecture**: Scalable, modular design with separate services
 - **Docker Support**: Complete containerization with docker-compose
@@ -41,45 +43,62 @@ A web-based chess application supporting human and AI players, with Stockfish en
 
 ```
 Chess-ai-app/
-├── engine/                      # Chess engine service (Port 8000)
-│   ├── main.py                 # API endpoints & Stockfish integration
-│   ├── Dockerfile              # Engine container config
-│   └── requirements.txt        # Python dependencies
+├── src/                        # CLI Application
+│   ├── main.py                # Main entry point
+│   ├── auth_client.py         # HTTP client for auth-service API
+│   ├── user_manager.py        # User management (uses AuthClient)
+│   ├── auth_ui.py             # CLI authentication prompts
+│   ├── game_manager.py        # Game logic
+│   ├── ui_manager.py          # Terminal UI
+│   └── ...                    # Other modules
 │
-├── auth-service/               # Authentication service (Port 8002)
-│   ├── main.py                # Auth API endpoints
-│   ├── Dockerfile             # Auth container config
-│   ├── requirements.txt       # Python dependencies
-│   └── users.db               # SQLite database (auto-created)
+├── engine/                     # Chess engine service (Port 8000)
+│   ├── main.py                # API endpoints & Stockfish integration
+│   ├── Dockerfile             # Engine container config
+│   └── requirements.txt       # Python dependencies
 │
-├── admin-service/              # Admin dashboard service (Port 8001)
-│   ├── main.py               # Admin API endpoints
-│   ├── Dockerfile            # Admin container config
+├── auth-service/              # Authentication service (Port 8002)
+│   ├── main.py               # Auth API endpoints
+│   ├── Dockerfile            # Auth container config
 │   └── requirements.txt      # Python dependencies
 │
-├── ui/                         # Web interface (Port 8080)
-│   ├── index.html            # Login/Register page
-│   ├── chessboard.html       # Main game interface
-│   ├── admin.html            # Admin dashboard
-│   ├── chessboard.js         # Chessboard library
-│   ├── chessboard.css        # Styling
-│   ├── img/                  # Chess piece images
-│   ├── nginx.conf            # Nginx configuration
-│   └── Dockerfile            # UI container config
+├── admin-service/             # Admin dashboard service (Port 8001)
+│   ├── main.py              # Admin API endpoints
+│   ├── Dockerfile           # Admin container config
+│   └── requirements.txt     # Python dependencies
 │
-├── docs/                       # Documentation
-│   └── Docker_Design.md      # Architecture documentation
+├── ui/                        # Web interface (Port 8080)
+│   ├── index.html           # Login/Register page
+│   ├── chessboard.html      # Main game interface
+│   ├── admin.html           # Admin dashboard
+│   ├── chessboard.js        # Chessboard library
+│   ├── chessboard.css       # Styling
+│   ├── img/                 # Chess piece images
+│   ├── nginx.conf           # Nginx configuration
+│   └── Dockerfile           # UI container config
 │
-├── docker-compose.yml          # Docker orchestration
-├── .env                        # Environment variables (create this)
-└── README.md                   # This file
+├── data/                      # Shared database directory
+│   └── users.db             # SQLite database (shared volume)
+│
+├── scripts/                   # Utility scripts
+│   ├── setup_test_user.py   # Create/reset test users
+│   └── migrate_json_to_sqlite.py
+│
+├── docs/                      # Documentation
+│   └── Docker_Design.md     # Architecture documentation
+│
+├── docker-compose.yml         # Docker orchestration
+├── requirements.txt           # CLI dependencies
+├── .env                       # Environment variables (create this)
+└── README.md                  # This file
 ```
 
 ## Getting Started
 
 ### Prerequisites
 
-- **Docker Desktop** (recommended)
+- **Docker Desktop** (for web services)
+- **Python 3.12+** (for CLI application)
 - **Web Browser** (Chrome, Firefox, Safari, Edge)
 
 ### Quick Start with Docker
@@ -107,12 +126,44 @@ Chess-ai-app/
    - **Admin Dashboard**: http://localhost:8080/admin.html
 
 5. **Login with default credentials**
-   - Username: `admin`
-   - Password: `admin123`
+   | Username | Password |
+   |----------|----------|
+   | admin | admin123 |
+   | johndoe | password123 |
+
+### Quick Start with CLI
+
+1. **Install Python dependencies**
+   ```powershell
+   pip install -r requirements.txt
+   ```
+
+2. **Ensure Docker services are running**
+   ```powershell
+   docker-compose up -d
+   ```
+
+3. **Run the CLI**
+   ```powershell
+   python -m src.main
+   ```
+
+4. **Login with credentials**
+   ```
+   --- Authentication Required ---
+     1: Login
+     2: Register New Account
+     q: Quit Application
+   Enter your choice: 1
+
+   --- Login ---
+   Username or Email: johndoe
+   Password: password123
+   ```
 
 ## Running the Application
 
-### Docker Compose (Recommended)
+### Docker Compose (Web Services)
 
 ```powershell
 # Start all services
@@ -128,6 +179,16 @@ docker-compose logs -f
 docker-compose down
 ```
 
+### CLI Application
+
+```powershell
+# Ensure Docker services are running first
+docker-compose up -d
+
+# Run the CLI
+python -m src.main
+```
+
 ### Service URLs
 
 | Service | URL | Description |
@@ -141,21 +202,44 @@ docker-compose down
 
 ## User Authentication
 
-### Default Admin Account
+### Unified Authentication
 
-| Field | Value |
-|-------|-------|
-| Username | `admin` |
-| Password | `admin123` |
-| Email | `admin@chess.local` |
+All clients (CLI, Web UI, Admin Dashboard) authenticate through the same auth-service API and share a single SQLite database:
 
-**Important**: Change the default password after first login.
+```
+┌─────────────┐   ┌─────────────┐   ┌─────────────┐
+│   CLI App   │   │   Web UI    │   │   Admin UI  │
+└──────┬──────┘   └──────┬──────┘   └──────┬──────┘
+       │                 │                 │
+       └─────────────────┼─────────────────┘
+                         │
+                         ▼
+              ┌─────────────────────┐
+              │   Auth Service      │
+              │   (Port 8002)       │
+              └──────────┬──────────┘
+                         │
+                         ▼
+              ┌─────────────────────┐
+              │   SQLite Database   │
+              │   data/users.db     │
+              └─────────────────────┘
+```
+
+### Default Accounts
+
+| Username | Password | Email | Admin |
+|----------|----------|-------|-------|
+| `admin` | `admin123` | admin@chess.local | Yes |
+| `johndoe` | `password123` | john@example.com | No |
+
+**Important**: Change the default passwords after first login.
 
 ### Authentication Flow
 
-1. User enters credentials on login page
-2. Auth service validates and returns JWT token
-3. Token stored in browser localStorage
+1. User enters credentials (login page or CLI)
+2. Auth service validates with bcrypt and returns JWT token
+3. Token stored in browser localStorage or CLI session
 4. All API requests include token in Authorization header
 5. Token expires after 24 hours
 
@@ -164,23 +248,59 @@ docker-compose down
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check |
-| `/auth/login` | POST | User login |
+| `/auth/login` | POST | User login (username OR email) |
 | `/auth/register` | POST | Create account |
 | `/auth/verify` | POST | Validate token |
+| `/auth/verify-email` | POST | Verify email with token |
 | `/auth/logout` | POST | End session |
 | `/auth/change-password` | POST | Update password |
+| `/auth/refresh` | POST | Refresh JWT token |
 
-### Login Example
+### Login Example (API)
 
 ```powershell
-# Login request
+# Login request (supports username OR email)
 $response = Invoke-RestMethod -Uri "http://localhost:8002/auth/login" `
   -Method Post `
   -ContentType "application/json" `
-  -Body '{"username":"admin","password":"admin123"}'
+  -Body '{"username":"johndoe","password":"password123"}'
+
+# Response
+# {
+#   "success": true,
+#   "message": "Welcome back, johndoe!",
+#   "token": "eyJhbGciOiJIUzI1NiIs...",
+#   "username": "johndoe",
+#   "is_admin": false
+# }
 
 # Use token for authenticated requests
 $token = $response.token
+```
+
+### Login Example (CLI)
+
+```powershell
+python -m src.main
+```
+
+```
+--- Authentication Required ---
+  1: Login
+  2: Register New Account
+  q: Quit Application
+Enter your choice: 1
+
+--- Login ---
+Username or Email: johndoe
+Password: 
+
+Welcome back, johndoe!
+
+--- Main Menu ---
+  1: Play a New Game
+  2: Load a Saved Game
+  ...
 ```
 
 ## Admin Dashboard
@@ -205,6 +325,7 @@ Access at **http://localhost:8080/admin.html**
 | `/admin/users` | GET | List all users |
 | `/admin/users/{username}/promote` | POST | Promote to admin |
 | `/admin/users/{username}/demote` | POST | Demote from admin |
+| `/admin/users/{username}/verify` | POST | Manually verify user |
 | `/admin/users/{username}` | DELETE | Delete user |
 
 ### Stats Response
@@ -213,9 +334,9 @@ Access at **http://localhost:8080/admin.html**
 {
   "total_users": 2,
   "admin_count": 1,
-  "verified_users": 0,
+  "verified_users": 2,
   "total_games": 0,
-  "timestamp": "2025-12-08T02:46:18.517617"
+  "timestamp": "2025-12-15T10:30:00.000000+00:00"
 }
 ```
 
@@ -265,7 +386,7 @@ Invoke-RestMethod -Uri "http://localhost:8000/move" `
 
 ## Playing Chess
 
-### Start a Game
+### Web Interface
 
 1. Login at http://localhost:8080
 2. Select player types (Human/AI)
@@ -273,12 +394,23 @@ Invoke-RestMethod -Uri "http://localhost:8000/move" `
 4. Set skill level (1-20)
 5. Click "Start New Game"
 
+### CLI Interface
+
+1. Run `python -m src.main`
+2. Login with your credentials
+3. Select "Play a New Game" from the menu
+4. Choose player types and AI settings
+5. Enter moves in algebraic notation
+
 ### Make Moves
 
+**Web UI:**
 - Drag pieces to valid squares
 - Invalid moves snap back automatically
-- AI responds after your move
-- Status box shows move history
+
+**CLI:**
+- Enter moves like `e2e4` or `Nf3`
+- Type `help` for available commands
 
 ### Game Status
 
@@ -289,7 +421,7 @@ Invoke-RestMethod -Uri "http://localhost:8000/move" `
 | Stalemate | Draw, no legal moves |
 | Draw | Game ends without winner |
 
-### Skill Levels
+### Skill Levels (Stockfish)
 
 | Level | Description |
 |-------|-------------|
@@ -312,17 +444,35 @@ DEEPSEEK_API_KEY=your_deepseek_key
 # JWT Configuration (optional, has defaults)
 JWT_SECRET_KEY=your_secret_key
 JWT_EXPIRATION_HOURS=24
+
+# Development Mode (auto-verifies new users)
+CHESS_DEV_MODE=false
+
+# Auth Service URL (for CLI, default: http://localhost:8002)
+AUTH_SERVICE_URL=http://localhost:8002
 ```
 
 ### Docker Compose Services
 
 ```yaml
 services:
-  chess-ui:        # Port 8080 - Frontend
-  chess-engine:    # Port 8000 - Game logic
-  chess-auth-service:    # Port 8002 - Authentication
-  chess-admin-service:   # Port 8001 - Admin functions
+  chess-ui:            # Port 8080 - Frontend
+  chess-engine:        # Port 8000 - Game logic
+  auth-service:        # Port 8002 - Authentication
+  admin-service:       # Port 8001 - Admin functions
 ```
+
+### CLI Dependencies
+
+Install with:
+```powershell
+pip install -r requirements.txt
+```
+
+Required packages:
+- `requests>=2.28.0`
+- `python-chess>=1.999`
+- `bcrypt>=4.0.0`
 
 ## Troubleshooting
 
@@ -330,11 +480,14 @@ services:
 
 | Issue | Solution |
 |-------|----------|
-| Can't login | Check credentials, verify auth service is running |
+| Can't login (Web) | Check credentials, verify auth service is running |
+| Can't login (CLI) | Ensure Docker services are running and `requests` is installed |
+| "Invalid username or password" | Reset password with `scripts/setup_test_user.py` |
 | Token expired | Logout and login again |
 | AI not responding | Check engine logs: `docker logs chess-engine` |
 | Port in use | `docker-compose down` then restart |
 | CORS errors | Ensure all services are running |
+| Database not syncing | Copy manually: `docker cp data/users.db chess-auth-service:/app/data/` |
 
 ### Health Checks
 
@@ -344,6 +497,32 @@ curl http://localhost:8000/        # Engine
 curl http://localhost:8001/health  # Admin
 curl http://localhost:8002/health  # Auth
 curl http://localhost:8001/admin/stats  # Stats
+```
+
+### Debug CLI Authentication
+
+```powershell
+# Test AuthClient directly
+python -c "
+from src.auth_client import AuthClient
+client = AuthClient()
+print('Health:', client.health_check())
+success, msg, token = client.login('johndoe', 'password123')
+print('Login:', success, msg)
+"
+```
+
+### Reset Test Users
+
+```powershell
+# Run setup script to reset passwords
+python scripts/setup_test_user.py
+
+# Copy database to container
+docker cp data/users.db chess-auth-service:/app/data/users.db
+
+# Restart auth service
+docker-compose restart auth-service
 ```
 
 ### View Logs
@@ -378,32 +557,56 @@ docker-compose up
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Docker Network                               │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────────┐   │
-│  │   chess-ui   │    │ chess-engine │    │  chess-admin-service │   │
-│  │  (Port 8080) │───▶│ (Port 8000)  │    │     (Port 8001)      │   │
-│  └──────┬───────┘    └──────────────┘    └──────────┬───────────┘   │
-│         │                                           │               │
-│         │            ┌──────────────────────┐       │               │
-│         └───────────▶│  chess-auth-service  │◀──────┘               │
-│                      │     (Port 8002)      │                       │
-│                      └──────────┬───────────┘                       │
-│                                 │                                   │
-│                      ┌──────────▼───────────┐                       │
-│                      │   SQLite Database    │                       │
-│                      │     (users.db)       │                       │
-│                      └──────────────────────┘                       │
-└─────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              Clients                                     │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────────────┐   │
+│  │   CLI App    │    │   Web UI     │    │   Admin Dashboard        │   │
+│  │ (python -m   │    │ (Port 8080)  │    │   (Port 8080/admin.html) │   │
+│  │  src.main)   │    │              │    │                          │   │
+│  └──────┬───────┘    └──────┬───────┘    └────────────┬─────────────┘   │
+│         │                   │                         │                  │
+└─────────┼───────────────────┼─────────────────────────┼──────────────────┘
+          │                   │                         │
+          │     HTTP API      │                         │
+          └─────────┬─────────┴─────────────────────────┘
+                    │
+┌───────────────────┼─────────────────────────────────────────────────────┐
+│                   │           Docker Network                             │
+├───────────────────┼─────────────────────────────────────────────────────┤
+│                   ▼                                                      │
+│         ┌──────────────────────┐                                        │
+│         │    auth-service      │◀───────────────────────┐               │
+│         │     (Port 8002)      │                        │               │
+│         └──────────┬───────────┘                        │               │
+│                    │                                    │               │
+│                    ▼                                    │               │
+│         ┌──────────────────────┐         ┌──────────────┴───────────┐   │
+│         │   SQLite Database    │◀────────│    admin-service         │   │
+│         │   data/users.db      │         │     (Port 8001)          │   │
+│         │   (Shared Volume)    │         └──────────────────────────┘   │
+│         └──────────────────────┘                                        │
+│                                                                          │
+│         ┌──────────────────────┐                                        │
+│         │    chess-engine      │                                        │
+│         │     (Port 8000)      │                                        │
+│         └──────────────────────┘                                        │
+│                                                                          │
+│         ┌──────────────────────┐                                        │
+│         │      chess-ui        │                                        │
+│         │     (Port 8080)      │                                        │
+│         └──────────────────────┘                                        │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Database
 
 - **Type**: SQLite
-- **Location**: `auth-service/users.db` (auto-created)
-- **Tables**: `users`
+- **Location**: `data/users.db` (shared volume)
+- **Accessed by**: auth-service, admin-service
+- **CLI Access**: Via auth-service API (http://localhost:8002)
 
 ### Users Table Schema
 
@@ -415,6 +618,7 @@ CREATE TABLE users (
     password_hash TEXT NOT NULL,
     is_admin BOOLEAN DEFAULT 0,
     is_verified BOOLEAN DEFAULT 0,
+    verification_token TEXT,
     games_count INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -428,6 +632,8 @@ CREATE TABLE users (
 |---------|--------|
 | Password Hashing | ✅ bcrypt |
 | JWT Authentication | ✅ 24-hour expiry |
+| Unified User Storage | ✅ Single SQLite database |
+| Login by Username/Email | ✅ Supported |
 | CORS | ⚠️ Open (for development) |
 | HTTPS | ❌ Not configured |
 | Rate Limiting | ❌ Not implemented |
@@ -455,6 +661,9 @@ CREATE TABLE users (
 - [ ] Opening book integration
 - [ ] Tournament mode
 - [ ] Game history storage
+- [ ] Email verification with SMTP
+- [ ] Password reset functionality
+- [ ] OAuth2 social login
 
 ---
 
@@ -470,21 +679,32 @@ CREATE TABLE users (
 
 ### Default Credentials
 
-| Username | Password |
-|----------|----------|
-| admin | admin123 |
+| Username | Password | Admin |
+|----------|----------|-------|
+| admin | admin123 | Yes |
+| johndoe | password123 | No |
 
 ### Commands
 
 ```powershell
-# Start
+# Start Docker services
 docker-compose up --build
 
-# Stop
+# Start in background
+docker-compose up -d
+
+# Run CLI
+python -m src.main
+
+# Stop services
 docker-compose down
 
-# Logs
+# View logs
 docker-compose logs -f
+
+# Reset test users
+python scripts/setup_test_user.py
+docker-compose restart auth-service
 
 # Rebuild
 docker-compose build --no-cache

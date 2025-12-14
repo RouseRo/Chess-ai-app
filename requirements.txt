@@ -2,3 +2,4 @@ fastapi
 uvicorn
 python-chess
 openai
+requests>=2.28.0

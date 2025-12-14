@@ -6,7 +6,7 @@ This document describes the Docker-based microservices architecture for the Ches
 
 ## Overview
 
-The application consists of **four containerized microservices**:
+The application consists of **four containerized microservices** plus a CLI application, all sharing a unified SQLite database for user authentication:
 
 | Service | Port | Description |
 |---------|------|-------------|
@@ -14,38 +14,88 @@ The application consists of **four containerized microservices**:
 | **chess-engine** | 8000 | Chess game logic and AI integration |
 | **chess-admin-service** | 8001 | Admin dashboard and user management |
 | **chess-auth-service** | 8002 | Authentication and JWT token management |
+| **CLI App** | - | Command-line interface (`python -m src.main`) |
 
 ---
 
 ## Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Docker Network                               │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────────┐   │
-│  │              │    │              │    │  chess-admin-service │   │
-│  │   chess-ui   │───▶│ chess-engine │    │     (Port 8001)      │   │
-│  │  (Port 8080) │    │ (Port 8000)  │    │                      │   │
-│  │              │    │              │    │                      │   │
-│  └──────┬───────┘    └──────────────┘    └──────────┬───────────┘   │
-│         │                                           │               │
-│         │            ┌──────────────────────┐       │               │
-│         │            │                      │       │               │
-│         └───────────▶│  chess-auth-service  │◀──────┘               │
-│                      │     (Port 8002)      │                       │
-│                      │                      │                       │
-│                      └──────────┬───────────┘                       │
-│                                 │                                   │
-│                      ┌──────────▼───────────┐                       │
-│                      │                      │                       │
-│                      │   SQLite Database    │                       │
-│                      │     (users.db)       │                       │
-│                      │                      │                       │
-│                      └──────────────────────┘                       │
-│                                                                      │
-└─────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              Clients                                     │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────────────┐   │
+│  │   CLI App    │    │   Web UI     │    │   Admin Dashboard        │   │
+│  │ (python -m   │    │ (Port 8080)  │    │   (Port 8080/admin.html) │   │
+│  │  src.main)   │    │              │    │                          │   │
+│  └──────┬───────┘    └──────┬───────┘    └────────────┬─────────────┘   │
+│         │                   │                         │                  │
+└─────────┼───────────────────┼─────────────────────────┼──────────────────┘
+          │                   │                         │
+          │     HTTP API      │                         │
+          └─────────┬─────────┴─────────────────────────┘
+                    │
+┌───────────────────┼─────────────────────────────────────────────────────┐
+│                   │           Docker Network                             │
+├───────────────────┼─────────────────────────────────────────────────────┤
+│                   ▼                                                      │
+│         ┌──────────────────────┐                                        │
+│         │  chess-auth-service  │◀───────────────────────┐               │
+│         │     (Port 8002)      │                        │               │
+│         └──────────┬───────────┘                        │               │
+│                    │                                    │               │
+│                    ▼                                    │               │
+│         ┌──────────────────────┐         ┌──────────────┴───────────┐   │
+│         │   SQLite Database    │◀────────│  chess-admin-service     │   │
+│         │   data/users.db      │         │     (Port 8001)          │   │
+│         │   (Shared Volume)    │         └──────────────────────────┘   │
+│         └──────────────────────┘                                        │
+│                                                                          │
+│         ┌──────────────────────┐                                        │
+│         │    chess-engine      │                                        │
+│         │     (Port 8000)      │                                        │
+│         └──────────────────────┘                                        │
+│                                                                          │
+│         ┌──────────────────────┐                                        │
+│         │      chess-ui        │                                        │
+│         │     (Port 8080)      │                                        │
+│         └──────────────────────┘                                        │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Unified Authentication Architecture
+
+All clients (CLI, Web UI, Admin Dashboard) authenticate through the same auth-service API:
+
+```
+┌─────────────┐   ┌─────────────┐   ┌─────────────┐
+│   CLI App   │   │   Web UI    │   │   Admin UI  │
+│             │   │             │   │             │
+│ AuthClient  │   │  fetch()    │   │  fetch()    │
+└──────┬──────┘   └──────┬──────┘   └──────┬──────┘
+       │                 │                 │
+       │    HTTP POST /auth/login          │
+       └─────────────────┼─────────────────┘
+                         │
+                         ▼
+              ┌─────────────────────┐
+              │   Auth Service      │
+              │   (Port 8002)       │
+              │                     │
+              │  • Validates creds  │
+              │  • Issues JWT       │
+              │  • bcrypt passwords │
+              └──────────┬──────────┘
+                         │
+                         ▼
+              ┌─────────────────────┐
+              │   SQLite Database   │
+              │   data/users.db     │
+              └─────────────────────┘
 ```
 
 ---
@@ -54,6 +104,13 @@ The application consists of **four containerized microservices**:
 
 ```
 chess-ai-app/
+│
+├── src/                       # CLI Application
+│   ├── main.py               # Main entry point
+│   ├── auth_client.py        # HTTP client for auth-service
+│   ├── user_manager.py       # User management (uses AuthClient)
+│   ├── auth_ui.py            # CLI authentication prompts
+│   └── ...
 │
 ├── engine/                    # Chess engine service
 │   ├── Dockerfile
@@ -74,26 +131,59 @@ chess-ai-app/
 ├── auth-service/              # Authentication service
 │   ├── Dockerfile
 │   ├── main.py
-│   ├── requirements.txt
-│   └── users.db               # SQLite database (created at runtime)
+│   └── requirements.txt
 │
 ├── admin-service/             # Admin management service
 │   ├── Dockerfile
 │   ├── main.py
-│   ├── requirements.txt
-│   └── ...
+│   └── requirements.txt
+│
+├── data/                      # Shared database directory
+│   └── users.db              # SQLite database (shared volume)
+│
+├── scripts/                   # Utility scripts
+│   ├── setup_test_user.py    # Create/reset test users
+│   └── migrate_json_to_sqlite.py
 │
 ├── docs/                      # Documentation
 │   └── Docker_Design.md
 │
-└── docker-compose.yml         # Container orchestration
+├── docker-compose.yml         # Container orchestration
+├── requirements.txt           # CLI dependencies
+└── .env                       # Environment variables
 ```
 
 ---
 
 ## Services
 
-### 1. Chess UI (Port 8080)
+### 1. CLI Application
+
+**Purpose:** Command-line interface for playing chess, managing games, and user authentication.
+
+**Tech Stack:**
+- Python 3.12
+- requests (for HTTP API calls)
+- python-chess
+
+**Authentication:**
+The CLI uses `AuthClient` to communicate with the auth-service:
+
+```python
+from src.auth_client import AuthClient
+
+client = AuthClient("http://localhost:8002")
+success, message, token = client.login("johndoe", "password123")
+```
+
+**Running the CLI:**
+```bash
+python -m src.main
+```
+
+---
+
+### 2. Chess UI (Port 8080)
 
 **Purpose:** Serves the frontend web application with interactive chessboard.
 
@@ -120,7 +210,7 @@ EXPOSE 80
 
 ---
 
-### 2. Chess Engine (Port 8000)
+### 3. Chess Engine (Port 8000)
 
 **Purpose:** Handles chess game logic, move validation, and AI integration.
 
@@ -153,9 +243,9 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 ---
 
-### 3. Auth Service (Port 8002)
+### 4. Auth Service (Port 8002)
 
-**Purpose:** Manages user authentication, registration, and JWT tokens.
+**Purpose:** Manages user authentication, registration, and JWT tokens. **Single source of truth for all user data.**
 
 **Tech Stack:**
 - Python 3.12
@@ -164,26 +254,47 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 - PyJWT
 - bcrypt
 
-**Database Location:** `auth-service/users.db` (auto-created on first run)
+**Database Location:** `data/users.db` (shared Docker volume)
 
 **Endpoints:**
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check |
-| `/auth/login` | POST | User login, returns JWT |
+| `/auth/login` | POST | User login (username or email), returns JWT |
 | `/auth/register` | POST | User registration |
 | `/auth/verify` | POST | Validate JWT token |
+| `/auth/verify-email` | POST | Verify email with token |
 | `/auth/refresh` | POST | Refresh JWT token |
 | `/auth/logout` | POST | Logout (client-side) |
 | `/auth/change-password` | POST | Update password |
 
+**Login Request (supports username OR email):**
+```json
+{
+  "username": "johndoe",
+  "password": "password123"
+}
+```
+
+**Login Response:**
+```json
+{
+  "success": true,
+  "message": "Welcome back, johndoe!",
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "username": "johndoe",
+  "is_admin": false
+}
+```
+
 **JWT Token Structure:**
 ```json
 {
-  "username": "admin",
-  "is_admin": true,
-  "exp": 1764999103,
-  "iat": 1764912703
+  "username": "johndoe",
+  "is_admin": false,
+  "email": "john@example.com",
+  "exp": 1765824254,
+  "iat": 1765737854
 }
 ```
 
@@ -200,14 +311,14 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8002"]
 
 ---
 
-### 4. Admin Service (Port 8001)
+### 5. Admin Service (Port 8001)
 
 **Purpose:** Provides admin dashboard functionality, user management, and system statistics.
 
 **Tech Stack:**
 - Python 3.12
 - FastAPI
-- SQLite (connects to auth-service database)
+- SQLite (connects to shared database)
 
 **Endpoints:**
 | Endpoint | Method | Auth | Description |
@@ -217,20 +328,17 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8002"]
 | `/admin/users` | GET | No | List all users |
 | `/admin/users/{username}/promote` | POST | Yes | Promote user to admin |
 | `/admin/users/{username}/demote` | POST | Yes | Demote admin to user |
+| `/admin/users/{username}/verify` | POST | Yes | Manually verify user |
 | `/admin/users/{username}` | DELETE | Yes | Delete user |
-| `/admin/models` | GET | Yes | List AI models |
-| `/admin/models/add` | POST | Yes | Add AI model |
-| `/admin/models/{id}/toggle` | POST | Yes | Toggle model status |
-| `/admin/models/{id}` | DELETE | Yes | Delete model |
 
 **Stats Response Example:**
 ```json
 {
   "total_users": 2,
   "admin_count": 1,
-  "verified_users": 0,
+  "verified_users": 2,
   "total_games": 0,
-  "timestamp": "2025-12-08T02:46:18.517617"
+  "timestamp": "2025-12-15T10:30:00.000000+00:00"
 }
 ```
 
@@ -277,17 +385,22 @@ services:
       - "8080:80"
     depends_on:
       - chess-engine
-      - chess-auth-service
+      - auth-service
     networks:
       - chess-network
 
-  chess-auth-service:
+  auth-service:
     build: ./auth-service
     container_name: chess-auth-service
     ports:
       - "8002:8002"
+    environment:
+      - DATABASE_PATH=/app/data/users.db
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-chess-app-secret-key}
+      - JWT_EXPIRATION_HOURS=${JWT_EXPIRATION_HOURS:-24}
+      - CHESS_DEV_MODE=${CHESS_DEV_MODE:-false}
     volumes:
-      - auth-data:/app/data
+      - ./data:/app/data
     networks:
       - chess-network
     healthcheck:
@@ -296,15 +409,17 @@ services:
       timeout: 10s
       retries: 3
 
-  chess-admin-service:
+  admin-service:
     build: ./admin-service
     container_name: chess-admin-service
     ports:
       - "8001:8001"
+    environment:
+      - DATABASE_PATH=/app/data/users.db
     volumes:
-      - auth-data:/app/data
+      - ./data:/app/data
     depends_on:
-      - chess-auth-service
+      - auth-service
     networks:
       - chess-network
     healthcheck:
@@ -316,16 +431,111 @@ services:
 networks:
   chess-network:
     driver: bridge
+```
 
-volumes:
-  auth-data:
+---
+
+## Database
+
+### Unified Storage
+
+All services and clients share a single SQLite database:
+
+| Environment | Location |
+|-------------|----------|
+| Docker Containers | `/app/data/users.db` (mounted from `./data`) |
+| Local Development | `data/users.db` |
+| CLI Application | Accesses via auth-service API (http://localhost:8002) |
+
+### Users Table Schema
+
+```sql
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    is_admin BOOLEAN DEFAULT 0,
+    is_verified BOOLEAN DEFAULT 0,
+    verification_token TEXT,
+    games_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Default Users
+
+Created automatically on first startup or via setup script:
+
+| Username | Email | Password | Admin | Verified |
+|----------|-------|----------|-------|----------|
+| `admin` | `admin@chess.local` | `admin123` | Yes | Yes |
+| `johndoe` | `john@example.com` | `password123` | No | Yes |
+
+### Setup Test Users
+
+```powershell
+# Run the setup script
+python scripts/setup_test_user.py
+
+# Copy database to container (if needed)
+docker cp data/users.db chess-auth-service:/app/data/users.db
+
+# Restart auth service
+docker-compose restart auth-service
+```
+
+### View Database Contents
+
+```powershell
+# Local database
+sqlite3 data/users.db "SELECT username, email, is_admin, is_verified FROM users;"
+
+# Inside container
+docker exec chess-auth-service python -c "
+import sqlite3
+conn = sqlite3.connect('/app/data/users.db')
+for row in conn.execute('SELECT username, is_admin, is_verified FROM users'):
+    print(row)
+"
 ```
 
 ---
 
 ## Authentication Flow
 
-### Login Sequence
+### CLI Login Sequence
+
+```
+┌─────────┐         ┌────────────┐         ┌──────────────┐
+│   CLI   │         │ AuthClient │         │ Auth Service │
+└────┬────┘         └─────┬──────┘         └──────┬───────┘
+     │                    │                       │
+     │  User enters       │                       │
+     │  credentials       │                       │
+     │                    │                       │
+     │  login(user, pass) │                       │
+     │───────────────────▶│                       │
+     │                    │                       │
+     │                    │  POST /auth/login     │
+     │                    │  {username, password} │
+     │                    │──────────────────────▶│
+     │                    │                       │
+     │                    │                       │  Validate with bcrypt
+     │                    │                       │  Generate JWT
+     │                    │                       │
+     │                    │  {success, token}     │
+     │                    │◀──────────────────────│
+     │                    │                       │
+     │  (success, msg,    │                       │
+     │   token)           │                       │
+     │◀───────────────────│                       │
+     │                    │                       │
+     │  Store token       │                       │
+     │  Show menu         │                       │
+```
+
+### Web Login Sequence
 
 ```
 ┌─────────┐         ┌──────────┐         ┌──────────────┐
@@ -354,127 +564,17 @@ volumes:
      │──────────────────▶│                      │
 ```
 
-### Authenticated Request
-
-```
-┌─────────┐         ┌──────────────┐         ┌──────────────┐
-│   UI    │         │ Chess Engine │         │ Auth Service │
-└────┬────┘         └──────┬───────┘         └──────┬───────┘
-     │                     │                        │
-     │  POST /move         │                        │
-     │  Auth: Bearer <JWT> │                        │
-     │────────────────────▶│                        │
-     │                     │                        │
-     │                     │  POST /auth/verify     │
-     │                     │  {token}               │
-     │                     │───────────────────────▶│
-     │                     │                        │
-     │                     │  {valid, username}     │
-     │                     │◀───────────────────────│
-     │                     │                        │
-     │                     │  Process move          │
-     │                     │                        │
-     │  {success, newFen}  │                        │
-     │◀────────────────────│                        │
-```
-
----
-
-## CORS Configuration
-
-All backend services include CORS middleware to allow cross-origin requests from the UI:
-
-```python
-from fastapi.middleware.cors import CORSMiddleware
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-```
-
-**Production Note:** Replace `allow_origins=["*"]` with specific allowed origins.
-
----
-
-## Database
-
-### Location
-
-The SQLite database is created automatically by the auth-service on first startup:
-
-| Environment | Location |
-|-------------|----------|
-| Docker Container | `/app/users.db` or `/app/data/users.db` |
-| Local Development | `auth-service/users.db` |
-
-### Users Table Schema
-
-```sql
-CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    is_admin BOOLEAN DEFAULT 0,
-    is_verified BOOLEAN DEFAULT 0,
-    games_count INTEGER DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-### Default Admin User
-
-Created automatically on first startup:
-
-| Field | Value |
-|-------|-------|
-| Username | `admin` |
-| Email | `admin@chess.local` |
-| Password | `admin123` |
-| Is Admin | `true` |
-
-### Database Initialization Code
-
-```python
-def init_db():
-    conn = sqlite3.connect('users.db')
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            is_admin BOOLEAN DEFAULT 0,
-            is_verified BOOLEAN DEFAULT 0,
-            games_count INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Create default admin user if not exists
-    cursor.execute('SELECT * FROM users WHERE username = ?', ('admin',))
-    if not cursor.fetchone():
-        password_hash = bcrypt.hashpw('admin123'.encode(), bcrypt.gensalt())
-        cursor.execute('''
-            INSERT INTO users (username, email, password_hash, is_admin)
-            VALUES (?, ?, ?, ?)
-        ''', ('admin', 'admin@chess.local', password_hash.decode(), True))
-    
-    conn.commit()
-    conn.close()
-```
-
 ---
 
 ## Running the Application
 
-### Start All Services
+### Prerequisites
+
+1. Docker and Docker Compose installed
+2. Python 3.12+ (for CLI)
+3. Required Python packages: `pip install -r requirements.txt`
+
+### Start All Docker Services
 
 ```bash
 cd c:\Users\rober\Source\Repos\Chess-ai-app
@@ -487,6 +587,13 @@ docker-compose up --build
 docker-compose up -d
 ```
 
+### Run CLI Application
+
+```bash
+# Ensure Docker services are running first
+python -m src.main
+```
+
 ### View Logs
 
 ```bash
@@ -497,13 +604,6 @@ docker-compose logs -f
 
 ```bash
 docker-compose down
-```
-
-### Rebuild Specific Service
-
-```bash
-docker-compose build chess-ui
-docker-compose up -d chess-ui
 ```
 
 ---
@@ -528,24 +628,19 @@ Verify all services are running:
 ```bash
 # Auth Service
 curl http://localhost:8002/health
+# Expected: {"status":"healthy","service":"auth","storage":"sqlite"}
 
 # Admin Service
 curl http://localhost:8001/health
+# Expected: {"status":"healthy","service":"admin","storage":"sqlite"}
 
 # Chess Engine
 curl http://localhost:8000/
+# Expected: {"status":"healthy"}
 
 # Admin Stats
 curl http://localhost:8001/admin/stats
-```
-
-**Expected Responses:**
-```json
-// Health check
-{"status": "healthy"}
-
-// Admin stats
-{"total_users": 2, "admin_count": 1, "verified_users": 0, "total_games": 0}
+# Expected: {"total_users":2,"admin_count":1,"verified_users":2,...}
 ```
 
 ---
@@ -559,9 +654,32 @@ Create a `.env` file in the project root:
 OPENAI_API_KEY=your_openai_key
 DEEPSEEK_API_KEY=your_deepseek_key
 
-# JWT Configuration (optional - defaults provided)
-JWT_SECRET_KEY=your_secret_key
+# JWT Configuration
+JWT_SECRET_KEY=your-secure-secret-key-change-in-production
 JWT_EXPIRATION_HOURS=24
+
+# Development Mode (auto-verifies new users)
+CHESS_DEV_MODE=false
+
+# Auth Service URL (for CLI)
+AUTH_SERVICE_URL=http://localhost:8002
+```
+
+---
+
+## CLI Dependencies
+
+The CLI application requires these Python packages (in `requirements.txt`):
+
+```
+requests>=2.28.0
+python-chess>=1.999
+bcrypt>=4.0.0
+```
+
+Install with:
+```bash
+pip install -r requirements.txt
 ```
 
 ---
@@ -574,6 +692,7 @@ JWT_EXPIRATION_HOURS=24
 |---------|--------|
 | Password Hashing | ✅ bcrypt |
 | JWT Authentication | ✅ Implemented |
+| Unified User Storage | ✅ Single SQLite database |
 | CORS | ⚠️ Open (restrict in prod) |
 | HTTPS | ❌ Not configured |
 | Rate Limiting | ❌ Not implemented |
@@ -583,12 +702,11 @@ JWT_EXPIRATION_HOURS=24
 
 1. **Enable HTTPS** - Use SSL certificates
 2. **Restrict CORS** - Specify allowed origins
-3. **Add Rate Limiting** - Prevent abuse
-4. **Use Environment Variables** - For sensitive data
+3. **Add Rate Limiting** - Prevent brute force attacks
+4. **Use Strong JWT Secret** - Generate secure random key
 5. **Database Backup** - Regular SQLite backups
-6. **Logging** - Centralized logging solution
-7. **Monitoring** - Health check alerts
-8. **Change Default Admin Password** - Update on first login
+6. **Change Default Passwords** - Update admin/johndoe on first use
+7. **Environment Variables** - Never commit secrets to git
 
 ---
 
@@ -598,44 +716,49 @@ JWT_EXPIRATION_HOURS=24
 
 | Issue | Solution |
 |-------|----------|
+| "Invalid username or password" (CLI) | Ensure `requests` is installed: `pip install requests` |
+| CLI can't reach auth service | Ensure Docker services are running: `docker-compose up -d` |
+| Database not syncing | Copy manually: `docker cp data/users.db chess-auth-service:/app/data/` |
 | Port already in use | `docker-compose down` then retry |
-| Database locked | Restart auth-service |
-| CORS errors | Check browser console, verify origins |
 | Token expired | Login again |
-| 404 favicon | Add favicon.ico to ui folder |
-| Database not found | Auth-service creates it automatically on startup |
+
+### Debug CLI Authentication
+
+```powershell
+# Test AuthClient directly
+python -c "
+from src.auth_client import AuthClient
+client = AuthClient()
+print('Health:', client.health_check())
+success, msg, token = client.login('johndoe', 'password123')
+print('Login:', success, msg)
+"
+```
 
 ### View Container Logs
 
 ```bash
-# All containers
-docker-compose logs
-
-# Specific container
-docker-compose logs chess-auth-service
-
-# Follow logs
-docker-compose logs -f chess-engine
+docker-compose logs auth-service
+docker-compose logs -f admin-service
 ```
 
 ### Access Container Shell
 
 ```bash
-docker exec -it chess-engine /bin/sh
 docker exec -it chess-auth-service /bin/bash
+docker exec -it chess-admin-service /bin/bash
 ```
 
-### View Database Contents
+---
 
-```bash
-# Access auth-service container
-docker exec -it chess-auth-service /bin/bash
+## Migration from JSON to SQLite
 
-# Inside container, use sqlite3
-sqlite3 users.db
-.tables
-SELECT * FROM users;
-.quit
+If you have existing users in JSON files (`user_data/users/profiles/*.json`), run the migration script:
+
+```powershell
+python scripts/migrate_json_to_sqlite.py
+docker cp data/users.db chess-auth-service:/app/data/users.db
+docker-compose restart auth-service
 ```
 
 ---
@@ -650,7 +773,9 @@ SELECT * FROM users;
 - [ ] Game history and replay
 - [ ] Multiplayer support
 - [ ] ELO rating system
-- [ ] Shared volume for database between services
+- [ ] Email verification with real SMTP
+- [ ] Password reset functionality
+- [ ] OAuth2 social login
 
 ---
 
@@ -663,3 +788,4 @@ SELECT * FROM users;
 - [JWT.io](https://jwt.io/)
 - [python-chess](https://python-chess.readthedocs.io/)
 - [SQLite](https://www.sqlite.org/)
+- [bcrypt](https://github.com/pyca/bcrypt)

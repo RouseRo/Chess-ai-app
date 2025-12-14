@@ -23,21 +23,16 @@ services:
       start_period: 10s
 
   auth-service:
-    build:
-      context: .
-      dockerfile: auth-service/Dockerfile
+    build: ./auth-service
     container_name: chess-auth-service
     ports:
       - "8002:8002"
     environment:
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-chess-ai-secret-key-change-in-production}
+      - DATABASE_PATH=/app/data/users.db
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-chess-app-secret-key}
+      - CHESS_DEV_MODE=${CHESS_DEV_MODE:-false}
     volumes:
-      - ./auth-service:/app/auth-service
-      - ./engine:/app/engine
-      - ./user_data:/app/user_data
-    depends_on:
-      chess-engine:
-        condition: service_healthy
+      - ./data:/app/data
     networks:
       - chess-network
     healthcheck:
@@ -48,19 +43,14 @@ services:
       start_period: 10s
 
   admin-service:
-    build:
-      context: .
-      dockerfile: admin-service/Dockerfile
+    build: ./admin-service
     container_name: chess-admin-service
     ports:
       - "8001:8001"
+    environment:
+      - DATABASE_PATH=/app/data/users.db
     volumes:
-      - ./admin-service:/app/admin-service
-      - ./engine:/app/engine
-      - ./user_data:/app/user_data
-    depends_on:
-      auth-service:
-        condition: service_healthy
+      - ./data:/app/data
     networks:
       - chess-network
     healthcheck:
