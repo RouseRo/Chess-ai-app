@@ -12,3 +12,7 @@ user_data/sessions.json
 user_data/users.json
 user_data/users/
 data/users.db
+
+# Log files
+*.log
+logs/
