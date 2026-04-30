@@ -1,7 +1,14 @@
 .env
 *.pyc
+*.pyo
 *.pyd
+__pycache__/
 venv/Scripts/*.exe
 venv/Lib/site-packages/
 venv/Scripts/*
- 
+
+# Runtime/user data files
+user_data/sessions.json
+user_data/users.json
+user_data/users/
+data/users.db

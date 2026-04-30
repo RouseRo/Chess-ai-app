@@ -2,6 +2,8 @@
 
 A web-based and CLI chess application supporting human and AI players, with Stockfish engine integration, interactive chessboard, real-time game updates, and comprehensive microservices architecture.
 
+The application is for people that are new to the game of chess and want to learn more about it for mental exercise and are interested in the history of the game and currents events in the chess community.
+
 ## Table of Contents
 
 - [Features](#features)
@@ -38,6 +40,31 @@ A web-based and CLI chess application supporting human and AI players, with Stoc
 - **Admin Dashboard**: Manage users and system settings
 - **Microservices Architecture**: Scalable, modular design with separate services
 - **Docker Support**: Complete containerization with docker-compose
+
+## Requirements
+
+### User Interface Requirements
+1. **Command Line Interface (CLI)** - A simple text interface for chess gameplay in the terminal
+2. **Website (Web UI)** - A graphical interface compatible with most popular browsers
+3. **Smartphone** - A mobile application for chess gameplay on smartphones
+
+### Application Requirements
+1. Each chess game has a unique identifier
+2. Each registered user to the application has a profile and a unique identifier.
+3. The Administrator Interface is only available as a Web UI.
+
+### Administrator Interface Operations
+1. **User Management**
+   - 1.1 View all users with summary information (username, email, role, games played)
+   - 1.2 View detailed user information (username, email, created date, last login, role, verification status, games list)
+   - 1.3 Promote regular users to administrator status
+   - 1.4 Demote administrators to regular user status
+   - 1.5 Verify user email addresses
+   - 1.6 Delete user accounts
+
+2. **System Statistics**
+   - 2.1 View dashboard statistics (total users, admin count, verified users, total games played)
+   - 2.2 Track admin and verification metrics
 
 ## Project Structure
 

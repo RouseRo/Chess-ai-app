@@ -3,7 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
 import os
-import json
+import sqlite3
+import bcrypt
 from datetime import datetime
 
 app = FastAPI(
@@ -20,33 +21,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# User data directory - consistent across all services
-USER_DATA_DIR = "/app/user_data/users"
+# Database configuration
+DATABASE_PATH = os.environ.get("DATABASE_PATH", "/app/data/users.db")
 
 print(f"\n[INIT] ========== ADMIN SERVICE INITIALIZATION ==========")
-print(f"[INIT] USER_DATA_DIR: {USER_DATA_DIR}")
-print(f"[INIT] os.path.exists(USER_DATA_DIR): {os.path.exists(USER_DATA_DIR)}")
-print(f"[INIT] os.path.isdir(USER_DATA_DIR): {os.path.isdir(USER_DATA_DIR)}")
-
-if os.path.exists(USER_DATA_DIR):
-    try:
-        contents = os.listdir(USER_DATA_DIR)
-        print(f"[INIT] Contents of {USER_DATA_DIR}: {contents}")
-    except Exception as e:
-        print(f"[INIT] Error listing {USER_DATA_DIR}: {e}")
-
-profiles_dir = os.path.join(USER_DATA_DIR, "profiles")
-print(f"[INIT] profiles_dir: {profiles_dir}")
-print(f"[INIT] os.path.exists(profiles_dir): {os.path.exists(profiles_dir)}")
-print(f"[INIT] os.path.isdir(profiles_dir): {os.path.isdir(profiles_dir)}")
-
-if os.path.exists(profiles_dir):
-    try:
-        files = os.listdir(profiles_dir)
-        print(f"[INIT] Contents of {profiles_dir}: {files}")
-    except Exception as e:
-        print(f"[INIT] Error listing {profiles_dir}: {e}")
-
+print(f"[INIT] DATABASE_PATH: {DATABASE_PATH}")
+print(f"[INIT] Database exists: {os.path.exists(DATABASE_PATH)}")
 print(f"[INIT] ========== END INITIALIZATION ==========\n")
 
 # ========== Pydantic Models ==========
@@ -74,93 +54,119 @@ class AdminActionResponse(BaseModel):
 
 # ========== Helper Functions ==========
 
-def get_user_file_path(username: str) -> str:
-    """Get the file path for a user profile."""
-    return os.path.join(USER_DATA_DIR, "profiles", f"{username}.json")
+def get_db_connection():
+    """Get SQLite database connection."""
+    conn = sqlite3.connect(DATABASE_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 def get_user(username: str) -> Optional[dict]:
-    """Get user data from file."""
-    user_file = get_user_file_path(username)
-    if os.path.exists(user_file):
-        try:
-            with open(user_file, 'r') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError) as e:
-            print(f"Error reading user file: {e}")
-            return None
-    return None
+    """Get user data from database."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            return dict(row)
+        return None
+    except Exception as e:
+        print(f"Error reading user: {e}")
+        return None
 
 def list_all_users() -> list:
-    """List all users."""
+    """List all users from database."""
     users = []
-    profiles_dir = os.path.join(USER_DATA_DIR, "profiles")
-    
-    print(f"\n[LIST_USERS] ========== START ==========")
-    print(f"[LIST_USERS] profiles_dir: {profiles_dir}")
-    print(f"[LIST_USERS] os.path.exists(profiles_dir): {os.path.exists(profiles_dir)}")
-    print(f"[LIST_USERS] os.path.isdir(profiles_dir): {os.path.isdir(profiles_dir)}")
-    
-    if not os.path.exists(profiles_dir):
-        print(f"[LIST_USERS] *** PROFILES DIRECTORY DOES NOT EXIST ***")
-        print(f"[LIST_USERS] Attempting to create it...")
-        try:
-            os.makedirs(profiles_dir, exist_ok=True)
-            print(f"[LIST_USERS] Created {profiles_dir}")
-        except Exception as e:
-            print(f"[LIST_USERS] Failed to create directory: {e}")
-        print(f"[LIST_USERS] ========== END (empty) ==========\n")
-        return users
-    
     try:
-        files = os.listdir(profiles_dir)
-        print(f"[LIST_USERS] os.listdir() returned: {files}")
-        print(f"[LIST_USERS] Number of items: {len(files)}")
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users")
+        rows = cursor.fetchall()
+        conn.close()
         
-        for filename in files:
-            print(f"[LIST_USERS] Processing: {filename}")
-            if filename.endswith('.json'):
-                filepath = os.path.join(profiles_dir, filename)
-                print(f"[LIST_USERS]   Full path: {filepath}")
-                print(f"[LIST_USERS]   File exists: {os.path.exists(filepath)}")
-                print(f"[LIST_USERS]   Is file: {os.path.isfile(filepath)}")
-                
-                try:
-                    with open(filepath, 'r') as f:
-                        content = f.read()
-                        print(f"[LIST_USERS]   File size: {len(content)} bytes")
-                        user_data = json.loads(content)
-                        users.append(user_data)
-                        print(f"[LIST_USERS]   ✓ Loaded user: {user_data.get('username')}")
-                except json.JSONDecodeError as e:
-                    print(f"[LIST_USERS]   ✗ JSON Error: {e}")
-                except IOError as e:
-                    print(f"[LIST_USERS]   ✗ IO Error: {e}")
-                except Exception as e:
-                    print(f"[LIST_USERS]   ✗ Unexpected error: {type(e).__name__}: {e}")
-            else:
-                print(f"[LIST_USERS]   Skipping (not .json): {filename}")
-        
-    except PermissionError as e:
-        print(f"[LIST_USERS] ✗ Permission Error: {e}")
+        for row in rows:
+            users.append(dict(row))
     except Exception as e:
-        print(f"[LIST_USERS] ✗ Error listing directory: {type(e).__name__}: {e}")
+        print(f"Error listing users: {e}")
     
-    print(f"[LIST_USERS] Total users loaded: {len(users)}")
-    print(f"[LIST_USERS] ========== END ==========\n")
     return users
 
-def save_user(username: str, user_data: dict) -> bool:
-    """Save user data to file."""
+def get_stats() -> dict:
+    """Get system statistics."""
     try:
-        profiles_dir = os.path.join(USER_DATA_DIR, "profiles")
-        os.makedirs(profiles_dir, exist_ok=True)
+        conn = get_db_connection()
+        cursor = conn.cursor()
         
-        user_file = get_user_file_path(username)
-        with open(user_file, 'w') as f:
-            json.dump(user_data, f, indent=2)
+        cursor.execute("SELECT COUNT(*) as total FROM users")
+        total_users = cursor.fetchone()["total"]
+        
+        cursor.execute("SELECT COUNT(*) as total FROM users WHERE is_admin = 1")
+        admin_count = cursor.fetchone()["total"]
+        
+        cursor.execute("SELECT COUNT(*) as total FROM users WHERE is_verified = 1")
+        verified_users = cursor.fetchone()["total"]
+        
+        # For now, total_games is 0 as we're not tracking games in this version
+        total_games = 0
+        
+        conn.close()
+        
+        return {
+            "total_users": total_users,
+            "admin_count": admin_count,
+            "verified_users": verified_users,
+            "total_games": total_games,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        print(f"Error getting stats: {e}")
+        return {
+            "total_users": 0,
+            "admin_count": 0,
+            "verified_users": 0,
+            "total_games": 0,
+            "timestamp": datetime.now().isoformat()
+        }
+
+def update_user_admin_status(username: str, is_admin: bool) -> bool:
+    """Update user admin status."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET is_admin = ? WHERE username = ?", (is_admin, username))
+        conn.commit()
+        conn.close()
         return True
-    except IOError as e:
-        print(f"Error saving user: {e}")
+    except Exception as e:
+        print(f"Error updating admin status: {e}")
+        return False
+
+def verify_user(username: str) -> bool:
+    """Verify user email."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET is_verified = 1 WHERE username = ?", (username,))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error verifying user: {e}")
+        return False
+
+def delete_user(username: str) -> bool:
+    """Delete a user from database."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM users WHERE username = ?", (username,))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error deleting user: {e}")
         return False
 
 # ========== Health Check ==========
@@ -185,12 +191,15 @@ async def root():
 
 # ========== Admin Endpoints ==========
 
+@app.get("/admin/stats")
+async def admin_stats():
+    """Get system statistics."""
+    return get_stats()
+
 @app.get("/admin/users", response_model=List[UserResponse])
 async def get_all_users():
     """Get list of all users."""
-    print(f"\n[ENDPOINT] GET /admin/users called")
     users = list_all_users()
-    print(f"[ENDPOINT] list_all_users() returned {len(users)} users")
     
     user_responses = []
     for user in users:
@@ -199,13 +208,12 @@ async def get_all_users():
                 username=user.get("username"),
                 email=user.get("email"),
                 created_at=user.get("created_at", ""),
-                is_admin=user.get("is_admin", False),
-                verified=user.get("verified", False),
-                games_count=len(user.get("games", []))
+                is_admin=bool(user.get("is_admin", 0)),
+                verified=bool(user.get("is_verified", 0)),
+                games_count=user.get("games_count", 0)
             )
         )
     
-    print(f"[ENDPOINT] Returning {len(user_responses)} user responses")
     return user_responses
 
 @app.get("/admin/users/{username}", response_model=UserDetailResponse)
@@ -220,10 +228,9 @@ async def get_user_details(username: str):
         username=user.get("username"),
         email=user.get("email"),
         created_at=user.get("created_at", ""),
-        last_login=user.get("last_login"),
-        is_admin=user.get("is_admin", False),
-        verified=user.get("verified", False),
-        games=user.get("games", [])
+        is_admin=bool(user.get("is_admin", 0)),
+        verified=bool(user.get("is_verified", 0)),
+        games=[]
     )
 
 @app.post("/admin/users/{username}/promote", response_model=AdminActionResponse)
@@ -234,12 +241,10 @@ async def promote_user_to_admin(username: str):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    if user.get("is_admin", False):
+    if user.get("is_admin", 0):
         raise HTTPException(status_code=400, detail="User is already an admin")
     
-    user["is_admin"] = True
-    
-    if save_user(username, user):
+    if update_user_admin_status(username, True):
         return {
             "success": True,
             "message": f"User {username} promoted to admin"
@@ -255,12 +260,10 @@ async def demote_user_from_admin(username: str):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    if not user.get("is_admin", False):
+    if not user.get("is_admin", 0):
         raise HTTPException(status_code=400, detail="User is not an admin")
     
-    user["is_admin"] = False
-    
-    if save_user(username, user):
+    if update_user_admin_status(username, False):
         return {
             "success": True,
             "message": f"User {username} demoted from admin"
@@ -269,19 +272,17 @@ async def demote_user_from_admin(username: str):
         raise HTTPException(status_code=500, detail="Failed to demote user")
 
 @app.post("/admin/users/{username}/verify", response_model=AdminActionResponse)
-async def verify_user(username: str):
+async def verify_user_endpoint(username: str):
     """Verify a user's email."""
     user = get_user(username)
     
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    if user.get("verified", False):
+    if user.get("is_verified", 0):
         raise HTTPException(status_code=400, detail="User is already verified")
     
-    user["verified"] = True
-    
-    if save_user(username, user):
+    if verify_user(username):
         return {
             "success": True,
             "message": f"User {username} verified"
@@ -290,39 +291,20 @@ async def verify_user(username: str):
         raise HTTPException(status_code=500, detail="Failed to verify user")
 
 @app.delete("/admin/users/{username}", response_model=AdminActionResponse)
-async def delete_user(username: str):
+async def delete_user_endpoint(username: str):
     """Delete a user account."""
-    user_file = get_user_file_path(username)
+    user = get_user(username)
     
-    if not os.path.exists(user_file):
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    try:
-        os.remove(user_file)
+    if delete_user(username):
         return {
             "success": True,
             "message": f"User {username} deleted"
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete user: {str(e)}")
-
-@app.get("/admin/stats")
-async def get_admin_stats():
-    """Get admin dashboard statistics."""
-    users = list_all_users()
-    
-    total_users = len(users)
-    admin_count = sum(1 for user in users if user.get("is_admin", False))
-    verified_count = sum(1 for user in users if user.get("verified", False))
-    total_games = sum(len(user.get("games", [])) for user in users)
-    
-    return {
-        "total_users": total_users,
-        "admin_count": admin_count,
-        "verified_users": verified_count,
-        "total_games": total_games,
-        "timestamp": datetime.utcnow().isoformat()
-    }
+    else:
+        raise HTTPException(status_code=500, detail="Failed to delete user")
 
 if __name__ == "__main__":
     import uvicorn

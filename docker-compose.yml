@@ -23,7 +23,9 @@ services:
       start_period: 10s
 
   auth-service:
-    build: ./auth-service
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
     container_name: chess-auth-service
     ports:
       - "8002:8002"
@@ -43,7 +45,9 @@ services:
       start_period: 10s
 
   admin-service:
-    build: ./admin-service
+    build:
+      context: .
+      dockerfile: admin-service/Dockerfile
     container_name: chess-admin-service
     ports:
       - "8001:8001"
