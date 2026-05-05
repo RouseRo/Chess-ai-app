@@ -5,6 +5,7 @@ from typing import Optional, List
 import os
 import sqlite3
 import bcrypt
+import json
 from datetime import datetime
 
 app = FastAPI(
@@ -51,6 +52,14 @@ class UserDetailResponse(BaseModel):
 class AdminActionResponse(BaseModel):
     success: bool
     message: str
+
+class AIModelResponse(BaseModel):
+    id: str
+    name: str
+    type: str
+    skill_level: Optional[int] = None
+    provider: Optional[str] = None
+    enabled: bool
 
 # ========== Helper Functions ==========
 
@@ -169,6 +178,45 @@ def delete_user(username: str) -> bool:
         print(f"Error deleting user: {e}")
         return False
 
+def load_ai_models() -> list:
+    """Load AI models from JSON file."""
+    models = []
+    try:
+        # Try multiple possible paths for the models file
+        possible_paths = [
+            "/app/user_data/ai_models.json",
+            "/app/data/ai_models.json",
+            "user_data/ai_models.json",
+            "../user_data/ai_models.json",
+            "./user_data/ai_models.json"
+        ]
+        
+        print("[DEBUG] Looking for ai_models.json in these locations:")
+        models_file = None
+        for path in possible_paths:
+            exists = os.path.exists(path)
+            print(f"  - {path}: {exists}")
+            if exists:
+                models_file = path
+                break
+        
+        if not models_file:
+            print(f"[ERROR] ai_models.json not found. Current working directory: {os.getcwd()}")
+            print(f"[ERROR] Contents of /app: {os.listdir('/app') if os.path.exists('/app') else 'N/A'}")
+            return []
+        
+        print(f"[DEBUG] Loading AI models from: {models_file}")
+        with open(models_file, 'r') as f:
+            data = json.load(f)
+            models = data.get("models", [])
+            print(f"[DEBUG] Loaded {len(models)} AI models")
+    except Exception as e:
+        print(f"[ERROR] Error loading AI models: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    return models
+
 # ========== Health Check ==========
 
 @app.get("/health")
@@ -195,6 +243,26 @@ async def root():
 async def admin_stats():
     """Get system statistics."""
     return get_stats()
+
+@app.get("/admin/models", response_model=List[AIModelResponse])
+async def get_ai_models():
+    """Get list of available AI models."""
+    models_data = load_ai_models()
+    
+    models_responses = []
+    for model in models_data:
+        models_responses.append(
+            AIModelResponse(
+                id=model.get("id"),
+                name=model.get("name"),
+                type=model.get("type"),
+                skill_level=model.get("skill_level"),
+                provider=model.get("provider"),
+                enabled=model.get("enabled", False)
+            )
+        )
+    
+    return models_responses
 
 @app.get("/admin/users", response_model=List[UserResponse])
 async def get_all_users():
