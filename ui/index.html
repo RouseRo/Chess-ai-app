@@ -511,34 +511,60 @@
                 <!-- Player Setup Tab -->
                 <div id="player-setup-panel" class="tab-panel-content" style="display: block;">
                   <h3 style="margin-top: 0;">Player Setup</h3>
-                  <label style="display: block; margin: 10px 0;">
-                    White Player:
-                    <select id="white-player" style="width: 100%; padding: 5px;">
-                      <option value="human">Human</option>
-                      <option value="ai">AI</option>
-                    </select>
-                  </label>
-                  <label style="display: block; margin: 10px 0;">
-                    Black Player:
-                    <select id="black-player" style="width: 100%; padding: 5px;">
-                      <option value="human">Human</option>
-                      <option value="ai" selected>AI</option>
-                    </select>
-                  </label>
-                  <label style="display: block; margin: 10px 0;">
-                    AI Type:
-                    <select id="ai-type" style="width: 100%; padding: 5px;">
-                      <option value="stockfish" selected>Stockfish</option>
-                      <option value="openai">OpenAI GPT</option>
-                      <option value="deepseek">DeepSeek</option>
-                      <option value="claude">Claude</option>
-                    </select>
-                  </label>
-                  <label style="display: block; margin: 10px 0;">
-                    Skill Level (1-20):
-                    <input type="number" id="skill-level" value="10" min="1" max="20" style="width: 100%; padding: 5px;">
-                  </label>
-                  <button onclick="startNewGame()" class="btn-primary">Start New Game</button>
+                  
+                  <!-- White Player Section -->
+                  <div style="border: 1px solid #ddd; padding: 10px; margin: 10px 0; border-radius: 4px;">
+                    <label style="display: block; margin: 10px 0; font-weight: bold;">
+                      White Player:
+                      <select id="white-player" onchange="updatePlayerConfig()" style="width: 100%; padding: 5px;">
+                        <option value="human">Human</option>
+                        <option value="ai">AI</option>
+                      </select>
+                    </label>
+                    <div id="white-ai-config" style="display: none;">
+                      <label style="display: block; margin: 10px 0;">
+                        AI Type:
+                        <select id="white-ai-type" style="width: 100%; padding: 5px;">
+                          <option value="stockfish" selected>Stockfish</option>
+                          <option value="openai">OpenAI GPT</option>
+                          <option value="deepseek">DeepSeek</option>
+                          <option value="claude">Claude</option>
+                        </select>
+                      </label>
+                      <label style="display: block; margin: 10px 0;">
+                        Skill Level (1-20):
+                        <input type="number" id="white-skill-level" value="10" min="1" max="20" style="width: 100%; padding: 5px;">
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Black Player Section -->
+                  <div style="border: 1px solid #ddd; padding: 10px; margin: 10px 0; border-radius: 4px;">
+                    <label style="display: block; margin: 10px 0; font-weight: bold;">
+                      Black Player:
+                      <select id="black-player" onchange="updatePlayerConfig()" style="width: 100%; padding: 5px;">
+                        <option value="human">Human</option>
+                        <option value="ai" selected>AI</option>
+                      </select>
+                    </label>
+                    <div id="black-ai-config" style="display: block;">
+                      <label style="display: block; margin: 10px 0;">
+                        AI Type:
+                        <select id="black-ai-type" style="width: 100%; padding: 5px;">
+                          <option value="stockfish" selected>Stockfish</option>
+                          <option value="openai">OpenAI GPT</option>
+                          <option value="deepseek">DeepSeek</option>
+                          <option value="claude">Claude</option>
+                        </select>
+                      </label>
+                      <label style="display: block; margin: 10px 0;">
+                        Skill Level (1-20):
+                        <input type="number" id="black-skill-level" value="10" min="1" max="20" style="width: 100%; padding: 5px;">
+                      </label>
+                    </div>
+                  </div>
+
+                  <button onclick="startNewGame()" class="btn-primary" style="margin-top: 15px;">Start New Game</button>
                 </div>
 
                 <!-- Move History Tab -->
@@ -683,6 +709,28 @@
                           }
                         }
 
+        function updatePlayerConfig() {
+          const whitePlayer = document.getElementById('white-player').value;
+          const blackPlayer = document.getElementById('black-player').value;
+
+          const whiteAiConfig = document.getElementById('white-ai-config');
+          const blackAiConfig = document.getElementById('black-ai-config');
+
+          // Show/hide White AI config based on selection
+          if (whitePlayer === 'ai') {
+            whiteAiConfig.style.display = 'block';
+          } else {
+            whiteAiConfig.style.display = 'none';
+          }
+
+          // Show/hide Black AI config based on selection
+          if (blackPlayer === 'ai') {
+            blackAiConfig.style.display = 'block';
+          } else {
+            blackAiConfig.style.display = 'none';
+          }
+        }
+
       function startNewGame() {
         const whitePlayer = document.getElementById('white-player').value;
         const blackPlayer = document.getElementById('black-player').value;
@@ -701,8 +749,27 @@
     }
 
       function sendMoveToEngine(move, fen, requestAiMove) {
-        const aiType = document.getElementById('ai-type').value;
-        const skillLevel = parseInt(document.getElementById('skill-level').value) || 10;
+        // Determine which player is making the move (or which AI to query)
+        let aiType, skillLevel;
+
+        if (requestAiMove) {
+          // Determine whose turn it is
+          const isWhiteTurn = game.turn() === 'w';
+
+          if (isWhiteTurn) {
+            // It's White's turn
+            aiType = document.getElementById('white-ai-type').value;
+            skillLevel = parseInt(document.getElementById('white-skill-level').value) || 10;
+          } else {
+            // It's Black's turn
+            aiType = document.getElementById('black-ai-type').value;
+            skillLevel = parseInt(document.getElementById('black-skill-level').value) || 10;
+          }
+        } else {
+          // For human moves, use Black's AI config as fallback (not used if human is playing)
+          aiType = document.getElementById('black-ai-type').value;
+          skillLevel = parseInt(document.getElementById('black-skill-level').value) || 10;
+        }
 
         console.log('[UI] Sending to engine:', { move, fen, requestAiMove, aiType, skillLevel });
     
