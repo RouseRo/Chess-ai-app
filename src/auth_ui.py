@@ -105,14 +105,11 @@ class AuthUI:
                 return
             print("Invalid choice. Please try again.")
 
+
 def main():
-    if os.environ.get("CHESS_APP_TEST_MODE") == "1":
-        # In test mode, skip authentication and go straight to main menu
-        AuthUI().show_main_menu()
-    else:
-        # Normal flow: show authentication menu first
-        AuthUI().display_auth_menu()
-        # Continue with login/registration as needed
+    """Main entry point for auth UI."""
+    AuthUI().display_auth_menu()
+
 
 if __name__ == "__main__":
     main()

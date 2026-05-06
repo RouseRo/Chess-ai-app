@@ -8,6 +8,7 @@ services:
       - "8000:8000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-chess-ai-secret-key-change-in-production}
     volumes:
       - ./engine:/app/engine
       - ./src:/app/src
@@ -21,6 +22,28 @@ services:
       retries: 3
       start_period: 10s
 
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
+    container_name: chess-auth-service
+    ports:
+      - "8002:8002"
+    environment:
+      - DATABASE_PATH=/app/data/users.db
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-chess-app-secret-key}
+      - CHESS_DEV_MODE=${CHESS_DEV_MODE:-false}
+    volumes:
+      - ./data:/app/data
+    networks:
+      - chess-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
   admin-service:
     build:
       context: .
@@ -28,13 +51,11 @@ services:
     container_name: chess-admin-service
     ports:
       - "8001:8001"
+    environment:
+      - DATABASE_PATH=/app/data/users.db
     volumes:
-      - ./admin-service:/app/admin-service
-      - ./engine:/app/engine
+      - ./data:/app/data
       - ./user_data:/app/user_data
-    depends_on:
-      chess-engine:
-        condition: service_healthy
     networks:
       - chess-network
     healthcheck:
@@ -53,6 +74,7 @@ services:
       - ./ui:/usr/share/nginx/html
     depends_on:
       - chess-engine
+      - auth-service
       - admin-service
     networks:
       - chess-network

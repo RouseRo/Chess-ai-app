@@ -1,20 +1,81 @@
-from fastapi import FastAPI, Response, Request, HTTPException, Header
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import chess
-import os
+from fastapi.responses import JSONResponse
 import sys
+import os
+import chess
+import random
+import subprocess
 
-# Add parent directory to Python path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from engine.user_manager import UserManager
 
-# Initialize UserManager
-user_manager = UserManager(data_dir="user_data")
+# Import AI players with error logging
+AI_AVAILABLE = False
+STOCKFISH_AVAILABLE = False
 
-app = FastAPI()
+try:
+    from src.ai_player import AIPlayer
+    AI_AVAILABLE = True
+    print("✓ AIPlayer loaded successfully")
+except ImportError as e:
+    print(f"✗ AIPlayer not available: {e}")
+
+try:
+    from src.stockfish_player import StockfishPlayer
+    STOCKFISH_AVAILABLE = True
+    print("✓ StockfishPlayer loaded successfully")
+except ImportError as e:
+    print(f"✗ StockfishPlayer not available: {e}")
+
+# Try to use python-chess's built-in engine support
+try:
+    import chess.engine
+    CHESS_ENGINE_AVAILABLE = True
+    print("✓ chess.engine available")
+except ImportError:
+    CHESS_ENGINE_AVAILABLE = False
+    print("✗ chess.engine not available")
+
+# Find Stockfish at startup
+def find_stockfish():
+    """Find Stockfish executable path."""
+    possible_paths = [
+        os.environ.get('STOCKFISH_PATH', ''),
+        '/usr/games/stockfish',
+        '/usr/bin/stockfish',
+        '/usr/local/bin/stockfish',
+        '/app/stockfish',
+        'stockfish'
+    ]
+    
+    # Also try to find using 'which' command
+    try:
+        result = subprocess.run(['which', 'stockfish'], capture_output=True, text=True)
+        if result.returncode == 0:
+            which_path = result.stdout.strip()
+            if which_path and which_path not in possible_paths:
+                possible_paths.insert(0, which_path)
+                print(f"✓ Found Stockfish via 'which': {which_path}")
+    except Exception as e:
+        print(f"Could not run 'which stockfish': {e}")
+    
+    for path in possible_paths:
+        if path and os.path.isfile(path):
+            print(f"✓ Stockfish found at: {path}")
+            return path
+    
+    print("✗ Stockfish not found in any known location")
+    return None
+
+STOCKFISH_PATH = find_stockfish()
+
+app = FastAPI(
+    title="Chess AI Engine",
+    description="Chess game engine and AI service",
+    version="1.0.0"
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,357 +85,369 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ----------- Pydantic Models -----------
+user_manager = UserManager(data_dir="user_data")
 
-class RegisterRequest(BaseModel):
-    username: str
-    email: str
-    password: str
+# Stockfish engine instance
+stockfish_engine = None
 
-class LoginRequest(BaseModel):
-    username: str
-    password: str
+def get_stockfish_engine():
+    """Get Stockfish engine using python-chess."""
+    global stockfish_engine
+    if stockfish_engine is None and CHESS_ENGINE_AVAILABLE and STOCKFISH_PATH:
+        try:
+            stockfish_engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
+            print(f"✓ Stockfish engine initialized")
+        except Exception as e:
+            print(f"✗ Failed to initialize Stockfish engine: {e}")
+    return stockfish_engine
 
-class LogoutRequest(BaseModel):
-    token: str
+# ========== Root Endpoint ==========
 
-class ChangePasswordRequest(BaseModel):
-    old_password: str
-    new_password: str
+@app.get("/")
+async def root():
+    """Root endpoint - health check."""
+    return {
+        "status": "online",
+        "service": "chess-ai-engine",
+        "version": "1.0.0",
+        "ai_available": AI_AVAILABLE,
+        "stockfish_available": STOCKFISH_AVAILABLE,
+        "chess_engine_available": CHESS_ENGINE_AVAILABLE,
+        "stockfish_path": STOCKFISH_PATH
+    }
 
-class AdminDeleteUserRequest(BaseModel):
-    username: str
+# ========== Health Check ==========
 
-class AdminPromoteUserRequest(BaseModel):
-    username: str
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {
+        "status": "healthy",
+        "service": "chess-ai-engine"
+    }
 
-class AdminDemoteUserRequest(BaseModel):
-    username: str
+# ========== Game Endpoints ==========
 
-class AdminAddModelRequest(BaseModel):
-    model_id: str
-    name: str
-    type: str
-    provider: str = None
-    skill_level: int = None
-
-class AdminUpdateModelRequest(BaseModel):
-    model_id: str
-    updates: dict
-
-class AdminRemoveModelRequest(BaseModel):
-    model_id: str
-
-# ----------- Helper Functions -----------
-
-def get_admin_user(authorization: str = Header(None)) -> str:
-    """Verify admin token and return admin username."""
+@app.post("/move")
+async def make_move(request_data: dict, authorization: str = Header(None)):
+    """Process chess move and get AI response."""
     if not authorization:
-        raise HTTPException(status_code=401, detail="Missing token")
-
-    token = authorization.replace("Bearer ", "")
+        raise HTTPException(status_code=401, detail="Missing authorization token")
     
-    if not user_manager.is_admin(token):
-        raise HTTPException(status_code=403, detail="Admin access required")
+    move = request_data.get('move')
+    fen = request_data.get('fen')
+    request_ai_move = request_data.get('request_ai_move', True)
+    ai_type = request_data.get('ai_type', 'stockfish')
+    skill_level = request_data.get('skill_level', 10)
     
-    success, username = user_manager.verify_token(token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    print(f"[MOVE] Received: move={move}, fen={fen[:30] if fen else 'None'}..., request_ai_move={request_ai_move}, ai_type={ai_type}")
     
-    return username
+    if not fen:
+        raise HTTPException(status_code=400, detail="Missing fen")
+    
+    try:
+        board = chess.Board(fen)
+        
+        ai_move_uci = None
+        ai_move_san = None
+        new_fen = fen
+        status = "Move processed"
+        
+        if request_ai_move and not board.is_game_over():
+            print(f"[AI] Requesting AI move, type={ai_type}, stockfish_path={STOCKFISH_PATH}")
+            
+            # Try Stockfish first via python-chess engine
+            if ai_type == 'stockfish' and CHESS_ENGINE_AVAILABLE and STOCKFISH_PATH:
+                engine = get_stockfish_engine()
+                if engine:
+                    try:
+                        # Set skill level (0-20)
+                        engine.configure({"Skill Level": min(20, max(0, skill_level))})
+                        result = engine.play(board, chess.engine.Limit(time=1.0))
+                        ai_move_uci = result.move.uci()
+                        print(f"[AI] Stockfish move: {ai_move_uci}")
+                    except Exception as e:
+                        print(f"[AI] Stockfish error: {e}")
+            
+            # Fallback to StockfishPlayer class
+            if not ai_move_uci and STOCKFISH_AVAILABLE:
+                try:
+                    from src.stockfish_player import StockfishPlayer
+                    player = StockfishPlayer(skill_level=skill_level)
+                    ai_move_uci = player.get_move(board)
+                    print(f"[AI] StockfishPlayer move: {ai_move_uci}")
+                except Exception as e:
+                    print(f"[AI] StockfishPlayer error: {e}")
+            
+            # Try AIPlayer for LLM-based AI
+            if not ai_move_uci and AI_AVAILABLE and ai_type in ['openai', 'deepseek', 'gemini', 'claude', 'llama']:
+                try:
+                    from src.ai_player import AIPlayer
+                    player = AIPlayer(model_id=ai_type)
+                    ai_move_uci = player.get_move(board)
+                    print(f"[AI] AIPlayer ({ai_type}) move: {ai_move_uci}")
+                except Exception as e:
+                    print(f"[AI] AIPlayer error: {e}")
+            
+            # Ultimate fallback: random legal move
+            if not ai_move_uci:
+                legal_moves = list(board.legal_moves)
+                if legal_moves:
+                    ai_move = random.choice(legal_moves)
+                    ai_move_uci = ai_move.uci()
+                    print(f"[AI] Random fallback move: {ai_move_uci}")
+            
+            # Apply AI move
+            if ai_move_uci:
+                try:
+                    ai_move_obj = chess.Move.from_uci(ai_move_uci)
+                    if ai_move_obj in board.legal_moves:
+                        ai_move_san = board.san(ai_move_obj)
+                        board.push(ai_move_obj)
+                        new_fen = board.fen()
+                        status = "AI move applied"
+                        print(f"[AI] Applied move: {ai_move_san}")
+                    else:
+                        print(f"[AI] Move {ai_move_uci} is not legal, using random")
+                        legal_moves = list(board.legal_moves)
+                        if legal_moves:
+                            ai_move_obj = random.choice(legal_moves)
+                            ai_move_uci = ai_move_obj.uci()
+                            ai_move_san = board.san(ai_move_obj)
+                            board.push(ai_move_obj)
+                            new_fen = board.fen()
+                            status = "AI move applied (fallback)"
+                except Exception as e:
+                    print(f"[AI] Error applying move: {e}")
+                    status = f"AI move error: {str(e)}"
+        else:
+            print(f"[AI] AI move not requested or game over. request_ai_move={request_ai_move}, game_over={board.is_game_over()}")
+        
+        # Check game status
+        if board.is_checkmate():
+            status = "Checkmate!"
+        elif board.is_stalemate():
+            status = "Stalemate!"
+        elif board.is_check():
+            status = "Check!"
+        elif board.is_game_over():
+            status = "Game over"
+        
+        response = {
+            "success": True,
+            "status": status,
+            "fen": new_fen,
+            "ai_move": ai_move_uci,
+            "ai_move_san": ai_move_san,
+            "ai_type": ai_type,
+            "source": "chess-engine-1"
+        }
+        print(f"[MOVE] Response: ai_move={ai_move_uci}, status={status}")
+        return JSONResponse(response)
+        
+    except Exception as e:
+        print(f"[ERROR] {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing move: {str(e)}")
 
-# ----------- Authentication Endpoints -----------
-
-@app.post("/auth/register")
-async def register(req: RegisterRequest):
-    """Register a new user."""
-    success, message = user_manager.register_user(
-        req.username, 
-        req.email, 
-        req.password
-    )
-    return {
-        "success": success,
-        "message": message
-    }
-
-@app.post("/auth/login")
-async def login(req: LoginRequest):
-    """Login user and return session token."""
-    success, message, token = user_manager.login_user(
-        req.username, 
-        req.password
-    )
-    user_info = user_manager.get_user_info(req.username) if success else None
-    return {
-        "success": success,
-        "message": message,
-        "token": token,
-        "user": user_info
-    }
-
-@app.post("/auth/logout")
-async def logout(req: LogoutRequest):
-    """Logout user by removing session token."""
-    success = user_manager.logout_user(req.token)
-    return {
-        "success": success,
-        "message": "Logged out successfully" if success else "Logout failed"
-    }
-
-@app.get("/auth/verify")
-async def verify_token(authorization: str = Header(None)):
-    """Verify session token."""
+@app.get("/ai/suggest")
+async def suggest_move(fen: str, authorization: str = Header(None), ai_type: str = "stockfish"):
+    """Get AI move suggestion."""
     if not authorization:
-        raise HTTPException(status_code=401, detail="Missing token")
-
-    token = authorization.replace("Bearer ", "")
-    success, username = user_manager.verify_token(token)
-
-    if not success:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    is_admin = user_manager.is_admin(token)
-    user_info = user_manager.get_user_info(username)
+        raise HTTPException(status_code=401, detail="Missing authorization token")
     
-    return {
-        "success": True,
-        "username": username,
-        "is_admin": is_admin,
-        "user_info": user_info
-    }
+    if not fen:
+        raise HTTPException(status_code=400, detail="Missing fen parameter")
+    
+    try:
+        board = chess.Board(fen)
+        
+        if board.is_game_over():
+            return {"success": False, "error": "Game is over", "fen": fen}
+        
+        suggested_move = None
+        
+        if ai_type == 'stockfish' and CHESS_ENGINE_AVAILABLE and STOCKFISH_PATH:
+            engine = get_stockfish_engine()
+            if engine:
+                try:
+                    result = engine.play(board, chess.engine.Limit(time=1.0))
+                    suggested_move = result.move.uci()
+                except Exception as e:
+                    print(f"Stockfish suggest error: {e}")
+        
+        if not suggested_move:
+            legal_moves = list(board.legal_moves)
+            if legal_moves:
+                suggested_move = random.choice(legal_moves).uci()
+        
+        return {
+            "success": True,
+            "suggested_move": suggested_move,
+            "fen": fen,
+            "ai_type": ai_type
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error suggesting move: {str(e)}")
 
-@app.get("/auth/user/{username}")
-async def get_user(username: str, authorization: str = Header(None)):
-    """Get user information (requires authentication)."""
+@app.post("/expert/question")
+async def ask_expert(request_data: dict, authorization: str = Header(None)):
+    """Ask chess expert question."""
     if not authorization:
-        raise HTTPException(status_code=401, detail="Missing token")
-
-    token = authorization.replace("Bearer ", "")
-    success, auth_username = user_manager.verify_token(token)
-
-    if not success:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_info = user_manager.get_user_info(username)
-    if not user_info:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    return {
-        "success": True,
-        "user_info": user_info
-    }
-
-@app.post("/auth/change-password")
-async def change_password(req: ChangePasswordRequest, authorization: str = Header(None)):
-    """Change user password."""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Missing token")
-
-    token = authorization.replace("Bearer ", "")
-    success, username = user_manager.verify_token(token)
-
-    if not success:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    success, message = user_manager.change_password(username, req.old_password, req.new_password)
+        raise HTTPException(status_code=401, detail="Missing authorization token")
     
-    return {
-        "success": success,
-        "message": message
-    }
+    question = request_data.get('question')
+    fen = request_data.get('fen')
+    
+    if not question:
+        raise HTTPException(status_code=400, detail="Missing question")
+    
+    print(f"[EXPERT] Received question: '{question}', FEN: {fen[:30] if fen else 'None'}...")
+    
+    try:
+        # Try to import and use ExpertService
+        try:
+            from src.expert_service import ExpertService
+            print("[EXPERT] ExpertService imported successfully")
+            
+            expert = ExpertService()
+            response = expert.ask_question(question, fen)
+            
+            print(f"[EXPERT] Response received: {response[:100] if response else 'None'}...")
+            
+            # Validate response
+            if not response or response.strip() == "":
+                print("[EXPERT] Warning: Expert returned empty response")
+                return {
+                    "success": False,
+                    "question": question,
+                    "error": "Expert service returned empty response"
+                }
+            
+            return {
+                "success": True,
+                "question": question,
+                "response": response
+            }
+            
+        except ImportError as e:
+            print(f"[EXPERT] ExpertService import failed: {e}")
+            print("[EXPERT] Attempting fallback...")
+            
+            # Fallback: Basic chess advice without expert service
+            fallback_response = generate_fallback_response(question, fen)
+            return {
+                "success": True,
+                "question": question,
+                "response": fallback_response,
+                "source": "fallback"
+            }
+    
+    except Exception as e:
+        print(f"[EXPERT] Unexpected error: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return {
+            "success": False,
+            "question": question,
+            "error": f"Expert service error: {str(e)}"
+        }
 
-# ----------- Admin User Management Endpoints -----------
 
-@app.get("/admin/users")
-async def list_users(authorization: str = Header(None)):
-    """List all users (admin only)."""
-    admin_username = get_admin_user(authorization)
-    users = user_manager.list_all_users()
+def generate_fallback_response(question: str, fen: str = None) -> str:
+    """Generate basic chess advice when ExpertService is unavailable."""
+    print(f"[EXPERT FALLBACK] Generating response for: '{question}'")
     
-    return {
-        "success": True,
-        "admin": admin_username,
-        "total_users": len(users),
-        "users": users
-    }
+    question_lower = question.lower()
+    
+    # Basic chess opening advice
+    if "opening" in question_lower or "start" in question_lower:
+        return "For strong openings, consider: 1.e4 (Open Game), 1.d4 (Closed Game), or 1.c4 (English Opening). Each leads to different types of positions."
+    
+    # Endgame advice
+    if "endgame" in question_lower or "endgame" in question_lower:
+        return "Key endgame principles: Activate your king, push passed pawns, and create threats. Practice fundamental endgames like K+P vs K and Rook endgames."
+    
+    # Tactical advice
+    if "tactic" in question_lower or "combination" in question_lower or "pin" in question_lower or "fork" in question_lower:
+        return "Tactical motifs: Look for pins, forks, skewers, and discovered attacks. Always check if your opponent has threats and look for forcing moves (checks, captures, threats)."
+    
+    # Strategy advice
+    if "strateg" in question_lower or "plan" in question_lower:
+        return "Strategic principles: Control the center, develop pieces quickly, ensure king safety, and create a coherent plan. Improve your worst-placed piece."
+    
+    # Move evaluation
+    if "best move" in question_lower or "should i" in question_lower:
+        return "To find the best move: 1) Look for forcing moves (checks, captures, threats), 2) Evaluate resulting positions, 3) Consider opponent's best responses, 4) Compare candidate moves."
+    
+    # Default helpful response
+    return "Chess tip: Always look for forcing moves (checks, captures, threats), consider your opponent's threats, and improve your worst-placed piece. Study classic games and positions!"
 
-@app.post("/admin/users/delete")
-async def delete_user(req: AdminDeleteUserRequest, authorization: str = Header(None)):
-    """Delete a user (admin only)."""
-    admin_username = get_admin_user(authorization)
-    
-    success, message = user_manager.delete_user(req.username, admin_username)
-    
-    return {
-        "success": success,
-        "message": message,
-        "admin": admin_username
-    }
-
-@app.post("/admin/users/promote")
-async def promote_user(req: AdminPromoteUserRequest, authorization: str = Header(None)):
-    """Promote user to admin (admin only)."""
-    admin_username = get_admin_user(authorization)
-    
-    success, message = user_manager.promote_user_to_admin(req.username)
-    
-    return {
-        "success": success,
-        "message": message,
-        "admin": admin_username
-    }
-
-@app.post("/admin/users/demote")
-async def demote_user(req: AdminDemoteUserRequest, authorization: str = Header(None)):
-    """Demote admin user to regular user (admin only)."""
-    admin_username = get_admin_user(authorization)
-    
-    success, message = user_manager.demote_user_from_admin(req.username)
-    
-    return {
-        "success": success,
-        "message": message,
-        "admin": admin_username
-    }
-
-# ----------- Admin AI Model Management Endpoints -----------
-
-@app.get("/admin/models")
-async def get_models(authorization: str = Header(None)):
-    """Get all AI models (admin only)."""
-    admin_username = get_admin_user(authorization)
-    models = user_manager.get_ai_models()
-    
-    return {
-        "success": True,
-        "admin": admin_username,
-        "models": models.get('models', [])
-    }
-
-@app.post("/admin/models/add")
-async def add_model(req: AdminAddModelRequest, authorization: str = Header(None)):
-    """Add a new AI model (admin only)."""
-    admin_username = get_admin_user(authorization)
-    
-    model_data = {
-        "name": req.name,
-        "type": req.type,
-        "enabled": False
-    }
-    
-    if req.provider:
-        model_data["provider"] = req.provider
-    if req.skill_level:
-        model_data["skill_level"] = req.skill_level
-    
-    success, message = user_manager.add_ai_model(req.model_id, model_data)
-    
-    return {
-        "success": success,
-        "message": message,
-        "admin": admin_username
-    }
-
-@app.post("/admin/models/remove")
-async def remove_model(req: AdminRemoveModelRequest, authorization: str = Header(None)):
-    """Remove an AI model (admin only)."""
-    admin_username = get_admin_user(authorization)
-    
-    success, message = user_manager.remove_ai_model(req.model_id)
-    
-    return {
-        "success": success,
-        "message": message,
-        "admin": admin_username
-    }
-
-@app.post("/admin/models/update")
-async def update_model(req: AdminUpdateModelRequest, authorization: str = Header(None)):
-    """Update AI model configuration (admin only)."""
-    admin_username = get_admin_user(authorization)
-    
-    success, message = user_manager.update_ai_model(req.model_id, req.updates)
-    
-    return {
-        "success": success,
-        "message": message,
-        "admin": admin_username
-    }
-
-# ----------- Admin System Statistics -----------
+# ========== Admin Endpoints ==========
 
 @app.get("/admin/stats")
 async def get_system_stats(authorization: str = Header(None)):
-    """Get system statistics (admin only)."""
-    admin_username = get_admin_user(authorization)
-    stats = user_manager.get_system_stats()
-    
-    return {
-        "success": True,
-        "admin": admin_username,
-        "stats": stats
-    }
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing authorization token")
+    return {"success": True, "stats": user_manager.get_system_stats()}
 
-# ----------- Game Endpoints -----------
+@app.get("/admin/users")
+async def list_users(authorization: str = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing authorization token")
+    users = user_manager.list_all_users()
+    return {"success": True, "total_users": len(users), "users": users}
 
-class MoveRequest(BaseModel):
-    fen: str
-    move: str = None
+@app.post("/admin/users/delete")
+async def delete_user(request_data: dict, authorization: str = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing authorization token")
+    success, message = user_manager.delete_user(request_data.get('username'), "admin")
+    return {"success": success, "message": message}
 
-@app.post("/move")
-async def move(request: Request):
-    data = await request.json()
-    move = data.get("move")
-    fen = data.get("fen")
-    board = chess.Board(fen)
+@app.post("/admin/users/promote")
+async def promote_user(request_data: dict, authorization: str = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing authorization token")
+    success, message = user_manager.promote_user_to_admin(request_data.get('username'))
+    return {"success": success, "message": message}
 
-    if move is not None:
-        user_move_uci = move.replace("-", "")
-        board.push_uci(user_move_uci)
+@app.post("/admin/users/demote")
+async def demote_user(request_data: dict, authorization: str = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing authorization token")
+    success, message = user_manager.demote_user_from_admin(request_data.get('username'))
+    return {"success": success, "message": message}
 
-    import random
-    legal_moves = list(board.legal_moves)
-    if legal_moves:
-        engine_move = random.choice(legal_moves)
-        board.push(engine_move)
-        engine_move_uci = engine_move.uci()
-        status = "Move accepted"
-    else:
-        engine_move_uci = None
-        status = "No legal moves for engine"
+@app.get("/admin/models")
+async def get_models(authorization: str = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing authorization token")
+    models = user_manager.get_ai_models()
+    return {"success": True, "models": models.get('models', [])}
 
-    new_fen = board.fen()
-    return JSONResponse({
-        "status": status,
-        "fen": new_fen,
-        "engine_move": engine_move_uci,
-        "source": "chess-engine-1"
-    })
+@app.post("/admin/models/add")
+async def add_model(request_data: dict, authorization: str = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing authorization token")
+    success, message = user_manager.add_ai_model(request_data.get('model_id'), request_data.get('model_data', {}))
+    return {"success": success, "message": message}
 
-@app.options("/move")
-def options_move():
-    return Response(status_code=200)
+@app.post("/admin/models/remove")
+async def remove_model(request_data: dict, authorization: str = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing authorization token")
+    success, message = user_manager.remove_ai_model(request_data.get('model_id'))
+    return {"success": success, "message": message}
 
-class ExpertRequest(BaseModel):
-    question: str = None
+# Cleanup on shutdown
+@app.on_event("shutdown")
+def shutdown_event():
+    global stockfish_engine
+    if stockfish_engine:
+        stockfish_engine.quit()
 
-@app.post("/expert/question")
-def ask_chess_question(req: ExpertRequest):
-    return {"response": "Chess expertise response"}
-
-@app.get("/expert/fact")
-def get_chess_fact():
-    return {"response": "A fun chess fact"}
-
-@app.get("/expert/joke")
-def get_expert_joke():
-    return {"response": "A chess joke"}
-
-@app.get("/expert/news")
-def get_chess_news():
-    return {"response": "Latest chess news"}
-
-@app.get("/")
-def read_root():
-    return {"Hello": "World", "message": "Chess AI App Running"}
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

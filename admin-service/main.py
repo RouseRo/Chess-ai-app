@@ -1,20 +1,16 @@
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from pydantic import BaseModel, ConfigDict
-import sys
+from pydantic import BaseModel
+from typing import Optional, List
 import os
-from typing import Optional
-
-# Add parent directory to Python path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from engine.user_manager import UserManager
+import sqlite3
+import bcrypt
+import json
+from datetime import datetime
 
 app = FastAPI(
     title="Chess AI Admin Service",
-    description="Admin management service for Chess AI App",
+    description="Admin dashboard and user management service for Chess AI App",
     version="1.0.0"
 )
 
@@ -26,61 +22,200 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize UserManager with shared user_data directory
-user_manager = UserManager(data_dir="user_data")
+# Database configuration
+DATABASE_PATH = os.environ.get("DATABASE_PATH", "/app/data/users.db")
+
+print(f"\n[INIT] ========== ADMIN SERVICE INITIALIZATION ==========")
+print(f"[INIT] DATABASE_PATH: {DATABASE_PATH}")
+print(f"[INIT] Database exists: {os.path.exists(DATABASE_PATH)}")
+print(f"[INIT] ========== END INITIALIZATION ==========\n")
 
 # ========== Pydantic Models ==========
 
-class DeleteUserRequest(BaseModel):
+class UserResponse(BaseModel):
     username: str
+    email: str
+    created_at: str
+    is_admin: bool
+    verified: bool
+    games_count: int
 
-class PromoteUserRequest(BaseModel):
+class UserDetailResponse(BaseModel):
     username: str
+    email: str
+    created_at: str
+    last_login: Optional[str] = None
+    is_admin: bool
+    verified: bool
+    games: List[str] = []
 
-class DemoteUserRequest(BaseModel):
-    username: str
+class AdminActionResponse(BaseModel):
+    success: bool
+    message: str
 
-class AddModelRequest(BaseModel):
-    model_config = ConfigDict(protected_namespaces=())
-    
-    model_id: str
+class AIModelResponse(BaseModel):
+    id: str
     name: str
     type: str
-    provider: Optional[str] = None
     skill_level: Optional[int] = None
-
-class RemoveModelRequest(BaseModel):
-    model_config = ConfigDict(protected_namespaces=())
-    
-    model_id: str
-
-class UpdateModelRequest(BaseModel):
-    model_config = ConfigDict(protected_namespaces=())
-    
-    model_id: str
-    updates: dict
-
-class ChangePasswordRequest(BaseModel):
-    old_password: str
-    new_password: str
+    provider: Optional[str] = None
+    enabled: bool
 
 # ========== Helper Functions ==========
 
-def get_admin_user(authorization: str = Header(None)) -> str:
-    """Verify admin token and return admin username."""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Missing authorization token")
+def get_db_connection():
+    """Get SQLite database connection."""
+    conn = sqlite3.connect(DATABASE_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-    token = authorization.replace("Bearer ", "")
+def get_user(username: str) -> Optional[dict]:
+    """Get user data from database."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            return dict(row)
+        return None
+    except Exception as e:
+        print(f"Error reading user: {e}")
+        return None
+
+def list_all_users() -> list:
+    """List all users from database."""
+    users = []
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users")
+        rows = cursor.fetchall()
+        conn.close()
+        
+        for row in rows:
+            users.append(dict(row))
+    except Exception as e:
+        print(f"Error listing users: {e}")
     
-    if not user_manager.is_admin(token):
-        raise HTTPException(status_code=403, detail="Admin access required")
+    return users
+
+def get_stats() -> dict:
+    """Get system statistics."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT COUNT(*) as total FROM users")
+        total_users = cursor.fetchone()["total"]
+        
+        cursor.execute("SELECT COUNT(*) as total FROM users WHERE is_admin = 1")
+        admin_count = cursor.fetchone()["total"]
+        
+        cursor.execute("SELECT COUNT(*) as total FROM users WHERE is_verified = 1")
+        verified_users = cursor.fetchone()["total"]
+        
+        # For now, total_games is 0 as we're not tracking games in this version
+        total_games = 0
+        
+        conn.close()
+        
+        return {
+            "total_users": total_users,
+            "admin_count": admin_count,
+            "verified_users": verified_users,
+            "total_games": total_games,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        print(f"Error getting stats: {e}")
+        return {
+            "total_users": 0,
+            "admin_count": 0,
+            "verified_users": 0,
+            "total_games": 0,
+            "timestamp": datetime.now().isoformat()
+        }
+
+def update_user_admin_status(username: str, is_admin: bool) -> bool:
+    """Update user admin status."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET is_admin = ? WHERE username = ?", (is_admin, username))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error updating admin status: {e}")
+        return False
+
+def verify_user(username: str) -> bool:
+    """Verify user email."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET is_verified = 1 WHERE username = ?", (username,))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error verifying user: {e}")
+        return False
+
+def delete_user(username: str) -> bool:
+    """Delete a user from database."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM users WHERE username = ?", (username,))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error deleting user: {e}")
+        return False
+
+def load_ai_models() -> list:
+    """Load AI models from JSON file."""
+    models = []
+    try:
+        # Try multiple possible paths for the models file
+        possible_paths = [
+            "/app/user_data/ai_models.json",
+            "/app/data/ai_models.json",
+            "user_data/ai_models.json",
+            "../user_data/ai_models.json",
+            "./user_data/ai_models.json"
+        ]
+        
+        print("[DEBUG] Looking for ai_models.json in these locations:")
+        models_file = None
+        for path in possible_paths:
+            exists = os.path.exists(path)
+            print(f"  - {path}: {exists}")
+            if exists:
+                models_file = path
+                break
+        
+        if not models_file:
+            print(f"[ERROR] ai_models.json not found. Current working directory: {os.getcwd()}")
+            print(f"[ERROR] Contents of /app: {os.listdir('/app') if os.path.exists('/app') else 'N/A'}")
+            return []
+        
+        print(f"[DEBUG] Loading AI models from: {models_file}")
+        with open(models_file, 'r') as f:
+            data = json.load(f)
+            models = data.get("models", [])
+            print(f"[DEBUG] Loaded {len(models)} AI models")
+    except Exception as e:
+        print(f"[ERROR] Error loading AI models: {e}")
+        import traceback
+        traceback.print_exc()
     
-    success, username = user_manager.verify_token(token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    return username
+    return models
 
 # ========== Health Check ==========
 
@@ -93,162 +228,151 @@ async def health_check():
         "version": "1.0.0"
     }
 
-# ========== Admin User Management Endpoints ==========
-
-@app.get("/admin/users")
-async def list_users(authorization: str = Header(None)):
-    """List all users (admin only)."""
-    admin_username = get_admin_user(authorization)
-    users = user_manager.list_all_users()
-    
+@app.get("/")
+async def root():
+    """Root endpoint."""
     return {
-        "success": True,
-        "admin": admin_username,
-        "total_users": len(users),
-        "users": users
+        "status": "online",
+        "service": "chess-ai-admin-service",
+        "version": "1.0.0"
     }
 
-@app.post("/admin/users/delete")
-async def delete_user(req: DeleteUserRequest, authorization: str = Header(None)):
-    """Delete a user (admin only)."""
-    admin_username = get_admin_user(authorization)
-    
-    success, message = user_manager.delete_user(req.username, admin_username)
-    
-    return {
-        "success": success,
-        "message": message,
-        "admin": admin_username
-    }
-
-@app.post("/admin/users/promote")
-async def promote_user(req: PromoteUserRequest, authorization: str = Header(None)):
-    """Promote user to admin (admin only)."""
-    admin_username = get_admin_user(authorization)
-    
-    success, message = user_manager.promote_user_to_admin(req.username)
-    
-    return {
-        "success": success,
-        "message": message,
-        "admin": admin_username
-    }
-
-@app.post("/admin/users/demote")
-async def demote_user(req: DemoteUserRequest, authorization: str = Header(None)):
-    """Demote admin user to regular user (admin only)."""
-    admin_username = get_admin_user(authorization)
-    
-    success, message = user_manager.demote_user_from_admin(req.username)
-    
-    return {
-        "success": success,
-        "message": message,
-        "admin": admin_username
-    }
-
-# ========== Admin AI Models Endpoints ==========
-
-@app.get("/admin/models")
-async def get_models(authorization: str = Header(None)):
-    """Get all AI models (admin only)."""
-    admin_username = get_admin_user(authorization)
-    models = user_manager.get_ai_models()
-    
-    return {
-        "success": True,
-        "admin": admin_username,
-        "models": models.get('models', [])
-    }
-
-@app.post("/admin/models/add")
-async def add_model(req: AddModelRequest, authorization: str = Header(None)):
-    """Add a new AI model (admin only)."""
-    admin_username = get_admin_user(authorization)
-    
-    model_data = {
-        "name": req.name,
-        "type": req.type,
-        "enabled": False
-    }
-    
-    if req.provider:
-        model_data["provider"] = req.provider
-    if req.skill_level:
-        model_data["skill_level"] = req.skill_level
-    
-    success, message = user_manager.add_ai_model(req.model_id, model_data)
-    
-    return {
-        "success": success,
-        "message": message,
-        "admin": admin_username
-    }
-
-@app.post("/admin/models/remove")
-async def remove_model(req: RemoveModelRequest, authorization: str = Header(None)):
-    """Remove an AI model (admin only)."""
-    admin_username = get_admin_user(authorization)
-    
-    success, message = user_manager.remove_ai_model(req.model_id)
-    
-    return {
-        "success": success,
-        "message": message,
-        "admin": admin_username
-    }
-
-@app.post("/admin/models/update")
-async def update_model(req: UpdateModelRequest, authorization: str = Header(None)):
-    """Update AI model configuration (admin only)."""
-    admin_username = get_admin_user(authorization)
-    
-    success, message = user_manager.update_ai_model(req.model_id, req.updates)
-    
-    return {
-        "success": success,
-        "message": message,
-        "admin": admin_username
-    }
-
-# ========== Admin System Statistics ==========
+# ========== Admin Endpoints ==========
 
 @app.get("/admin/stats")
-async def get_system_stats(authorization: str = Header(None)):
-    """Get system statistics (admin only)."""
-    admin_username = get_admin_user(authorization)
-    stats = user_manager.get_system_stats()
-    
-    return {
-        "success": True,
-        "admin": admin_username,
-        "stats": stats
-    }
+async def admin_stats():
+    """Get system statistics."""
+    return get_stats()
 
-# ========== Admin Password Change ==========
-
-@app.post("/admin/change-password")
-async def change_password(req: ChangePasswordRequest, authorization: str = Header(None)):
-    """Change admin password."""
-    admin_username = get_admin_user(authorization)
+@app.get("/admin/models", response_model=List[AIModelResponse])
+async def get_ai_models():
+    """Get list of available AI models."""
+    models_data = load_ai_models()
     
-    success, message = user_manager.change_password(
-        admin_username,
-        req.old_password,
-        req.new_password
+    models_responses = []
+    for model in models_data:
+        models_responses.append(
+            AIModelResponse(
+                id=model.get("id"),
+                name=model.get("name"),
+                type=model.get("type"),
+                skill_level=model.get("skill_level"),
+                provider=model.get("provider"),
+                enabled=model.get("enabled", False)
+            )
+        )
+    
+    return models_responses
+
+@app.get("/admin/users", response_model=List[UserResponse])
+async def get_all_users():
+    """Get list of all users."""
+    users = list_all_users()
+    
+    user_responses = []
+    for user in users:
+        user_responses.append(
+            UserResponse(
+                username=user.get("username"),
+                email=user.get("email"),
+                created_at=user.get("created_at", ""),
+                is_admin=bool(user.get("is_admin", 0)),
+                verified=bool(user.get("is_verified", 0)),
+                games_count=user.get("games_count", 0)
+            )
+        )
+    
+    return user_responses
+
+@app.get("/admin/users/{username}", response_model=UserDetailResponse)
+async def get_user_details(username: str):
+    """Get detailed user information."""
+    user = get_user(username)
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return UserDetailResponse(
+        username=user.get("username"),
+        email=user.get("email"),
+        created_at=user.get("created_at", ""),
+        is_admin=bool(user.get("is_admin", 0)),
+        verified=bool(user.get("is_verified", 0)),
+        games=[]
     )
+
+@app.post("/admin/users/{username}/promote", response_model=AdminActionResponse)
+async def promote_user_to_admin(username: str):
+    """Promote a user to admin."""
+    user = get_user(username)
     
-    return {
-        "success": success,
-        "message": message
-    }
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if user.get("is_admin", 0):
+        raise HTTPException(status_code=400, detail="User is already an admin")
+    
+    if update_user_admin_status(username, True):
+        return {
+            "success": True,
+            "message": f"User {username} promoted to admin"
+        }
+    else:
+        raise HTTPException(status_code=500, detail="Failed to promote user")
 
-# ========== Static Files ==========
+@app.post("/admin/users/{username}/demote", response_model=AdminActionResponse)
+async def demote_user_from_admin(username: str):
+    """Demote an admin user to regular user."""
+    user = get_user(username)
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if not user.get("is_admin", 0):
+        raise HTTPException(status_code=400, detail="User is not an admin")
+    
+    if update_user_admin_status(username, False):
+        return {
+            "success": True,
+            "message": f"User {username} demoted from admin"
+        }
+    else:
+        raise HTTPException(status_code=500, detail="Failed to demote user")
 
-@app.get("/")
-async def serve_admin_dashboard():
-    """Serve admin dashboard HTML."""
-    return FileResponse("admin-service/static/admin.html", media_type="text/html")
+@app.post("/admin/users/{username}/verify", response_model=AdminActionResponse)
+async def verify_user_endpoint(username: str):
+    """Verify a user's email."""
+    user = get_user(username)
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if user.get("is_verified", 0):
+        raise HTTPException(status_code=400, detail="User is already verified")
+    
+    if verify_user(username):
+        return {
+            "success": True,
+            "message": f"User {username} verified"
+        }
+    else:
+        raise HTTPException(status_code=500, detail="Failed to verify user")
+
+@app.delete("/admin/users/{username}", response_model=AdminActionResponse)
+async def delete_user_endpoint(username: str):
+    """Delete a user account."""
+    user = get_user(username)
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if delete_user(username):
+        return {
+            "success": True,
+            "message": f"User {username} deleted"
+        }
+    else:
+        raise HTTPException(status_code=500, detail="Failed to delete user")
 
 if __name__ == "__main__":
     import uvicorn

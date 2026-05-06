@@ -1,21 +1,102 @@
-# Docker Upgrade Plan: Chess AI App
+# Docker Architecture: Chess AI App
 
-This document describes how to upgrade the Chess AI App to a two-container Docker architecture, separating the **visual interactive chessboard** (frontend) from the **chess engine** (backend).
+This document describes the Docker-based microservices architecture for the Chess AI App.
 
 ---
 
 ## Overview
 
-- **Frontend Container:**  
-  Runs a web server serving a static web app using [chessboardjs.com](https://chessboardjs.com/) for the interactive chessboard.  
-  Handles user interaction and communicates with the backend via HTTP or WebSocket.
+The application consists of **four containerized microservices** plus a CLI application, all sharing a unified SQLite database for user authentication:
 
-- **Backend Container:**  
-  Runs the Python chess engine (your existing app, with a new API layer).  
-  Exposes a REST or WebSocket API for move validation, AI move generation, and game state.
+| Service | Port | Description |
+|---------|------|-------------|
+| **chess-ui** | 8080 | Frontend web interface with chessboard |
+| **chess-engine** | 8000 | Chess game logic and AI integration |
+| **chess-admin-service** | 8001 | Admin dashboard and user management |
+| **chess-auth-service** | 8002 | Authentication and JWT token management |
+| **CLI App** | - | Command-line interface (`python -m src.main`) |
 
-- **Communication:**  
-  The frontend container communicates with the backend container over a Docker network using HTTP (REST) or WebSocket.
+---
+
+## Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              Clients                                     │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────────────┐   │
+│  │   CLI App    │    │   Web UI     │    │   Admin Dashboard        │   │
+│  │ (python -m   │    │ (Port 8080)  │    │   (Port 8080/admin.html) │   │
+│  │  src.main)   │    │              │    │                          │   │
+│  └──────┬───────┘    └──────┬───────┘    └────────────┬─────────────┘   │
+│         │                   │                         │                  │
+└─────────┼───────────────────┼─────────────────────────┼──────────────────┘
+          │                   │                         │
+          │     HTTP API      │                         │
+          └─────────┬─────────┴─────────────────────────┘
+                    │
+┌───────────────────┼─────────────────────────────────────────────────────┐
+│                   │           Docker Network                             │
+├───────────────────┼─────────────────────────────────────────────────────┤
+│                   ▼                                                      │
+│         ┌──────────────────────┐                                        │
+│         │  chess-auth-service  │◀───────────────────────┐               │
+│         │     (Port 8002)      │                        │               │
+│         └──────────┬───────────┘                        │               │
+│                    │                                    │               │
+│                    ▼                                    │               │
+│         ┌──────────────────────┐         ┌──────────────┴───────────┐   │
+│         │   SQLite Database    │◀────────│  chess-admin-service     │   │
+│         │   data/users.db      │         │     (Port 8001)          │   │
+│         │   (Shared Volume)    │         └──────────────────────────┘   │
+│         └──────────────────────┘                                        │
+│                                                                          │
+│         ┌──────────────────────┐                                        │
+│         │    chess-engine      │                                        │
+│         │     (Port 8000)      │                                        │
+│         └──────────────────────┘                                        │
+│                                                                          │
+│         ┌──────────────────────┐                                        │
+│         │      chess-ui        │                                        │
+│         │     (Port 8080)      │                                        │
+│         └──────────────────────┘                                        │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Unified Authentication Architecture
+
+All clients (CLI, Web UI, Admin Dashboard) authenticate through the same auth-service API:
+
+```
+┌─────────────┐   ┌─────────────┐   ┌─────────────┐
+│   CLI App   │   │   Web UI    │   │   Admin UI  │
+│             │   │             │   │             │
+│ AuthClient  │   │  fetch()    │   │  fetch()    │
+└──────┬──────┘   └──────┬──────┘   └──────┬──────┘
+       │                 │                 │
+       │    HTTP POST /auth/login          │
+       └─────────────────┼─────────────────┘
+                         │
+                         ▼
+              ┌─────────────────────┐
+              │   Auth Service      │
+              │   (Port 8002)       │
+              │                     │
+              │  • Validates creds  │
+              │  • Issues JWT       │
+              │  • bcrypt passwords │
+              └──────────┬──────────┘
+                         │
+                         ▼
+              ┌─────────────────────┐
+              │   SQLite Database   │
+              │   data/users.db     │
+              └─────────────────────┘
+```
 
 ---
 
@@ -24,350 +105,687 @@ This document describes how to upgrade the Chess AI App to a two-container Docke
 ```
 chess-ai-app/
 │
-├── engine/           # Python backend (your current app, with API)
-│   ├── Dockerfile
+├── src/                       # CLI Application
+│   ├── main.py               # Main entry point
+│   ├── auth_client.py        # HTTP client for auth-service
+│   ├── user_manager.py       # User management (uses AuthClient)
+│   ├── auth_ui.py            # CLI authentication prompts
 │   └── ...
 │
-├── ui/               # Static web UI (chessboardjs, JS, web server)
+├── engine/                    # Chess engine service
 │   ├── Dockerfile
+│   ├── main.py
+│   ├── requirements.txt
 │   └── ...
 │
-└── docker-compose.yml
+├── ui/                        # Frontend web UI
+│   ├── Dockerfile
+│   ├── nginx.conf
+│   ├── index.html             # Login page
+│   ├── chessboard.html        # Game interface
+│   ├── admin.html             # Admin dashboard
+│   ├── chessboard.js
+│   ├── chessboard.css
+│   └── img/
+│
+├── auth-service/              # Authentication service
+│   ├── Dockerfile
+│   ├── main.py
+│   └── requirements.txt
+│
+├── admin-service/             # Admin management service
+│   ├── Dockerfile
+│   ├── main.py
+│   └── requirements.txt
+│
+├── data/                      # Shared database directory
+│   └── users.db              # SQLite database (shared volume)
+│
+├── scripts/                   # Utility scripts
+│   ├── setup_test_user.py    # Create/reset test users
+│   └── migrate_json_to_sqlite.py
+│
+├── docs/                      # Documentation
+│   └── Docker_Design.md
+│
+├── docker-compose.yml         # Container orchestration
+├── requirements.txt           # CLI dependencies
+└── .env                       # Environment variables
 ```
 
 ---
 
-## Backend (Chess Engine) Container
+## Services
 
-- **Tech:** Python (FastAPI or Flask recommended for REST API)
-- **Responsibilities:**
-  - Accept new game requests
-  - Validate moves
-  - Generate AI moves
-  - Return board state (FEN, PGN, etc.)
+### 1. CLI Application
 
-**Example Endpoints:**
-- `POST /newgame`
-- `POST /move`
-- `GET /fen`
-- `POST /ai-move`
+**Purpose:** Command-line interface for playing chess, managing games, and user authentication.
 
-**Dockerfile Example:**
+**Tech Stack:**
+- Python 3.12
+- requests (for HTTP API calls)
+- python-chess
+
+**Authentication:**
+The CLI uses `AuthClient` to communicate with the auth-service:
+
+```python
+from src.auth_client import AuthClient
+
+client = AuthClient("http://localhost:8002")
+success, message, token = client.login("johndoe", "password123")
+```
+
+**Running the CLI:**
+```bash
+python -m src.main
+```
+
+---
+
+### 2. Chess UI (Port 8080)
+
+**Purpose:** Serves the frontend web application with interactive chessboard.
+
+**Tech Stack:**
+- nginx (Alpine-based)
+- HTML/CSS/JavaScript
+- chessboard.js library
+- chess.js for move validation
+
+**Pages:**
+| Page | Description |
+|------|-------------|
+| `index.html` | Login/Register page |
+| `chessboard.html` | Main game interface |
+| `admin.html` | Admin dashboard |
+
+**Dockerfile:**
+```dockerfile
+FROM nginx:alpine
+COPY . /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+```
+
+---
+
+### 3. Chess Engine (Port 8000)
+
+**Purpose:** Handles chess game logic, move validation, and AI integration.
+
+**Tech Stack:**
+- Python 3.12
+- FastAPI
+- python-chess
+- OpenAI/DeepSeek integration
+
+**Endpoints:**
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/` | GET | No | Health check |
+| `/move` | POST | Yes | Submit a chess move |
+| `/ai/suggest` | GET | Yes | Get AI move suggestion |
+| `/expert/question` | POST | Yes | Ask chess expert |
+| `/expert/joke` | GET | Yes | Get chess joke |
+| `/expert/fact` | GET | Yes | Get chess fact |
+
+**Dockerfile:**
 ```dockerfile
 FROM python:3.12-slim
 WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
-RUN pip install -r requirements.txt
 EXPOSE 8000
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 ---
 
-## Frontend (UI) Container
+### 4. Auth Service (Port 8002)
 
-- **Tech:** Static HTML/JS (chessboardjs), served by Node.js/Express or Python/Flask
-- **Responsibilities:**
-  - Display chessboard and UI
-  - Send/receive moves to/from backend API
-  - Show move history, game status, etc.
+**Purpose:** Manages user authentication, registration, and JWT tokens. **Single source of truth for all user data.**
 
-**Dockerfile Example (Node.js/Express):**
+**Tech Stack:**
+- Python 3.12
+- FastAPI
+- SQLite
+- PyJWT
+- bcrypt
+
+**Database Location:** `data/users.db` (shared Docker volume)
+
+**Endpoints:**
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/auth/login` | POST | User login (username or email), returns JWT |
+| `/auth/register` | POST | User registration |
+| `/auth/verify` | POST | Validate JWT token |
+| `/auth/verify-email` | POST | Verify email with token |
+| `/auth/refresh` | POST | Refresh JWT token |
+| `/auth/logout` | POST | Logout (client-side) |
+| `/auth/change-password` | POST | Update password |
+
+**Login Request (supports username OR email):**
+```json
+{
+  "username": "johndoe",
+  "password": "password123"
+}
+```
+
+**Login Response:**
+```json
+{
+  "success": true,
+  "message": "Welcome back, johndoe!",
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "username": "johndoe",
+  "is_admin": false
+}
+```
+
+**JWT Token Structure:**
+```json
+{
+  "username": "johndoe",
+  "is_admin": false,
+  "email": "john@example.com",
+  "exp": 1765824254,
+  "iat": 1765737854
+}
+```
+
+**Dockerfile:**
 ```dockerfile
-FROM node:20-alpine
+FROM python:3.12-slim
 WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
-RUN npm install
-EXPOSE 80
-CMD ["node", "server.js"]
+EXPOSE 8002
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8002"]
+```
+
+---
+
+### 5. Admin Service (Port 8001)
+
+**Purpose:** Provides admin dashboard functionality, user management, and system statistics.
+
+**Tech Stack:**
+- Python 3.12
+- FastAPI
+- SQLite (connects to shared database)
+
+**Endpoints:**
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/health` | GET | No | Health check |
+| `/admin/stats` | GET | No | System statistics |
+| `/admin/users` | GET | No | List all users |
+| `/admin/users/{username}/promote` | POST | Yes | Promote user to admin |
+| `/admin/users/{username}/demote` | POST | Yes | Demote admin to user |
+| `/admin/users/{username}/verify` | POST | Yes | Manually verify user |
+| `/admin/users/{username}` | DELETE | Yes | Delete user |
+
+**Stats Response Example:**
+```json
+{
+  "total_users": 2,
+  "admin_count": 1,
+  "verified_users": 2,
+  "total_games": 0,
+  "timestamp": "2025-12-15T10:30:00.000000+00:00"
+}
+```
+
+**Dockerfile:**
+```dockerfile
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+EXPOSE 8001
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
 ```
 
 ---
 
 ## Docker Compose
 
-**docker-compose.yml Example:**
+**docker-compose.yml:**
 ```yaml
-version: '3'
+version: '3.8'
+
 services:
   chess-engine:
     build: ./engine
+    container_name: chess-engine
     ports:
       - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+    networks:
+      - chess-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   chess-ui:
     build: ./ui
+    container_name: chess-ui
     ports:
       - "8080:80"
     depends_on:
       - chess-engine
+      - auth-service
+    networks:
+      - chess-network
+
+  auth-service:
+    build: ./auth-service
+    container_name: chess-auth-service
+    ports:
+      - "8002:8002"
+    environment:
+      - DATABASE_PATH=/app/data/users.db
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-chess-app-secret-key}
+      - JWT_EXPIRATION_HOURS=${JWT_EXPIRATION_HOURS:-24}
+      - CHESS_DEV_MODE=${CHESS_DEV_MODE:-false}
+    volumes:
+      - ./data:/app/data
+    networks:
+      - chess-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  admin-service:
+    build: ./admin-service
+    container_name: chess-admin-service
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_PATH=/app/data/users.db
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - auth-service
+    networks:
+      - chess-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  chess-network:
+    driver: bridge
 ```
 
 ---
 
-## Communication Flow
+## Database
 
-1. **User interacts with chessboard in browser (served by UI container).**
-2. **Frontend JS sends move/command to backend API (engine container).**
-3. **Backend processes move, returns result (valid/invalid, new FEN, AI move, etc.).**
-4. **Frontend updates board and UI accordingly.**
+### Unified Storage
+
+All services and clients share a single SQLite database:
+
+| Environment | Location |
+|-------------|----------|
+| Docker Containers | `/app/data/users.db` (mounted from `./data`) |
+| Local Development | `data/users.db` |
+| CLI Application | Accesses via auth-service API (http://localhost:8002) |
+
+### Users Table Schema
+
+```sql
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    is_admin BOOLEAN DEFAULT 0,
+    is_verified BOOLEAN DEFAULT 0,
+    verification_token TEXT,
+    games_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Default Users
+
+Created automatically on first startup or via setup script:
+
+| Username | Email | Password | Admin | Verified |
+|----------|-------|----------|-------|----------|
+| `admin` | `admin@chess.local` | `admin123` | Yes | Yes |
+| `johndoe` | `john@example.com` | `password123` | No | Yes |
+
+### Setup Test Users
+
+```powershell
+# Run the setup script
+python scripts/setup_test_user.py
+
+# Copy database to container (if needed)
+docker cp data/users.db chess-auth-service:/app/data/users.db
+
+# Restart auth service
+docker-compose restart auth-service
+```
+
+### View Database Contents
+
+```powershell
+# Local database
+sqlite3 data/users.db "SELECT username, email, is_admin, is_verified FROM users;"
+
+# Inside container
+docker exec chess-auth-service python -c "
+import sqlite3
+conn = sqlite3.connect('/app/data/users.db')
+for row in conn.execute('SELECT username, is_admin, is_verified FROM users'):
+    print(row)
+"
+```
 
 ---
 
-## Next Steps
+## Authentication Flow
 
-1. **Add REST API to your Python chess engine (FastAPI or Flask).**
-2. **Build a minimal web UI using chessboardjs.com and connect it to the backend API.**
-3. **Write Dockerfiles for both containers.**
-4. **Create a docker-compose.yml to orchestrate both containers.**
-5. **Test locally: `docker-compose up` and access the UI at `http://localhost:8080`.**
+### CLI Login Sequence
+
+```
+┌─────────┐         ┌────────────┐         ┌──────────────┐
+│   CLI   │         │ AuthClient │         │ Auth Service │
+└────┬────┘         └─────┬──────┘         └──────┬───────┘
+     │                    │                       │
+     │  User enters       │                       │
+     │  credentials       │                       │
+     │                    │                       │
+     │  login(user, pass) │                       │
+     │───────────────────▶│                       │
+     │                    │                       │
+     │                    │  POST /auth/login     │
+     │                    │  {username, password} │
+     │                    │──────────────────────▶│
+     │                    │                       │
+     │                    │                       │  Validate with bcrypt
+     │                    │                       │  Generate JWT
+     │                    │                       │
+     │                    │  {success, token}     │
+     │                    │◀──────────────────────│
+     │                    │                       │
+     │  (success, msg,    │                       │
+     │   token)           │                       │
+     │◀───────────────────│                       │
+     │                    │                       │
+     │  Store token       │                       │
+     │  Show menu         │                       │
+```
+
+### Web Login Sequence
+
+```
+┌─────────┐         ┌──────────┐         ┌──────────────┐
+│   UI    │         │  Browser │         │ Auth Service │
+└────┬────┘         └────┬─────┘         └──────┬───────┘
+     │                   │                      │
+     │  User enters      │                      │
+     │  credentials      │                      │
+     │◀──────────────────│                      │
+     │                   │                      │
+     │  POST /auth/login │                      │
+     │  {username, pass} │                      │
+     │───────────────────┼─────────────────────▶│
+     │                   │                      │
+     │                   │      Validate creds  │
+     │                   │      Generate JWT    │
+     │                   │                      │
+     │  {success, token} │                      │
+     │◀──────────────────┼──────────────────────│
+     │                   │                      │
+     │  Store in         │                      │
+     │  localStorage     │                      │
+     │                   │                      │
+     │  Redirect to      │                      │
+     │  chessboard.html  │                      │
+     │──────────────────▶│                      │
+```
 
 ---
 
-## Optional Enhancements
+## Running the Application
 
-- Use WebSocket for real-time updates.
-- Add authentication or user profiles.
-- Deploy to cloud (Azure, AWS, etc.).
-- Add persistent storage for game logs.
+### Prerequisites
+
+1. Docker and Docker Compose installed
+2. Python 3.12+ (for CLI)
+3. Required Python packages: `pip install -r requirements.txt`
+
+### Start All Docker Services
+
+```bash
+cd c:\Users\rober\Source\Repos\Chess-ai-app
+docker-compose up --build
+```
+
+### Start in Background
+
+```bash
+docker-compose up -d
+```
+
+### Run CLI Application
+
+```bash
+# Ensure Docker services are running first
+python -m src.main
+```
+
+### View Logs
+
+```bash
+docker-compose logs -f
+```
+
+### Stop Services
+
+```bash
+docker-compose down
+```
+
+---
+
+## Access URLs
+
+| Service | URL |
+|---------|-----|
+| Login Page | http://localhost:8080 |
+| Chessboard | http://localhost:8080/chessboard.html |
+| Admin Dashboard | http://localhost:8080/admin.html |
+| Engine API | http://localhost:8000 |
+| Admin API | http://localhost:8001 |
+| Auth API | http://localhost:8002 |
+
+---
+
+## Health Checks
+
+Verify all services are running:
+
+```bash
+# Auth Service
+curl http://localhost:8002/health
+# Expected: {"status":"healthy","service":"auth","storage":"sqlite"}
+
+# Admin Service
+curl http://localhost:8001/health
+# Expected: {"status":"healthy","service":"admin","storage":"sqlite"}
+
+# Chess Engine
+curl http://localhost:8000/
+# Expected: {"status":"healthy"}
+
+# Admin Stats
+curl http://localhost:8001/admin/stats
+# Expected: {"total_users":2,"admin_count":1,"verified_users":2,...}
+```
+
+---
+
+## Environment Variables
+
+Create a `.env` file in the project root:
+
+```env
+# AI API Keys
+OPENAI_API_KEY=your_openai_key
+DEEPSEEK_API_KEY=your_deepseek_key
+
+# JWT Configuration
+JWT_SECRET_KEY=your-secure-secret-key-change-in-production
+JWT_EXPIRATION_HOURS=24
+
+# Development Mode (auto-verifies new users)
+CHESS_DEV_MODE=false
+
+# Auth Service URL (for CLI)
+AUTH_SERVICE_URL=http://localhost:8002
+```
+
+---
+
+## CLI Dependencies
+
+The CLI application requires these Python packages (in `requirements.txt`):
+
+```
+requests>=2.28.0
+python-chess>=1.999
+bcrypt>=4.0.0
+```
+
+Install with:
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## Security Considerations
+
+### Current Implementation
+
+| Feature | Status |
+|---------|--------|
+| Password Hashing | ✅ bcrypt |
+| JWT Authentication | ✅ Implemented |
+| Unified User Storage | ✅ Single SQLite database |
+| CORS | ⚠️ Open (restrict in prod) |
+| HTTPS | ❌ Not configured |
+| Rate Limiting | ❌ Not implemented |
+| Input Validation | ✅ Basic |
+
+### Production Recommendations
+
+1. **Enable HTTPS** - Use SSL certificates
+2. **Restrict CORS** - Specify allowed origins
+3. **Add Rate Limiting** - Prevent brute force attacks
+4. **Use Strong JWT Secret** - Generate secure random key
+5. **Database Backup** - Regular SQLite backups
+6. **Change Default Passwords** - Update admin/johndoe on first use
+7. **Environment Variables** - Never commit secrets to git
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| "Invalid username or password" (CLI) | Ensure `requests` is installed: `pip install requests` |
+| CLI can't reach auth service | Ensure Docker services are running: `docker-compose up -d` |
+| Database not syncing | Copy manually: `docker cp data/users.db chess-auth-service:/app/data/` |
+| Port already in use | `docker-compose down` then retry |
+| Token expired | Login again |
+
+### Debug CLI Authentication
+
+```powershell
+# Test AuthClient directly
+python -c "
+from src.auth_client import AuthClient
+client = AuthClient()
+print('Health:', client.health_check())
+success, msg, token = client.login('johndoe', 'password123')
+print('Login:', success, msg)
+"
+```
+
+### View Container Logs
+
+```bash
+docker-compose logs auth-service
+docker-compose logs -f admin-service
+```
+
+### Access Container Shell
+
+```bash
+docker exec -it chess-auth-service /bin/bash
+docker exec -it chess-admin-service /bin/bash
+```
+
+---
+
+## Migration from JSON to SQLite
+
+If you have existing users in JSON files (`user_data/users/profiles/*.json`), run the migration script:
+
+```powershell
+python scripts/migrate_json_to_sqlite.py
+docker cp data/users.db chess-auth-service:/app/data/users.db
+docker-compose restart auth-service
+```
+
+---
+
+## Future Enhancements
+
+- [ ] WebSocket support for real-time games
+- [ ] Redis for session management
+- [ ] PostgreSQL for production database
+- [ ] Kubernetes deployment
+- [ ] CI/CD pipeline
+- [ ] Game history and replay
+- [ ] Multiplayer support
+- [ ] ELO rating system
+- [ ] Email verification with real SMTP
+- [ ] Password reset functionality
+- [ ] OAuth2 social login
 
 ---
 
 ## References
 
-- [chessboardjs.com](https://chessboardjs.com/)
+- [chessboard.js](https://chessboardjs.com/)
+- [chess.js](https://github.com/jhlywa/chess.js)
 - [FastAPI](https://fastapi.tiangolo.com/)
-- [Docker Compose Docs](https://docs.docker.com/compose/)
-- [Node.js](https://nodejs.org/)
-
----
-
-## Running chessboard.js in a Docker Container
-
-To use [chessboard.js](https://chessboardjs.com/) inside a Docker container, you can serve its static files using a lightweight web server such as nginx. This allows you to view and interact with the chessboard.js demo in your browser via a containerized environment.
-
-### Steps
-
-1. **Project Structure**
-
-   Create a directory (e.g., `chessboardjs-docker`) and place the chessboard.js files and an `index.html` inside it. Example structure:
-
-   ```
-   chessboardjs-docker/
-     index.html
-     chessboard.js
-     chessboard.css
-     img/
-   ```
-
-2. **Sample `index.html`**
-
-   ```html
-   <!DOCTYPE html>
-   <html>
-   <head>
-     <title>Chessboard.js Docker Demo</title>
-     <link rel="stylesheet" href="chessboard.css">
-     <style>
-       #board { width: 400px; }
-     </style>
-   </head>
-   <body>
-     <div id="board"></div>
-     <script src="chessboard.js"></script>
-     <script>
-       var board = Chessboard('board', 'start');
-     </script>
-   </body>
-   </html>
-   ```
-
-3. **Dockerfile**
-
-   Use nginx to serve the static files:
-
-   ```dockerfile
-   FROM nginx:alpine
-   COPY . /usr/share/nginx/html
-   EXPOSE 80
-   ```
-
-4. **Build and Run**
-
-   In your project directory, run:
-
-   ```sh
-   docker build -t chessboardjs-demo .
-   docker run -d -p 8080:80 chessboardjs-demo
-   ```
-
-   Then open [http://localhost:8080](http://localhost:8080) in your browser.
-
-### Summary
-
-- Download chessboard.js and its assets.
-- Create an `index.html` that uses it.
-- Use a Dockerfile with nginx to serve the files.
-- Build and run the container, then access via your browser.
-
-This approach provides a simple, reproducible way to use chessboard.js in any environment that supports Docker.
-
----
-
-## Customizing chessboard.js Look and Feel & Adding Buttons
-
-You can easily modify the appearance of chessboard.js and add custom buttons for new features.
-
-### 1. Edit CSS for Look and Feel
-
-- Open or create your own CSS file (or edit `chessboard.css`).
-- Change board size, colors, borders, or piece images by overriding CSS classes.
-- Example:
-    ```css
-    #board {
-      width: 500px;
-      margin: 20px auto;
-    }
-    .white-1e1d7 {
-      background-color: #f0d9b5;
-    }
-    .black-3c85d {
-      background-color: #b58863;
-    }
-    ```
-
-### 2. Add Buttons for New Features
-
-- Edit your `index.html` and add buttons above or below the board:
-    ```html
-    <div id="controls" style="text-align:center; margin-bottom:10px;">
-      <button id="newGameBtn">New Game</button>
-      <button id="flipBtn">Flip Board</button>
-      <button id="customBtn">My Feature</button>
-    </div>
-    <div id="board"></div>
-    ```
-
-### 3. Add JavaScript for Button Actions
-
-- In your `<script>` section or JS file, add event listeners for your buttons:
-    ```javascript
-    var board = Chessboard('board', 'start');
-
-    document.getElementById('newGameBtn').onclick = function() {
-      board.start();
-    };
-
-    document.getElementById('flipBtn').onclick = function() {
-      board.flip();
-    };
-
-    document.getElementById('customBtn').onclick = function() {
-      alert('Custom feature coming soon!');
-      // Add your custom JS here
-    };
-    ```
-
-### 4. (Optional) Use Custom Piece Images
-
-- Download or create your own piece images and update the `pieceTheme` option:
-    ```javascript
-    var board = Chessboard('board', {
-      pieceTheme: 'img/chesspieces/wikipedia/{piece}.png'
-    });
-    ```
-
-### 5. Rebuild and Restart Docker Container (if using Docker)
-
-- After editing your files, rebuild and restart your Docker container to see the changes.
-
----
-
-## Installing chessboard.js and Creating the Directory Structure
-
-To integrate [chessboard.js](https://chessboardjs.com/) as your frontend, follow these steps:
-
-### 1. Create the UI Directory Structure
-
-Within your main project directory (`chess-ai-app/`), create a `ui/` folder for the frontend assets:
-
-```
-chess-ai-app/
-│
-├── engine/           # Python backend (your current app, with API)
-│   ├── Dockerfile
-│   └── ...
-│
-├── ui/               # Static web UI (chessboardjs, JS, web server)
-│   ├── Dockerfile
-│   ├── index.html
-│   ├── chessboard.js
-│   ├── chessboard.css
-│   └── img/
-│
-└── docker-compose.yml
-```
-
-### 2. Download chessboard.js
-
-- Visit [https://chessboardjs.com/download/](https://chessboardjs.com/download/) and download the latest release.
-- Extract the archive and copy the following files into your `ui/` directory:
-  - `chessboard.js`
-  - `chessboard.css`
-  - The `img/` folder (contains chess piece images)
-
-### 3. Add jQuery
-
-chessboard.js depends on [jQuery](https://jquery.com/).  
-You can include it in your `index.html` via CDN:
-
-```html
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-```
-
-### 4. Create a Minimal `index.html`
-
-Create `ui/index.html` with the following content:
-
-```html
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Chessboard.js Frontend</title>
-  <link rel="stylesheet" href="chessboard.css">
-  <style>
-    #board { width: 400px; }
-  </style>
-</head>
-<body>
-  <div id="board"></div>
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-  <script src="chessboard.js"></script>
-  <script>
-    var board = Chessboard('board', 'start');
-  </script>
-</body>
-</html>
-```
-
-### 5. (Optional) Customize Your UI
-
-- chessboard.js is "just a board" and does not handle chess rules, move validation, or PGN parsing.
-- For chess logic (move validation, game state, etc.), integrate [chess.js](https://github.com/jhlywa/chess.js) or connect to your backend API.
-- You can add buttons, move history, and other UI elements as needed.
-
-### 6. (Optional) Add a Simple Web Server
-
-You can serve the static files using a simple web server (Node.js/Express, Python Flask, or nginx as shown in the Dockerfile examples above).
-
----
-
-**Summary of Steps:**
-1. Create the `ui/` directory under your project root.
-2. Download and copy chessboard.js, chessboard.css, and the `img/` folder into `ui/`.
-3. Add an `index.html` that loads jQuery and chessboard.js, and displays the chessboard.
-4. (Optional) Add a Dockerfile and web server for containerized deployment.
-
----
-
-**Note:**  
-chessboard.js is a flexible JavaScript chessboard component that does not include chess logic or a chess engine. It is designed to be used alongside other libraries (such as chess.js) or your backend API for full chess functionality. For more information, see [chessboardjs.com](http://chessboardjs.com) and the [README](https://github.com/oakmac/chessboardjs/blob/master/README.md).
+- [Docker Compose](https://docs.docker.com/compose/)
+- [JWT.io](https://jwt.io/)
+- [python-chess](https://python-chess.readthedocs.io/)
+- [SQLite](https://www.sqlite.org/)
+- [bcrypt](https://github.com/pyca/bcrypt)
