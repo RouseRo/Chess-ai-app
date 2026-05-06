@@ -746,6 +746,13 @@
       updateFenDisplay();
       checkGameStatus();
       updateStatusBox(`New game started: White=${whitePlayer}, Black=${blackPlayer}`, 'success');
+
+        // If White is AI, request the first move
+        if (whitePlayer === 'ai') {
+          setTimeout(() => {
+            sendMoveToEngine('', game.fen(), true);
+          }, 500);
+        }
     }
 
       function sendMoveToEngine(move, fen, requestAiMove) {
@@ -836,6 +843,21 @@
               updateFenDisplay();
               updateStatusBox(`AI played: ${sanMove} (${data.ai_type})`, 'info');
               checkGameStatus();
+
+              // Check if game is over
+              if (!game.in_checkmate() && !game.in_draw() && !game.in_stalemate()) {
+                // If next player is also AI, request their move automatically
+                const whitePlayer = document.getElementById('white-player').value;
+                const blackPlayer = document.getElementById('black-player').value;
+                const isWhiteTurn = game.turn() === 'w';
+
+                if ((isWhiteTurn && whitePlayer === 'ai') || (!isWhiteTurn && blackPlayer === 'ai')) {
+                  // Request next AI move after a short delay
+                  setTimeout(() => {
+                    sendMoveToEngine('', game.fen(), true);
+                  }, 1000);
+                }
+              }
             } else {
               console.error('[UI] Failed to apply AI move:', data.ai_move);
               updateStatusBox(`Failed to apply AI move: ${data.ai_move}`, 'error');
