@@ -515,7 +515,6 @@
                   <button class="tab-panel-button active" onclick="switchTab('player-setup-panel')">Player Setup</button>
                   <button class="tab-panel-button" onclick="switchTab('move-history-panel')">Move History</button>
                   <button class="tab-panel-button" onclick="switchTab('expert-panel')">Ask Expert</button>
-                  <button class="tab-panel-button" onclick="switchTab('strategy-panel')">Strategy</button>
                 </div>
 
                 <!-- Player Setup Tab -->
@@ -574,6 +573,27 @@
                     </div>
                   </div>
 
+                  <!-- Strategy Section -->
+                  <div style="border: 1px solid #ddd; padding: 10px; margin: 10px 0; border-radius: 4px;">
+                    <h4 style="margin-top: 0;">Strategy</h4>
+                    <label style="display: block; margin: 10px 0;">
+                      White Opening:
+                      <select id="white-strategy" style="width: 100%; padding: 5px;">
+                        <option value="">No Opening</option>
+                        <option value="ruy-lopez">Ruy Lopez</option>
+                        <option value="italian">Italian Game</option>
+                      </select>
+                    </label>
+                    <label style="display: block; margin: 10px 0;">
+                      Black Defense:
+                      <select id="black-strategy" style="width: 100%; padding: 5px;">
+                        <option value="">No Defense</option>
+                        <option value="sicilian">Sicilian Defense</option>
+                        <option value="french">French Defense</option>
+                      </select>
+                    </label>
+                  </div>
+
                   <button onclick="startNewGame()" class="btn-primary" style="margin-top: 15px;">Start New Game</button>
                 </div>
 
@@ -595,27 +615,6 @@
                   <div id="expert-response">
                     <p style="color: #999;">Ask a question and get expert chess advice</p>
                   </div>
-                </div>
-
-                <!-- Strategy Tab -->
-                <div id="strategy-panel" class="tab-panel-content">
-                  <h3 style="margin-top: 0;">Strategy</h3>
-                  <label style="display: block; margin: 10px 0;">
-                    White Opening:
-                    <select id="white-strategy" style="width: 100%; padding: 5px;">
-                      <option value="">No Opening</option>
-                      <option value="ruy-lopez">Ruy Lopez</option>
-                      <option value="italian">Italian Game</option>
-                    </select>
-                  </label>
-                  <label style="display: block; margin: 10px 0;">
-                    Black Defense:
-                    <select id="black-strategy" style="width: 100%; padding: 5px;">
-                      <option value="">No Defense</option>
-                      <option value="sicilian">Sicilian Defense</option>
-                      <option value="french">French Defense</option>
-                    </select>
-                  </label>
                 </div>
               </div>
             </div>
