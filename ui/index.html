@@ -488,6 +488,12 @@
             <div id="game-status" style="margin-top: 10px; text-align: center; font-size: 16px;">
               <p>Game Status: <strong>Ready to play</strong></p>
             </div>
+
+            <!-- Player Info Display -->
+            <div id="player-info-box" style="width: 400px; margin: 15px auto; padding: 12px; background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+              <p style="margin: 5px 0;"><strong>White:</strong> <span id="white-player-display">Not configured</span></p>
+              <p style="margin: 5px 0;"><strong>Black:</strong> <span id="black-player-display">Not configured</span></p>
+            </div>
           </div>
 
           <div class="game-panel">
@@ -528,7 +534,7 @@
                     <div id="white-ai-config" style="display: none;">
                       <label style="display: block; margin: 10px 0;">
                         AI Type:
-                        <select id="white-ai-type" style="width: 100%; padding: 5px;">
+                        <select id="white-ai-type" onchange="updatePlayerDisplay()" style="width: 100%; padding: 5px;">
                           <option value="stockfish" selected>Stockfish</option>
                           <option value="openai">OpenAI GPT</option>
                           <option value="deepseek">DeepSeek</option>
@@ -537,7 +543,7 @@
                       </label>
                       <label style="display: block; margin: 10px 0;">
                         Skill Level (1-20):
-                        <input type="number" id="white-skill-level" value="10" min="1" max="20" style="width: 100%; padding: 5px;">
+                        <input type="number" id="white-skill-level" value="10" min="1" max="20" onchange="updatePlayerDisplay()" style="width: 100%; padding: 5px;">
                       </label>
                     </div>
                   </div>
@@ -554,7 +560,7 @@
                     <div id="black-ai-config" style="display: block;">
                       <label style="display: block; margin: 10px 0;">
                         AI Type:
-                        <select id="black-ai-type" style="width: 100%; padding: 5px;">
+                        <select id="black-ai-type" onchange="updatePlayerDisplay()" style="width: 100%; padding: 5px;">
                           <option value="stockfish" selected>Stockfish</option>
                           <option value="openai">OpenAI GPT</option>
                           <option value="deepseek">DeepSeek</option>
@@ -563,7 +569,7 @@
                       </label>
                       <label style="display: block; margin: 10px 0;">
                         Skill Level (1-20):
-                        <input type="number" id="black-skill-level" value="10" min="1" max="20" style="width: 100%; padding: 5px;">
+                        <input type="number" id="black-skill-level" value="10" min="1" max="20" onchange="updatePlayerDisplay()" style="width: 100%; padding: 5px;">
                       </label>
                     </div>
                   </div>
@@ -636,6 +642,7 @@
         console.log('Chessboard initialized for user:', currentUser);
         updateStatusBox('Chessboard initialized successfully', 'success');
         updateFenDisplay();
+        updatePlayerDisplay();
       }
 
           function onDragStart(source, piece, position, orientation) {
@@ -733,6 +740,35 @@
           } else {
             blackAiConfig.style.display = 'none';
           }
+
+    // Update the player display
+    updatePlayerDisplay();
+  }
+
+  function updatePlayerDisplay() {
+    const whitePlayer = document.getElementById('white-player').value;
+    const blackPlayer = document.getElementById('black-player').value;
+
+    let whiteDisplay = whitePlayer === 'human' ? `Human (${currentUser})` : 'AI';
+    let blackDisplay = blackPlayer === 'human' ? `Human (${currentUser})` : 'AI';
+
+    if (whitePlayer === 'ai') {
+      const whiteAiType = document.getElementById('white-ai-type').value;
+      const whiteSkilLevel = document.getElementById('white-skill-level').value;
+      whiteDisplay = `AI (${whiteAiType}, Level ${whiteSkilLevel})`;
+    }
+
+    if (blackPlayer === 'ai') {
+      const blackAiType = document.getElementById('black-ai-type').value;
+      const blackSkillLevel = document.getElementById('black-skill-level').value;
+      blackDisplay = `AI (${blackAiType}, Level ${blackSkillLevel})`;
+    }
+
+    const whiteDisplayEl = document.getElementById('white-player-display');
+    const blackDisplayEl = document.getElementById('black-player-display');
+
+    if (whiteDisplayEl) whiteDisplayEl.textContent = whiteDisplay;
+    if (blackDisplayEl) blackDisplayEl.textContent = blackDisplay;
         }
 
       function startNewGame() {
@@ -749,6 +785,7 @@
       document.getElementById('move-history').innerHTML = '<p style="color: #999;">No moves yet</p>';
       updateFenDisplay();
       checkGameStatus();
+        updatePlayerDisplay();
       updateStatusBox(`New game started: White=${whitePlayer}, Black=${blackPlayer}`, 'success');
 
         // If White is AI, request the first move
