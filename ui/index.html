@@ -272,6 +272,55 @@
       max-height: 80px;
       overflow-y: auto;
     }
+    /* Comm diagnostics panel */
+    .comm-log {
+      overflow-y: auto;
+      max-height: 420px;
+      font-family: monospace;
+      font-size: 12px;
+      background: #fafafa;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      flex: 1;
+      min-height: 0;
+    }
+    .comm-entry {
+      border-bottom: 1px solid #e8e8e8;
+      padding: 6px 8px;
+    }
+    .comm-entry.comm-req {
+      border-left: 3px solid #1565c0;
+      background: #e3f2fd;
+    }
+    .comm-entry.comm-res.ok {
+      border-left: 3px solid #2e7d32;
+      background: #e8f5e9;
+    }
+    .comm-entry.comm-res.err {
+      border-left: 3px solid #c62828;
+      background: #ffebee;
+    }
+    .comm-entry.comm-conn-err {
+      border-left: 3px solid #e65100;
+      background: #fff3e0;
+    }
+    .comm-timestamp { color: #757575; font-size: 11px; }
+    .comm-direction { font-weight: bold; }
+    .comm-body {
+      margin-top: 4px;
+      word-break: break-all;
+      white-space: pre-wrap;
+      max-height: 80px;
+      overflow-y: auto;
+      background: rgba(0,0,0,0.04);
+      border-radius: 3px;
+      padding: 3px 5px;
+    }
+    #comm-panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
   </style>
 </head>
 <body>
@@ -287,6 +336,7 @@
     let board = null;
       let game = null;
       let moveHistory = [];
+        let commMessages = [];
 
     function checkAuthentication() {
       const token = localStorage.getItem('authToken');
@@ -348,13 +398,16 @@
         return;
       }
 
+        logCommMessage('req', 'AUTH', '/auth/login', { username }, null);
+        let _loginStatus = null;
       fetch('http://localhost:8002/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       })
-        .then(response => response.json())
+        .then(response => { _loginStatus = response.status; return response.json(); })
         .then(data => {
+          logCommMessage('res', 'AUTH', '/auth/login', data, _loginStatus);
           if (data.success && data.token) {
             authToken = data.token;
             currentUser = username;
@@ -373,6 +426,7 @@
           }
         })
         .catch(error => {
+          logCommMessage('err', 'AUTH', '/auth/login', { message: error.message }, null);
           errorDiv.textContent = 'Error: ' + error.message;
           errorDiv.style.display = 'block';
         });
@@ -390,13 +444,16 @@
         return;
       }
 
+        logCommMessage('req', 'AUTH', '/auth/register', { username, email }, null);
+        let _registerStatus = null;
       fetch('http://localhost:8002/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email, password })
       })
-        .then(response => response.json())
+        .then(response => { _registerStatus = response.status; return response.json(); })
         .then(data => {
+          logCommMessage('res', 'AUTH', '/auth/register', data, _registerStatus);
           if (data.success) {
             alert('Registration successful! Please login.');
             showLoginInterface();
@@ -406,18 +463,22 @@
           }
         })
         .catch(error => {
+          logCommMessage('err', 'AUTH', '/auth/register', { message: error.message }, null);
           errorDiv.textContent = 'Error: ' + error.message;
           errorDiv.style.display = 'block';
         });
     }
 
       function verifyToken(token) {
+        logCommMessage('req', 'AUTH', '/auth/verify', { token: '(stored token)' }, null);
+        let _verifyStatus = null;
       fetch('http://localhost:8002/auth/verify', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + token }
       })
-        .then(response => response.json())
+        .then(response => { _verifyStatus = response.status; return response.json(); })
         .then(data => {
+          logCommMessage('res', 'AUTH', '/auth/verify', data, _verifyStatus);
           if (data.success) {
             currentUser = data.username;
             localStorage.setItem('isAdmin', data.is_admin ? 'true' : 'false');
@@ -435,6 +496,7 @@
           }
         })
         .catch(() => {
+          logCommMessage('err', 'AUTH', '/auth/verify', { message: 'Network or parse error' }, null);
           localStorage.removeItem('authToken');
           localStorage.removeItem('currentUser');
           localStorage.removeItem('isAdmin');
@@ -460,6 +522,69 @@
           }
         }
       }
+
+        function logCommMessage(direction, service, endpoint, data, statusCode) {
+          const sanitized = Object.assign({}, data);
+          if (sanitized.password !== undefined) sanitized.password = '***';
+          if (sanitized.token !== undefined) sanitized.token = '(token)';
+          const msg = {
+            ts: new Date().toLocaleTimeString(),
+            direction: direction,
+            service: service,
+            endpoint: endpoint,
+            data: sanitized,
+            statusCode: statusCode
+          };
+          commMessages.push(msg);
+          if (commMessages.length > 200) commMessages.shift();
+          renderCommEntry(msg);
+        }
+
+        function renderCommEntry(msg) {
+          const log = document.getElementById('comm-log');
+          if (!log) return;
+
+          const placeholder = log.querySelector('p');
+          if (placeholder) placeholder.remove();
+
+          let entryClass = 'comm-entry ';
+          let dirLabel = '';
+          if (msg.direction === 'req') {
+            entryClass += 'comm-req';
+            dirLabel = '→ REQ';
+          } else if (msg.direction === 'res') {
+            entryClass += 'comm-res ' + (msg.statusCode && msg.statusCode >= 400 ? 'err' : 'ok');
+            dirLabel = '← RES';
+          } else {
+            entryClass += 'comm-conn-err';
+            dirLabel = '✕ ERR';
+          }
+
+          const statusText = msg.statusCode ? ` ${msg.statusCode}` : '';
+          const bodyText = JSON.stringify(msg.data, null, 2);
+          const safeBody = bodyText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+          const entry = document.createElement('div');
+          entry.className = entryClass;
+          entry.innerHTML =
+            `<span class="comm-timestamp">[${msg.ts}]</span> ` +
+            `<span class="comm-direction">${dirLabel}</span> ` +
+            `<strong>${msg.service}</strong>${statusText} <code>${msg.endpoint}</code>` +
+            `<div class="comm-body">${safeBody}</div>`;
+
+          log.insertBefore(entry, log.firstChild);
+
+          const badge = document.getElementById('comm-count');
+          if (badge) badge.textContent = `(${commMessages.length} message${commMessages.length !== 1 ? 's' : ''})`;
+        }
+
+        function clearCommLog() {
+          commMessages = [];
+          const log = document.getElementById('comm-log');
+          if (log) log.innerHTML = '<p style="color:#999; font-size:12px;">Log cleared.</p>';
+          const badge = document.getElementById('comm-count');
+          if (badge) badge.textContent = '(0 messages)';
+        }
 
       function updateMoveHistory(move, isAI = false) {
         const player = isAI ? 'AI' : 'You';
@@ -493,6 +618,17 @@
                             const selectedPanel = document.getElementById(tabName);
                             if (selectedPanel) {
                               selectedPanel.style.display = 'block';
+                            }
+
+                            // On first open of Comm panel, replay buffered pre-render messages
+                            if (tabName === 'comm-panel') {
+                              const log = document.getElementById('comm-log');
+                              if (log && log.querySelector('p') && commMessages.length > 0) {
+                                log.innerHTML = '';
+                                for (let i = 0; i < commMessages.length; i++) {
+                                  renderCommEntry(commMessages[i]);
+                                }
+                              }
                             }
 
                             // Highlight active button
@@ -540,6 +676,7 @@
                   <button class="tab-panel-button active" onclick="switchTab('player-setup-panel')">Player Setup</button>
                   <button class="tab-panel-button" onclick="switchTab('move-history-panel')">Move History</button>
                   <button class="tab-panel-button" onclick="switchTab('expert-panel')">Ask Expert</button>
+                  <button class="tab-panel-button" onclick="switchTab('comm-panel')">Comm</button>
                 </div>
 
                 <!-- Player Setup Tab -->
@@ -639,6 +776,17 @@
                   </div>
                   <div id="expert-response">
                     <p style="color: #999;">Ask a question and get expert chess advice</p>
+                  </div>
+                </div>
+
+                <!-- Comm Tab -->
+                <div id="comm-panel" class="tab-panel-content">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-shrink:0;">
+                    <h3 style="margin:0;">Comm Log <span id="comm-count" style="font-size:0.75em; color:#757575; font-weight:normal;">(0 messages)</span></h3>
+                    <button onclick="clearCommLog()" style="padding:4px 10px; font-size:0.85em; background:#f44336; color:white; border:none; border-radius:3px; cursor:pointer;">Clear</button>
+                  </div>
+                  <div id="comm-log" class="comm-log">
+                    <p style="color:#999; font-size:12px;">No messages yet. Messages are captured from page load.</p>
                   </div>
                 </div>
               </div>
@@ -844,6 +992,8 @@
         }
 
         console.log('[UI] Sending to engine:', { move, fen, requestAiMove, aiType, skillLevel });
+        logCommMessage('req', 'ENGINE', '/move', { move, fen, request_ai_move: requestAiMove, ai_type: aiType, skill_level: skillLevel }, null);
+        let _moveStatus = null;
     
       fetch('http://localhost:8000/move', {
         method: 'POST',
@@ -861,6 +1011,7 @@
       })
         .then(response => {
           console.log('[UI] Response status:', response.status);
+          _moveStatus = response.status;
           if (response.status === 401) {
             updateStatusBox('Authentication failed. Please login again.', 'error');
             handleLogout();
@@ -870,6 +1021,7 @@
         })
         .then(data => {
           console.log('[UI] Response data:', data);
+          logCommMessage('res', 'ENGINE', '/move', data, _moveStatus);
 
           if (data.error) {
             updateStatusBox(`Server error: ${data.error}`, 'error');
@@ -941,6 +1093,7 @@
           if (error.message !== 'Unauthorized') {
             console.error('[UI] Error:', error);
             updateStatusBox(`Connection error: ${error.message}`, 'error');
+            logCommMessage('err', 'ENGINE', '/move', { message: error.message }, null);
           }
         });
     }
@@ -954,6 +1107,8 @@
 
       updateStatusBox(`Asking expert: "${question}"`, 'info');
 
+        logCommMessage('req', 'ENGINE', '/expert/question', { question, fen: game.fen() }, null);
+        let _expertStatus = null;
       fetch('http://localhost:8000/expert/question', {
         method: 'POST',
         headers: {
@@ -963,6 +1118,7 @@
         body: JSON.stringify({ question: question, fen: game.fen() })
       })
         .then(response => {
+          _expertStatus = response.status;
           if (response.status === 401) {
             updateStatusBox('Authentication failed. Please login again.', 'error');
             handleLogout();
@@ -971,6 +1127,7 @@
           return response.json();
         })
         .then(data => {
+          logCommMessage('res', 'ENGINE', '/expert/question', data, _expertStatus);
           if (data.error) {
             document.getElementById('expert-response').textContent = 'Error: ' + data.error;
             updateStatusBox(`Expert error: ${data.error}`, 'error');
@@ -982,6 +1139,7 @@
         })
         .catch(error => {
           if (error.message !== 'Unauthorized') {
+            logCommMessage('err', 'ENGINE', '/expert/question', { message: error.message }, null);
             document.getElementById('expert-response').textContent = 'Error: ' + error.message;
             updateStatusBox(`Expert connection error: ${error.message}`, 'error');
           }
@@ -990,6 +1148,7 @@
 
       function handleLogout() {
         if (confirm('Are you sure you want to logout?')) {
+          logCommMessage('req', 'AUTH', '/auth/logout', {}, null);
           fetch('http://localhost:8002/auth/logout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
