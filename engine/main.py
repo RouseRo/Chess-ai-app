@@ -292,49 +292,78 @@ async def suggest_move(fen: str, authorization: str = Header(None), ai_type: str
 
 @app.post("/expert/question")
 async def ask_expert(request_data: dict, authorization: str = Header(None)):
-    """Ask chess expert question."""
+    """Ask chess expert question with optional live game context."""
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing authorization token")
     
     question = request_data.get('question')
     fen = request_data.get('fen')
+    move_history = request_data.get('move_history', [])   # list of SAN strings
+    turn = request_data.get('turn')                        # 'white' or 'black'
+    move_count = request_data.get('move_count', 0)
+    is_check = request_data.get('is_check', False)
+    is_checkmate = request_data.get('is_checkmate', False)
+    is_draw = request_data.get('is_draw', False)
+    captured_by_white = request_data.get('captured_by_white', [])
+    captured_by_black = request_data.get('captured_by_black', [])
     
     if not question:
         raise HTTPException(status_code=400, detail="Missing question")
     
     print(f"[EXPERT] Received question: '{question}', FEN: {fen[:30] if fen else 'None'}...")
-    
+
+    # Build a contextual prompt when a live game is in progress
+    contextual_question = question
+    if fen and fen != 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1':
+        context_parts = [f"Current position (FEN): {fen}"]
+        if move_count:
+            context_parts.append(f"Move number: {move_count}")
+        if turn:
+            context_parts.append(f"It is {turn}'s turn.")
+        if is_checkmate:
+            context_parts.append("The game has ended in checkmate.")
+        elif is_draw:
+            context_parts.append("The game has ended in a draw.")
+        elif is_check:
+            context_parts.append(f"The {turn} king is in check.")
+        if move_history:
+            pgn_moves = []
+            for i in range(0, len(move_history), 2):
+                num = i // 2 + 1
+                w = move_history[i] if i < len(move_history) else ''
+                b = move_history[i + 1] if i + 1 < len(move_history) else ''
+                pgn_moves.append(f"{num}. {w} {b}".strip())
+            context_parts.append("Moves so far: " + " ".join(pgn_moves))
+        piece_names = {'p': 'pawn', 'r': 'rook', 'b': 'bishop', 'n': 'knight', 'q': 'queen'}
+        if captured_by_white:
+            names = [piece_names.get(p, p) for p in captured_by_white]
+            context_parts.append(f"White has captured: {', '.join(names)}.")
+        if captured_by_black:
+            names = [piece_names.get(p, p) for p in captured_by_black]
+            context_parts.append(f"Black has captured: {', '.join(names)}.")
+        contextual_question = "\n".join(context_parts) + f"\n\nQuestion: {question}"
+
     try:
-        # Try to import and use ExpertService
-        try:
-            from src.expert_service import ExpertService
-            print("[EXPERT] ExpertService imported successfully")
-            
-            expert = ExpertService()
-            response = expert.ask_question(question, fen)
-            
+        if AI_AVAILABLE:
+            print("[EXPERT] Using AIPlayer directly for expert response")
+            player = AIPlayer(model_name="anthropic/claude-fable-5")
+            response = player.get_chess_fact_or_answer(contextual_question)
             print(f"[EXPERT] Response received: {response[:100] if response else 'None'}...")
-            
-            # Validate response
+
             if not response or response.strip() == "":
-                print("[EXPERT] Warning: Expert returned empty response")
                 return {
                     "success": False,
                     "question": question,
                     "error": "Expert service returned empty response"
                 }
-            
+
             return {
                 "success": True,
                 "question": question,
                 "response": response
             }
-            
-        except ImportError as e:
-            print(f"[EXPERT] ExpertService import failed: {e}")
-            print("[EXPERT] Attempting fallback...")
-            
-            # Fallback: Basic chess advice without expert service
+        else:
+            print("[EXPERT] AIPlayer not available, using positional fallback")
             fallback_response = generate_fallback_response(question, fen)
             return {
                 "success": True,
@@ -342,12 +371,12 @@ async def ask_expert(request_data: dict, authorization: str = Header(None)):
                 "response": fallback_response,
                 "source": "fallback"
             }
-    
+
     except Exception as e:
         print(f"[EXPERT] Unexpected error: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
-        
+
         return {
             "success": False,
             "question": question,
@@ -356,33 +385,75 @@ async def ask_expert(request_data: dict, authorization: str = Header(None)):
 
 
 def generate_fallback_response(question: str, fen: str = None) -> str:
-    """Generate basic chess advice when ExpertService is unavailable."""
+    """Generate a position-aware response using python-chess when AI is unavailable."""
     print(f"[EXPERT FALLBACK] Generating response for: '{question}'")
-    
+
+    # If we have a FEN, extract basic position facts using python-chess
+    position_context = ""
+    if fen:
+        try:
+            board = chess.Board(fen)
+            turn = "White" if board.turn == chess.WHITE else "Black"
+            legal_count = board.legal_moves.count()
+            in_check = board.is_check()
+
+            piece_values = {chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3,
+                            chess.ROOK: 5, chess.QUEEN: 9, chess.KING: 0}
+            white_material = sum(piece_values.get(pt, 0)
+                                 for pt in piece_values
+                                 for _ in board.pieces(pt, chess.WHITE))
+            black_material = sum(piece_values.get(pt, 0)
+                                 for pt in piece_values
+                                 for _ in board.pieces(pt, chess.BLACK))
+            diff = white_material - black_material
+
+            material_str = "material is equal"
+            if diff > 0:
+                material_str = f"White is ahead by {diff} point(s)"
+            elif diff < 0:
+                material_str = f"Black is ahead by {abs(diff)} point(s)"
+
+            check_str = " The king is in check." if in_check else ""
+            position_context = (
+                f"Position summary: It is {turn}'s turn with {legal_count} legal moves available. "
+                f"{material_str}.{check_str}\n\n"
+            )
+        except Exception:
+            pass
+
     question_lower = question.lower()
-    
-    # Basic chess opening advice
+
+    if "best move" in question_lower or "suggest" in question_lower or "what move" in question_lower:
+        return (position_context +
+                "Move selection tip: Look for forcing moves first (checks, captures, threats). "
+                "Then consider improving your worst-placed piece or creating a passed pawn.")
+
     if "opening" in question_lower or "start" in question_lower:
-        return "For strong openings, consider: 1.e4 (Open Game), 1.d4 (Closed Game), or 1.c4 (English Opening). Each leads to different types of positions."
-    
-    # Endgame advice
-    if "endgame" in question_lower or "endgame" in question_lower:
-        return "Key endgame principles: Activate your king, push passed pawns, and create threats. Practice fundamental endgames like K+P vs K and Rook endgames."
-    
-    # Tactical advice
-    if "tactic" in question_lower or "combination" in question_lower or "pin" in question_lower or "fork" in question_lower:
-        return "Tactical motifs: Look for pins, forks, skewers, and discovered attacks. Always check if your opponent has threats and look for forcing moves (checks, captures, threats)."
-    
-    # Strategy advice
-    if "strateg" in question_lower or "plan" in question_lower:
-        return "Strategic principles: Control the center, develop pieces quickly, ensure king safety, and create a coherent plan. Improve your worst-placed piece."
-    
-    # Move evaluation
-    if "best move" in question_lower or "should i" in question_lower:
-        return "To find the best move: 1) Look for forcing moves (checks, captures, threats), 2) Evaluate resulting positions, 3) Consider opponent's best responses, 4) Compare candidate moves."
-    
-    # Default helpful response
-    return "Chess tip: Always look for forcing moves (checks, captures, threats), consider your opponent's threats, and improve your worst-placed piece. Study classic games and positions!"
+        return (position_context +
+                "Opening principles: Control the center (e4/d4), develop knights before bishops, "
+                "castle early, and connect your rooks.")
+
+    if "endgame" in question_lower:
+        return (position_context +
+                "Endgame principles: Activate your king, push passed pawns, and create threats. "
+                "Practice K+P vs K and rook endgames.")
+
+    if "tactic" in question_lower or "pin" in question_lower or "fork" in question_lower or "combination" in question_lower:
+        return (position_context +
+                "Tactical motifs: Look for pins, forks, skewers, and discovered attacks. "
+                "Always check if your opponent has threats before executing a combination.")
+
+    if "strateg" in question_lower or "plan" in question_lower or "analyze" in question_lower:
+        return (position_context +
+                "Strategic principles: Control the center, develop pieces quickly, ensure king safety, "
+                "and improve your worst-placed piece.")
+
+    if "winning" in question_lower or "advantage" in question_lower or "material" in question_lower:
+        return position_context + "Use Stockfish or an AI model for a deeper evaluation of this position."
+
+    return (position_context +
+            "Chess tip: Look for forcing moves (checks, captures, threats), consider your opponent's "
+            "threats, and improve your worst-placed piece.")
 
 # ========== Admin Endpoints ==========
 

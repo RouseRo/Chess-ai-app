@@ -167,6 +167,36 @@
     .expert-send-btn:hover {
       background-color: #1976D2;
     }
+    .expert-quick-btn {
+      padding: 5px 10px;
+      font-size: 0.8em;
+      background-color: #f0f0f0;
+      border: 1px solid #ccc;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+    .expert-quick-btn:hover {
+      background-color: #e0e0e0;
+    }
+    .expert-qa-entry {
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      overflow: hidden;
+      font-size: 0.9em;
+    }
+    .expert-qa-question {
+      padding: 7px 10px;
+      background: #e3f2fd;
+      color: #1565c0;
+      font-weight: 500;
+    }
+    .expert-qa-answer {
+      padding: 8px 10px;
+      background: white;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
     #expert-response {
       min-height: 80px;
       padding: 10px;
@@ -337,6 +367,8 @@
       let game = null;
       let moveHistory = [];
         let commMessages = [];
+        let capturedByWhite = []; // black pieces captured by White
+        let capturedByBlack = []; // white pieces captured by Black
 
     function checkAuthentication() {
       const token = localStorage.getItem('authToken');
@@ -586,6 +618,65 @@
           if (badge) badge.textContent = '(0 messages)';
         }
 
+          // Captured-pieces helpers
+          const PIECE_SYMBOLS = {
+            p: { w: '♙', b: '♟' },
+            r: { w: '♖', b: '♜' },
+            b: { w: '♗', b: '♝' },
+            n: { w: '♘', b: '♞' },
+            q: { w: '♕', b: '♛' },
+            k: { w: '♔', b: '♚' }
+          };
+          const PIECE_VALUES = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+
+          function updateCapturedPieces(move) {
+            if (!move || !move.captured) return;
+            if (move.color === 'w') {
+              capturedByWhite.push(move.captured);
+            } else {
+              capturedByBlack.push(move.captured);
+            }
+            renderCapturedPieces();
+          }
+
+          function renderCapturedPieces() {
+            const whiteEl = document.getElementById('white-captured');
+            const blackEl = document.getElementById('black-captured');
+            const advantageEl = document.getElementById('material-advantage');
+            const whiteScoreEl = document.getElementById('white-material-score');
+            const blackScoreEl = document.getElementById('black-material-score');
+            if (!whiteEl || !blackEl) return;
+
+            const sortByValue = (a, b) => PIECE_VALUES[b] - PIECE_VALUES[a];
+            const sortedWhite = [...capturedByWhite].sort(sortByValue);
+            const sortedBlack = [...capturedByBlack].sort(sortByValue);
+
+            // White captured black pieces → show black piece symbols
+            whiteEl.textContent = sortedWhite.map(p => PIECE_SYMBOLS[p]['b']).join('') || '—';
+            // Black captured white pieces → show white piece symbols
+            blackEl.textContent = sortedBlack.map(p => PIECE_SYMBOLS[p]['w']).join('') || '—';
+
+            const whiteMaterial = capturedByWhite.reduce((s, p) => s + (PIECE_VALUES[p] || 0), 0);
+            const blackMaterial = capturedByBlack.reduce((s, p) => s + (PIECE_VALUES[p] || 0), 0);
+
+            if (whiteScoreEl) whiteScoreEl.textContent = whiteMaterial > 0 ? `(+${whiteMaterial})` : '';
+            if (blackScoreEl) blackScoreEl.textContent = blackMaterial > 0 ? `(+${blackMaterial})` : '';
+
+            const diff = whiteMaterial - blackMaterial;
+            if (advantageEl) {
+              if (diff > 0) {
+                advantageEl.textContent = `White +${diff}`;
+                advantageEl.style.color = '#2e7d32';
+              } else if (diff < 0) {
+                advantageEl.textContent = `Black +${Math.abs(diff)}`;
+                advantageEl.style.color = '#1565c0';
+              } else {
+                advantageEl.textContent = whiteMaterial > 0 ? 'Equal material' : '';
+                advantageEl.style.color = '#555';
+              }
+            }
+          }
+
       function updateMoveHistory(move, isAI = false) {
         const player = isAI ? 'AI' : 'You';
         moveHistory.push({ move, player });
@@ -662,6 +753,24 @@
             <div id="player-info-box" style="width: 400px; margin: 15px auto; padding: 12px; background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
               <p style="margin: 5px 0;"><strong>White:</strong> <span id="white-player-display">Not configured</span></p>
               <p style="margin: 5px 0;"><strong>Black:</strong> <span id="black-player-display">Not configured</span></p>
+            </div>
+
+            <!-- Captured Pieces Display -->
+            <div id="captured-pieces-box" style="width: 400px; margin: 10px auto; padding: 12px; background-color: #fff; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <strong>Captured Pieces</strong>
+                <span id="material-advantage" style="font-size: 12px; color: #555;"></span>
+              </div>
+              <div style="margin: 4px 0; display: flex; align-items: center; gap: 6px;">
+                <span style="font-weight: bold; min-width: 110px;">White captured:</span>
+                <span id="white-captured" style="font-size: 22px; letter-spacing: 1px;">—</span>
+                <span id="white-material-score" style="font-size: 12px; color: #888;"></span>
+              </div>
+              <div style="margin: 4px 0; display: flex; align-items: center; gap: 6px;">
+                <span style="font-weight: bold; min-width: 110px;">Black captured:</span>
+                <span id="black-captured" style="font-size: 22px; letter-spacing: 1px;">—</span>
+                <span id="black-material-score" style="font-size: 12px; color: #888;"></span>
+              </div>
             </div>
           </div>
 
@@ -770,12 +879,30 @@
                 <!-- Expert Tab -->
                 <div id="expert-panel" class="tab-panel-content">
                   <h3 style="margin-top: 0;">Ask Expert</h3>
+
+                  <!-- Game context badge -->
+                  <div id="expert-game-context" style="margin-bottom: 10px; padding: 7px 10px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 4px; font-size: 12px; color: #2e7d32; display: none;">
+                    <strong>Analyzing live game</strong> — <span id="expert-context-summary"></span>
+                  </div>
+
+                  <!-- Quick action buttons -->
+                  <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;">
+                    <button class="expert-quick-btn" onclick="askExpertPreset('Analyze the current position and suggest the best plan.')">Analyze position</button>
+                    <button class="expert-quick-btn" onclick="askExpertPreset('What is the best move right now and why?')">Best move?</button>
+                    <button class="expert-quick-btn" onclick="askExpertPreset('Explain the last move that was played.')">Explain last move</button>
+                    <button class="expert-quick-btn" onclick="askExpertPreset('What threats should I be aware of in this position?')">Threats?</button>
+                    <button class="expert-quick-btn" onclick="askExpertPreset('Who is winning and what is the material balance?')">Who is winning?</button>
+                  </div>
+
                   <div class="expert-input-group">
-                    <input id="expert-input" type="text" placeholder="Ask a chess question...">
+                    <input id="expert-input" type="text" placeholder="Ask about the game or any chess question..."
+                      onkeydown="if(event.key==='Enter') askExpert()">
                     <button class="expert-send-btn" onclick="askExpert()">Send</button>
                   </div>
-                  <div id="expert-response">
-                    <p style="color: #999;">Ask a question and get expert chess advice</p>
+
+                  <!-- Conversation history -->
+                  <div id="expert-response" style="display: flex; flex-direction: column; gap: 10px;">
+                    <p style="color: #999; margin: 0;">Ask a question and get expert chess analysis</p>
                   </div>
                 </div>
 
@@ -845,7 +972,9 @@
 
             updateStatusBox(`You played: ${move.san}`, 'info');
             updateMoveHistory(move.san, false);
+            updateCapturedPieces(move);
             updateFenDisplay();
+            updateExpertContextBadge();
 
             // Check if we need AI to respond
             const blackPlayer = document.getElementById('black-player').value;
@@ -949,15 +1078,21 @@
 
       game = new Chess();
       moveHistory = [];
+        capturedByWhite = [];
+        capturedByBlack = [];
 
       if (board) {
         board.start();
       }
 
       document.getElementById('move-history').innerHTML = '<p style="color: #999;">No moves yet</p>';
+        const expertResp = document.getElementById('expert-response');
+        if (expertResp) expertResp.innerHTML = '<p style="color: #999; margin: 0;">Ask a question and get expert chess analysis</p>';
       updateFenDisplay();
       checkGameStatus();
         updatePlayerDisplay();
+        renderCapturedPieces();
+        updateExpertContextBadge();
       updateStatusBox(`New game started: White=${whitePlayer}, Black=${blackPlayer}`, 'success');
 
         // If White is AI, request the first move
@@ -1053,6 +1188,7 @@
             if (aiMoveResult) {
               // Update the board display
               board.position(game.fen());
+              updateCapturedPieces(aiMoveResult);
 
               // Update move history with SAN notation
               const sanMove = data.ai_move_san || aiMoveResult.san;
@@ -1060,6 +1196,7 @@
               updateFenDisplay();
               updateStatusBox(`AI played: ${sanMove} (${data.ai_type})`, 'info');
               checkGameStatus();
+              updateExpertContextBadge();
 
               // Check if game is over
               if (!game.in_checkmate() && !game.in_draw() && !game.in_stalemate()) {
@@ -1098,53 +1235,122 @@
         });
     }
 
-      function askExpert() {
-        const question = document.getElementById('expert-input').value;
-      if (!question) {
-        updateStatusBox('Please enter a question', 'error');
-        return;
-      }
+        function buildExpertGameContext() {
+          if (!game) return null;
+          const sanMoves = moveHistory.map(m => m.move);
+          return {
+            fen: game.fen(),
+            move_history: sanMoves,
+            move_count: Math.ceil(sanMoves.length / 2),
+            turn: game.turn() === 'w' ? 'white' : 'black',
+            is_check: game.in_check(),
+            is_checkmate: game.in_checkmate(),
+            is_draw: game.in_draw(),
+            captured_by_white: [...capturedByWhite],
+            captured_by_black: [...capturedByBlack]
+          };
+        }
 
-      updateStatusBox(`Asking expert: "${question}"`, 'info');
-
-        logCommMessage('req', 'ENGINE', '/expert/question', { question, fen: game.fen() }, null);
-        let _expertStatus = null;
-      fetch('http://localhost:8000/expert/question', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + authToken
-        },
-        body: JSON.stringify({ question: question, fen: game.fen() })
-      })
-        .then(response => {
-          _expertStatus = response.status;
-          if (response.status === 401) {
-            updateStatusBox('Authentication failed. Please login again.', 'error');
-            handleLogout();
-            throw new Error('Unauthorized');
+        function updateExpertContextBadge() {
+          const badge = document.getElementById('expert-game-context');
+          const summary = document.getElementById('expert-context-summary');
+          if (!badge || !summary || !game) return;
+          const moveCount = Math.ceil(moveHistory.length / 2);
+          if (moveCount === 0) {
+            badge.style.display = 'none';
+            return;
           }
-          return response.json();
-        })
-        .then(data => {
-          logCommMessage('res', 'ENGINE', '/expert/question', data, _expertStatus);
-          if (data.error) {
-            document.getElementById('expert-response').textContent = 'Error: ' + data.error;
-            updateStatusBox(`Expert error: ${data.error}`, 'error');
+          badge.style.display = 'block';
+          const turn = game.turn() === 'w' ? 'White' : 'Black';
+          let status = `move ${moveCount}, ${turn} to move`;
+          if (game.in_checkmate()) status = 'game over — checkmate';
+          else if (game.in_draw()) status = 'game over — draw';
+          else if (game.in_check()) status += ', in check';
+          summary.textContent = status;
+        }
+
+        function addExpertQA(question, answer, isError) {
+          const container = document.getElementById('expert-response');
+          if (!container) return;
+          // Remove placeholder
+          const placeholder = container.querySelector('p');
+          if (placeholder) placeholder.remove();
+
+          const entry = document.createElement('div');
+          entry.className = 'expert-qa-entry';
+          const qDiv = document.createElement('div');
+          qDiv.className = 'expert-qa-question';
+          qDiv.textContent = question;
+          const aDiv = document.createElement('div');
+          aDiv.className = 'expert-qa-answer';
+          if (isError) {
+            aDiv.style.color = '#c62828';
+            aDiv.textContent = answer;
           } else {
-            document.getElementById('expert-response').innerHTML = data.response || 'No response';
-            document.getElementById('expert-input').value = '';
-            updateStatusBox('Expert response received', 'success');
+            aDiv.innerHTML = answer;
           }
+          entry.appendChild(qDiv);
+          entry.appendChild(aDiv);
+          // Prepend so newest is at top
+          container.insertBefore(entry, container.firstChild);
+        }
+
+        function askExpertPreset(question) {
+          const input = document.getElementById('expert-input');
+          if (input) input.value = question;
+          askExpert();
+        }
+
+      function askExpert() {
+        const question = document.getElementById('expert-input').value.trim();
+        if (!question) {
+          updateStatusBox('Please enter a question', 'error');
+          return;
+        }
+
+        updateStatusBox(`Asking expert: "${question}"`, 'info');
+        document.getElementById('expert-input').value = '';
+
+        const ctx = buildExpertGameContext();
+        const payload = { question, ...(ctx || {}) };
+
+        logCommMessage('req', 'ENGINE', '/expert/question', { question, fen: ctx ? ctx.fen : null }, null);
+        let _expertStatus = null;
+        fetch('http://localhost:8000/expert/question', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + authToken
+          },
+          body: JSON.stringify(payload)
         })
-        .catch(error => {
-          if (error.message !== 'Unauthorized') {
-            logCommMessage('err', 'ENGINE', '/expert/question', { message: error.message }, null);
-            document.getElementById('expert-response').textContent = 'Error: ' + error.message;
-            updateStatusBox(`Expert connection error: ${error.message}`, 'error');
-          }
-        });
-    }
+          .then(response => {
+            _expertStatus = response.status;
+            if (response.status === 401) {
+              updateStatusBox('Authentication failed. Please login again.', 'error');
+              handleLogout();
+              throw new Error('Unauthorized');
+            }
+            return response.json();
+          })
+          .then(data => {
+            logCommMessage('res', 'ENGINE', '/expert/question', data, _expertStatus);
+            if (data.error) {
+              addExpertQA(question, 'Error: ' + data.error, true);
+              updateStatusBox(`Expert error: ${data.error}`, 'error');
+            } else {
+              addExpertQA(question, data.response || 'No response', false);
+              updateStatusBox('Expert response received', 'success');
+            }
+          })
+          .catch(error => {
+            if (error.message !== 'Unauthorized') {
+              logCommMessage('err', 'ENGINE', '/expert/question', { message: error.message }, null);
+              addExpertQA(question, 'Connection error: ' + error.message, true);
+              updateStatusBox(`Expert connection error: ${error.message}`, 'error');
+            }
+          });
+      }
 
       function handleLogout() {
         if (confirm('Are you sure you want to logout?')) {
