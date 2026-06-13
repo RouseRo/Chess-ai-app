@@ -11,6 +11,28 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from engine.user_manager import UserManager
 
+# Load app config to pick up chess_expert_model and ai_models
+_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src", "config.json")
+try:
+    import json as _json
+    with open(_CONFIG_PATH) as _f:
+        _APP_CONFIG = _json.load(_f)
+    print(f"✓ Config loaded from {_CONFIG_PATH}")
+except Exception as _e:
+    _APP_CONFIG = {}
+    print(f"✗ Could not load config: {_e}")
+
+CHESS_EXPERT_MODEL = _APP_CONFIG.get("chess_expert_model", "anthropic/claude-3-5-sonnet-20241022")
+
+def _get_chess_expert_model() -> str:
+    """Read chess_expert_model from config file on each call so changes take effect without restarting."""
+    try:
+        import json as _j
+        with open(_CONFIG_PATH) as _cf:
+            return _j.load(_cf).get("chess_expert_model", CHESS_EXPERT_MODEL)
+    except Exception:
+        return CHESS_EXPERT_MODEL
+
 # Import AI players with error logging
 AI_AVAILABLE = False
 STOCKFISH_AVAILABLE = False
@@ -345,8 +367,10 @@ async def ask_expert(request_data: dict, authorization: str = Header(None)):
 
     try:
         if AI_AVAILABLE:
+            expert_model = _get_chess_expert_model()
             print("[EXPERT] Using AIPlayer directly for expert response")
-            player = AIPlayer(model_name="anthropic/claude-fable-5")
+            player = AIPlayer(model_name=expert_model)
+            print(f"[EXPERT] Using model: {expert_model}")
             response = player.get_chess_fact_or_answer(contextual_question)
             print(f"[EXPERT] Response received: {response[:100] if response else 'None'}...")
 
@@ -355,6 +379,13 @@ async def ask_expert(request_data: dict, authorization: str = Header(None)):
                     "success": False,
                     "question": question,
                     "error": "Expert service returned empty response"
+                }
+
+            if response.startswith("[ERROR]"):
+                return {
+                    "success": False,
+                    "question": question,
+                    "error": response
                 }
 
             return {
