@@ -351,6 +351,76 @@
       flex-direction: column;
       min-height: 0;
     }
+    /* Welcome Tab */
+    .welcome-tab-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin: 12px 0;
+    }
+    .welcome-tab-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      background: #fafafa;
+      cursor: pointer;
+      font-size: 0.88em;
+      font-weight: 600;
+      color: #333;
+      text-align: left;
+      transition: all 0.15s ease;
+    }
+    .welcome-tab-btn:hover {
+      border-color: #2196F3;
+      background: #e3f2fd;
+      color: #1565c0;
+    }
+    .welcome-tab-btn .wb-icon { font-size: 1.3em; }
+    .welcome-tab-btn.wb-primary { border-color: #4CAF50; background: #f1f8f1; color: #2e7d32; }
+    .welcome-tab-btn.wb-primary:hover { background: #c8e6c9; border-color: #388e3c; color: #1b5e20; }
+    .welcome-tab-btn.wb-continue { border-color: #ff9800; background: #fff8f0; color: #e65100; }
+    .welcome-tab-btn.wb-continue:hover { background: #ffe0b2; border-color: #f57c00; }
+    #welcome-info-area {
+      margin-top: 12px;
+      padding: 12px 14px;
+      background: #f5f5f5;
+      border-radius: 6px;
+      border: 1px solid #e0e0e0;
+      font-size: 0.9em;
+      line-height: 1.6;
+      display: none;
+    }
+    #welcome-info-area.visible { display: block; }
+    #welcome-info-area h4 { margin: 0 0 6px; }
+    #welcome-info-area ul { margin: 4px 0; padding-left: 18px; }
+    .endgame-drill-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 2px solid #4CAF50;
+      border-radius: 8px;
+      background: #f1f8f1;
+      cursor: pointer;
+      font-size: 0.88em;
+      color: #2e7d32;
+      text-align: left;
+      width: 100%;
+      transition: all 0.15s ease;
+    }
+    .endgame-drill-btn:hover {
+      background: #c8e6c9;
+      border-color: #388e3c;
+    }
+    .endgame-drill-btn.endgame-drill-locked {
+      border-color: #ccc;
+      background: #f5f5f5;
+      color: #aaa;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -726,6 +796,126 @@
                             event.target.classList.add('active');
                           }
 
+      // ─── Welcome Tab ──────────────────────────────────────────────────────────
+
+      const CHESS_JOKES = [
+        "Why did the chess player bring a ladder? Because they heard the stakes were high!",
+        "What do you call a chess player who always talks during a game? A chess-chatting machine!",
+        "Why was the chess board so wet? Because all the players kept castling in the rain!",
+        "I used to be a chess grandmaster... then I lost my queen and my dignity in the same move.",
+        "Why do chess players make great drivers? Because they always think several moves ahead!",
+        "What's a chess player's favourite drink? Earl Grey — because it's a proper opening.",
+        "How many chess players does it take to change a lightbulb? One, but they spend 40 minutes calculating all possible solutions.",
+        "Why can't pawns play cards? Because they're always getting promoted before the game gets interesting."
+      ];
+
+      const CHESS_NEWS_ITEMS = [
+        { title: "Magnus Carlsen Continues World Blitz Dominance", body: "The Norwegian legend secured yet another blitz title, showing no signs of slowing down despite stepping back from classical chess." },
+        { title: "AI Surpasses Grandmasters in Correspondence Chess", body: "Modern AI engines now evaluate positions to depths that no human can verify, raising new questions about computer-assisted play." },
+        { title: "Record Prize Fund at Candidates Tournament 2025", body: "FIDE announced the largest-ever prize pool for the Candidates Tournament, attracting unprecedented global attention." },
+        { title: "Chess Popularity Surges Among Gen Z", body: "Following the success of 'The Queen's Gambit' and online platforms, chess sees its highest youth participation numbers in decades." },
+        { title: "New Opening Theory: The Anti-London Variation", body: "Top theoreticians are publishing fresh ideas against the London System, as Black players seek dynamic counterplay." }
+      ];
+
+      function navigateToTab(tabName) {
+        document.querySelectorAll('.tab-panel-content').forEach(p => p.style.display = 'none');
+        document.querySelectorAll('.tab-panel-button').forEach(b => b.classList.remove('active'));
+        const panel = document.getElementById(tabName);
+        if (panel) panel.style.display = 'block';
+        document.querySelectorAll('.tab-panel-button').forEach(b => {
+          if (b.getAttribute('onclick') && b.getAttribute('onclick').includes("'" + tabName + "'")) {
+            b.classList.add('active');
+          }
+        });
+        if (tabName === 'comm-panel') {
+          const log = document.getElementById('comm-log');
+          if (log && log.querySelector('p') && commMessages.length > 0) {
+            log.innerHTML = '';
+            commMessages.forEach(m => renderCommEntry(m));
+          }
+        }
+      }
+
+      function showWelcomeInfo(type) {
+        const area = document.getElementById('welcome-info-area');
+        if (!area) return;
+        if (type === 'joke') {
+          const joke = CHESS_JOKES[Math.floor(Math.random() * CHESS_JOKES.length)];
+          area.innerHTML = `<h4>♟ Chess Joke</h4><p style="margin:0;">${joke}</p>`;
+        } else if (type === 'news') {
+          const item = CHESS_NEWS_ITEMS[Math.floor(Math.random() * CHESS_NEWS_ITEMS.length)];
+          area.innerHTML = `<h4>📰 ${item.title}</h4><p style="margin:0;">${item.body}</p>`;
+        } else if (type === 'openings') {
+          area.innerHTML = `<h4>📖 Practice Openings</h4>
+              <ul>
+                <li><strong>Ruy López</strong> — 1.e4 e5 2.Nf3 Nc6 3.Bb5</li>
+                <li><strong>Sicilian Defence</strong> — 1.e4 c5</li>
+                <li><strong>Italian Game</strong> — 1.e4 e5 2.Nf3 Nc6 3.Bc4</li>
+                <li><strong>Queen's Gambit</strong> — 1.d4 d5 2.c4</li>
+                <li><strong>King's Indian Defence</strong> — 1.d4 Nf6 2.c4 g6</li>
+              </ul>
+              <p style="color:#888;margin:4px 0 0;font-size:0.9em;">Set up the position on the board using Player Setup.</p>`;
+        } else if (type === 'endgames') {
+          area.innerHTML = `<h4>🏁 Practice Endgames — choose a drill:</h4>
+              <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">
+                <button class="endgame-drill-btn" onclick="loadEndgamePosition(
+                  '8/8/4k3/4P3/4K3/8/8/8 w - - 0 1',
+                  'King &amp; Pawn vs King',
+                  ['White to move. Can the pawn promote?',
+                   'Tip: Place your king in front of the pawn to escort it.',
+                   'Key concept: Direct opposition — kings facing each other with one square between them.',
+                   'If White king reaches e6 with the pawn on e5, the pawn will promote.']
+                )">
+                  <span style="font-size:1.2em;">♙</span>
+                  <span><strong>King &amp; Pawn vs King</strong><br><small>Opposition &amp; key squares</small></span>
+                </button>
+                <button class="endgame-drill-btn endgame-drill-locked" disabled title="Coming soon">
+                  <span style="font-size:1.2em;">♖</span>
+                  <span><strong>Rook Endgames</strong><br><small>Lucena &amp; Philidor — coming soon</small></span>
+                </button>
+                <button class="endgame-drill-btn endgame-drill-locked" disabled title="Coming soon">
+                  <span style="font-size:1.2em;">♕</span>
+                  <span><strong>Queen vs Pawn</strong><br><small>Promotion race — coming soon</small></span>
+                </button>
+              </div>`;
+        }
+        area.classList.add('visible');
+      }
+
+      function loadEndgamePosition(fen, title, hints) {
+        // Reset game state to the given FEN
+        game = new Chess();
+        game.load(fen);
+        moveHistory = [];
+        capturedByWhite = [];
+        capturedByBlack = [];
+
+        if (board) {
+          board.position(fen);
+        }
+
+        const historyEl = document.getElementById('move-history');
+        if (historyEl) historyEl.innerHTML = '<p style="color:#999;">No moves yet</p>';
+        const expertResp = document.getElementById('expert-response');
+        if (expertResp) expertResp.innerHTML = '<p style="color:#999;margin:0;">Ask a question and get expert chess analysis</p>';
+
+        updateFenDisplay();
+        checkGameStatus();
+        renderCapturedPieces();
+        updateExpertContextBadge();
+
+        // Show coaching hints in the status box
+        updateStatusBox(`Endgame drill loaded: ${title}`, 'success');
+        if (hints && hints.length) {
+          hints.forEach(h => updateStatusBox(h, 'info'));
+        }
+
+        // Switch to Move History tab so the player can start immediately
+        navigateToTab('move-history-panel');
+      }
+
+      // ─── Chessboard Interface ──────────────────────────────────────────────────
+
       function loadChessboardInterface() {
         const chessboardHTML = `
         <header>
@@ -782,14 +972,45 @@
               <!-- TabPanel: Player Setup, Move History, Ask Expert & Strategy (Right) -->
               <div class="tab-panel">
                 <div class="tab-panel-list">
-                  <button class="tab-panel-button active" onclick="switchTab('player-setup-panel')">Player Setup</button>
+                  <button class="tab-panel-button active" onclick="switchTab('welcome-panel')">Welcome</button>
+                  <button class="tab-panel-button" onclick="switchTab('player-setup-panel')">Player Setup</button>
                   <button class="tab-panel-button" onclick="switchTab('move-history-panel')">Move History</button>
                   <button class="tab-panel-button" onclick="switchTab('expert-panel')">Ask Expert</button>
                   <button class="tab-panel-button" onclick="switchTab('comm-panel')">Comm</button>
                 </div>
 
+                <!-- Welcome Tab -->
+                <div id="welcome-panel" class="tab-panel-content" style="display: block;">
+                  <div style="text-align: center; padding: 8px 0 4px;">
+                    <span style="font-size: 2.2em; line-height: 1;">♟</span>
+                    <h3 style="margin: 4px 0 2px;">Welcome back, ${currentUser}!</h3>
+                    <p style="color: #666; margin: 0 0 4px; font-size: 0.88em;">What would you like to do?</p>
+                  </div>
+                  <div class="welcome-tab-grid">
+                    <button class="welcome-tab-btn wb-primary" onclick="startNewGame(); navigateToTab('player-setup-panel');">
+                      <span class="wb-icon">♙</span> Start New Game
+                    </button>
+                    <button class="welcome-tab-btn wb-continue" onclick="navigateToTab('player-setup-panel'); updateStatusBox('Configure players and press Start New Game.', 'info');">
+                      <span class="wb-icon">▶</span> Continue Game
+                    </button>
+                    <button class="welcome-tab-btn" onclick="showWelcomeInfo('openings')">
+                      <span class="wb-icon">📖</span> Practice Openings
+                    </button>
+                    <button class="welcome-tab-btn" onclick="showWelcomeInfo('endgames')">
+                      <span class="wb-icon">🏁</span> Practice Endgames
+                    </button>
+                    <button class="welcome-tab-btn" onclick="showWelcomeInfo('news')">
+                      <span class="wb-icon">📰</span> Chess News
+                    </button>
+                    <button class="welcome-tab-btn" onclick="showWelcomeInfo('joke')">
+                      <span class="wb-icon">😄</span> Chess Joke
+                    </button>
+                  </div>
+                  <div id="welcome-info-area"></div>
+                </div>
+
                 <!-- Player Setup Tab -->
-                <div id="player-setup-panel" class="tab-panel-content" style="display: block;">
+                <div id="player-setup-panel" class="tab-panel-content">
                   <h3 style="margin-top: 0;">Player Setup</h3>
                   
                   <!-- White Player Section -->
