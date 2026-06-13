@@ -421,6 +421,58 @@
       color: #aaa;
       cursor: not-allowed;
     }
+    /* Stats Tab */
+    .stats-summary-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .stats-summary-card {
+      text-align: center;
+      padding: 10px 6px;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+    }
+    .stats-summary-card .sc-value {
+      font-size: 1.8em;
+      font-weight: 700;
+      line-height: 1.1;
+    }
+    .stats-summary-card .sc-label {
+      font-size: 0.78em;
+      color: #777;
+      margin-top: 2px;
+    }
+    .stats-summary-card.sc-win  { background: #e8f5e9; border-color: #a5d6a7; }
+    .stats-summary-card.sc-win  .sc-value { color: #2e7d32; }
+    .stats-summary-card.sc-loss { background: #ffebee; border-color: #ef9a9a; }
+    .stats-summary-card.sc-loss .sc-value { color: #c62828; }
+    .stats-summary-card.sc-draw { background: #fff8e1; border-color: #ffe082; }
+    .stats-summary-card.sc-draw .sc-value { color: #f57f17; }
+    .stats-opponent-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85em;
+    }
+    .stats-opponent-table th {
+      background: #f5f5f5;
+      padding: 6px 8px;
+      text-align: left;
+      border-bottom: 2px solid #ddd;
+      font-weight: 600;
+    }
+    .stats-opponent-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #eee;
+      vertical-align: middle;
+    }
+    .stats-opponent-table tr:last-child td { border-bottom: none; }
+    .stats-opponent-table tr:hover td { background: #fafafa; }
+    .stat-w { color: #2e7d32; font-weight: 600; }
+    .stat-l { color: #c62828; font-weight: 600; }
+    .stat-d { color: #f57f17; font-weight: 600; }
+    .stats-empty { color: #999; font-size: 0.9em; text-align: center; padding: 20px 0; }
   </style>
 </head>
 <body>
@@ -439,6 +491,10 @@
         let commMessages = [];
         let capturedByWhite = []; // black pieces captured by White
         let capturedByBlack = []; // white pieces captured by Black
+        let playerStats = JSON.parse(localStorage.getItem('chessPlayerStats') || '{}');
+        let currentOpponent = null; // set at start of each game
+        let currentPlayerColor = null; // 'white' or 'black'
+        let gameResultRecorded = false;
 
     function checkAuthentication() {
       const token = localStorage.getItem('authToken');
@@ -890,6 +946,12 @@
         capturedByWhite = [];
         capturedByBlack = [];
 
+        // Track opponent for stats (same as startNewGame)
+        const whitePlayer = document.getElementById('white-player').value;
+        currentPlayerColor = (whitePlayer === 'human') ? 'white' : 'black';
+        currentOpponent = getOpponentLabel();
+        gameResultRecorded = false;
+
         if (board) {
           board.position(fen);
         }
@@ -914,7 +976,101 @@
         navigateToTab('move-history-panel');
       }
 
-      // ─── Chessboard Interface ──────────────────────────────────────────────────
+    // ─── Stats ────────────────────────────────────────────────────────────────
+
+    function getOpponentLabel() {
+      const whitePlayer = document.getElementById('white-player').value;
+      const blackPlayer = document.getElementById('black-player').value;
+      // The human plays as white if white=human, else plays as black
+      const humanIsWhite = (whitePlayer === 'human');
+      const aiSide = humanIsWhite ? 'black' : 'white';
+      const aiType = document.getElementById(aiSide + '-ai-type').value;
+      const aiLevel = document.getElementById(aiSide + '-skill-level').value;
+      if ((humanIsWhite && blackPlayer === 'ai') || (!humanIsWhite && whitePlayer === 'ai')) {
+        return `${aiType.charAt(0).toUpperCase() + aiType.slice(1)} (Level ${aiLevel})`;
+      }
+      // AI vs AI — label from white's perspective
+      const wType = document.getElementById('white-ai-type').value;
+      const wLevel = document.getElementById('white-skill-level').value;
+      return `AI vs AI — ${wType} L${wLevel}`;
+    }
+
+    function recordGameResult(result) {
+      // result: 'win' | 'loss' | 'draw' (from the human's perspective)
+      if (gameResultRecorded) return;
+      gameResultRecorded = true;
+      const key = currentOpponent || 'Unknown';
+      if (!playerStats[key]) {
+        playerStats[key] = { wins: 0, losses: 0, draws: 0, lastPlayed: null };
+      }
+      playerStats[key][result === 'win' ? 'wins' : result === 'loss' ? 'losses' : 'draws']++;
+      playerStats[key].lastPlayed = new Date().toLocaleDateString();
+      localStorage.setItem('chessPlayerStats', JSON.stringify(playerStats));
+    }
+
+    function renderStatsPanel() {
+      let totalWins = 0, totalLosses = 0, totalDraws = 0;
+      Object.values(playerStats).forEach(s => {
+        totalWins += s.wins || 0;
+        totalLosses += s.losses || 0;
+        totalDraws += s.draws || 0;
+      });
+      const wEl = document.getElementById('stat-total-wins');
+      const lEl = document.getElementById('stat-total-losses');
+      const dEl = document.getElementById('stat-total-draws');
+      if (wEl) wEl.textContent = totalWins;
+      if (lEl) lEl.textContent = totalLosses;
+      if (dEl) dEl.textContent = totalDraws;
+
+      const listEl = document.getElementById('stats-opponent-list');
+      if (!listEl) return;
+      const keys = Object.keys(playerStats);
+      if (keys.length === 0) {
+        listEl.innerHTML = '<p class="stats-empty">No games played yet.</p>';
+        return;
+      }
+      // Sort by total games descending
+      keys.sort((a, b) => {
+        const ta = (playerStats[a].wins + playerStats[a].losses + playerStats[a].draws);
+        const tb = (playerStats[b].wins + playerStats[b].losses + playerStats[b].draws);
+        return tb - ta;
+      });
+      let rows = keys.map(k => {
+        const s = playerStats[k];
+        const total = s.wins + s.losses + s.draws;
+        const pct = total > 0 ? Math.round((s.wins / total) * 100) : 0;
+        return `<tr>
+              <td><strong>${k}</strong></td>
+              <td class="stat-w">${s.wins}</td>
+              <td class="stat-l">${s.losses}</td>
+              <td class="stat-d">${s.draws}</td>
+              <td>${total}</td>
+              <td>${pct}%</td>
+              <td style="color:#aaa;font-size:0.85em;">${s.lastPlayed || '—'}</td>
+            </tr>`;
+      }).join('');
+      listEl.innerHTML = `<table class="stats-opponent-table">
+            <thead><tr>
+              <th>Opponent</th>
+              <th class="stat-w">W</th>
+              <th class="stat-l">L</th>
+              <th class="stat-d">D</th>
+              <th>Total</th>
+              <th>Win%</th>
+              <th>Last</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>`;
+    }
+
+    function clearStats() {
+      if (!confirm('Reset all stats? This cannot be undone.')) return;
+      playerStats = {};
+      localStorage.removeItem('chessPlayerStats');
+      renderStatsPanel();
+    }
+
+            // ─── Chessboard Interface ──────────────────────────────────────────────────
 
       function loadChessboardInterface() {
         const chessboardHTML = `
@@ -977,6 +1133,7 @@
                   <button class="tab-panel-button" onclick="switchTab('move-history-panel')">Move History</button>
                   <button class="tab-panel-button" onclick="switchTab('expert-panel')">Ask Expert</button>
                   <button class="tab-panel-button" onclick="switchTab('comm-panel')">Comm</button>
+                  <button class="tab-panel-button" onclick="switchTab('stats-panel'); renderStatsPanel();">Stats</button>
                 </div>
 
                 <!-- Welcome Tab -->
@@ -1127,6 +1284,20 @@
                   </div>
                 </div>
 
+                <!-- Stats Tab -->
+                <div id="stats-panel" class="tab-panel-content">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h3 style="margin:0;">My Stats</h3>
+                    <button onclick="clearStats()" style="padding:4px 10px; font-size:0.82em; background:#f44336; color:white; border:none; border-radius:3px; cursor:pointer;">Reset</button>
+                  </div>
+                  <div class="stats-summary-row">
+                    <div class="stats-summary-card sc-win"><div class="sc-value" id="stat-total-wins">0</div><div class="sc-label">Wins</div></div>
+                    <div class="stats-summary-card sc-loss"><div class="sc-value" id="stat-total-losses">0</div><div class="sc-label">Losses</div></div>
+                    <div class="stats-summary-card sc-draw"><div class="sc-value" id="stat-total-draws">0</div><div class="sc-label">Draws</div></div>
+                  </div>
+                  <div id="stats-opponent-list"><p class="stats-empty">No games played yet.</p></div>
+                </div>
+
                 <!-- Comm Tab -->
                 <div id="comm-panel" class="tab-panel-content">
                   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-shrink:0;">
@@ -1227,9 +1398,14 @@
                           if (game.in_checkmate()) {
                             status = game.turn() === 'w' ? 'Black wins by checkmate!' : 'White wins by checkmate!';
                             updateStatusBox(status, 'success');
+                            // Record result: human wins if the side that just got mated is NOT the human's side
+                            const humanWon = (currentPlayerColor === 'white' && game.turn() === 'b') ||
+                              (currentPlayerColor === 'black' && game.turn() === 'w');
+                            recordGameResult(humanWon ? 'win' : 'loss');
                           } else if (game.in_draw()) {
                             status = 'Game drawn!';
                             updateStatusBox(status, 'info');
+                            recordGameResult('draw');
                           } else if (game.in_check()) {
                             status = game.turn() === 'w' ? 'White is in check' : 'Black is in check';
                             updateStatusBox(status, 'info');
@@ -1296,6 +1472,11 @@
       function startNewGame() {
         const whitePlayer = document.getElementById('white-player').value;
         const blackPlayer = document.getElementById('black-player').value;
+
+        // Track opponent info and the human's color for stats
+        currentPlayerColor = (whitePlayer === 'human') ? 'white' : 'black';
+        currentOpponent = getOpponentLabel();
+        gameResultRecorded = false;
 
       game = new Chess();
       moveHistory = [];
