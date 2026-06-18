@@ -95,6 +95,16 @@ def init_db():
             VALUES (?, ?, ?, ?, ?)
         ''', ("admin", "admin@chess.local", password_hash, True, True))
         print("[AUTH] Created default admin user")
+
+    # Create default test user if not exists
+    cursor.execute("SELECT id FROM users WHERE username = ?", ("testuser",))
+    if not cursor.fetchone():
+        password_hash = bcrypt.hashpw(b"Chess123", bcrypt.gensalt()).decode()
+        cursor.execute('''
+            INSERT INTO users (username, email, password_hash, is_admin, is_verified)
+            VALUES (?, ?, ?, ?, ?)
+        ''', ("testuser", "testuser@chess.local", password_hash, False, True))
+        print("[AUTH] Created default test user")
     
     conn.commit()
     conn.close()
