@@ -35,6 +35,12 @@ The application is for people that are new to the game of chess and want to lear
 - **Move History**: Track all moves in algebraic notation
 - **Status Box**: Live feed of moves and engine responses
 - **FEN Notation**: View and track game state
+- **Captured Pieces & Material Advantage**: Live display of captured pieces with material score
+- **Opening & Defense Selection**: Configure White opening and Black defense strategy before each game
+- **Endgame Practice Drills**: Guided endgame positions (King & Pawn vs King, King & Rook vs King, Lucena Position, Philidor Position)
+- **Player Stats**: Win/loss/draw record per opponent, stored locally in the browser
+- **Chess News & Jokes**: Built-in rotating chess news articles and jokes
+- **Comm Log**: Diagnostics panel showing all API requests and responses
 - **User Authentication**: Secure JWT-based authentication with bcrypt hashing
 - **Unified User Storage**: Single SQLite database shared across all clients
 - **Admin Dashboard**: Manage users and system settings
@@ -95,9 +101,10 @@ Chess-ai-app/
 │   └── requirements.txt     # Python dependencies
 │
 ├── ui/                        # Web interface (Port 8080)
-│   ├── index.html           # Login/Register page
-│   ├── chessboard.html      # Main game interface
+│   ├── index.html           # Login/Register + game interface (single-page app)
 │   ├── admin.html           # Admin dashboard
+│   ├── game-play.ts         # Chessboard drag-and-drop logic (TypeScript)
+│   ├── player-selection.ts  # Player/opening/defense selection logic (TypeScript)
 │   ├── chessboard.js        # Chessboard library
 │   ├── chessboard.css       # Styling
 │   ├── img/                 # Chess piece images
@@ -220,8 +227,7 @@ python -m src.main
 
 | Service | URL | Description |
 |---------|-----|-------------|
-| **Chess UI** | http://localhost:8080 | Main web interface |
-| **Chessboard** | http://localhost:8080/chessboard.html | Game interface |
+| **Chess UI** | http://localhost:8080 | Login, registration & game interface |
 | **Admin Dashboard** | http://localhost:8080/admin.html | User management |
 | **Auth API** | http://localhost:8002 | Authentication service |
 | **Admin API** | http://localhost:8001 | Admin service |
@@ -415,11 +421,20 @@ Invoke-RestMethod -Uri "http://localhost:8000/move" `
 
 ### Web Interface
 
-1. Login at http://localhost:8080
-2. Select player types (Human/AI)
-3. Choose AI engine (Stockfish recommended)
-4. Set skill level (1-20)
-5. Click "Start New Game"
+1. Open http://localhost:8080 and log in
+2. After login the game interface loads automatically with a tabbed panel:
+
+| Tab | Description |
+|-----|-------------|
+| **Welcome** | Quick-start buttons: Start New Game, Practice Openings, Practice Endgames, Chess News, Chess Jokes |
+| **Player Setup** | Configure White/Black as Human or AI; select AI engine, skill level, opening and defense |
+| **Move History** | Full move list for the current game |
+| **Ask Expert** | Chat with the AI chess expert; quick-action buttons for position analysis |
+| **Stats** | Win/loss/draw record per opponent stored in the browser |
+| **Comm** | Diagnostics log of all API requests and responses |
+
+3. Go to the **Player Setup** tab, configure both players and click **Start New Game**
+4. Drag pieces to make moves; the AI responds automatically
 
 ### CLI Interface
 
@@ -700,8 +715,7 @@ CREATE TABLE users (
 
 | Service | URL |
 |---------|-----|
-| Login | http://localhost:8080 |
-| Play Chess | http://localhost:8080/chessboard.html |
+| Login / Play Chess | http://localhost:8080 |
 | Admin | http://localhost:8080/admin.html |
 
 ### Default Credentials

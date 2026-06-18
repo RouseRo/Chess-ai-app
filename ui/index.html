@@ -866,11 +866,31 @@
       ];
 
       const CHESS_NEWS_ITEMS = [
-        { title: "Magnus Carlsen Continues World Blitz Dominance", body: "The Norwegian legend secured yet another blitz title, showing no signs of slowing down despite stepping back from classical chess." },
-        { title: "AI Surpasses Grandmasters in Correspondence Chess", body: "Modern AI engines now evaluate positions to depths that no human can verify, raising new questions about computer-assisted play." },
-        { title: "Record Prize Fund at Candidates Tournament 2025", body: "FIDE announced the largest-ever prize pool for the Candidates Tournament, attracting unprecedented global attention." },
-        { title: "Chess Popularity Surges Among Gen Z", body: "Following the success of 'The Queen's Gambit' and online platforms, chess sees its highest youth participation numbers in decades." },
-        { title: "New Opening Theory: The Anti-London Variation", body: "Top theoreticians are publishing fresh ideas against the London System, as Black players seek dynamic counterplay." }
+        {
+          title: "Magnus Carlsen Continues World Blitz Dominance",
+          body: "The Norwegian legend secured yet another blitz title, showing no signs of slowing down despite stepping back from classical chess.",
+          details: "Magnus Carlsen has solidified his status as the undisputed king of rapid and blitz chess. Despite abdicating the Classical World Championship title in 2023, Carlsen continues to dominate elite events across all time controls. In the most recent Grand Chess Tour events, Carlsen outclassed a field that included World Champion Ding Liren, Fabiano Caruana, and rising star Praggnanandhaa. His exceptional calculation speed, endgame mastery, and competitive drive make him the benchmark all other players are measured against. His victories in rapid and blitz events — including the Superbet Rapid &amp; Blitz Poland — reaffirm his status as the planet's strongest all-around player."
+        },
+        {
+          title: "AI Surpasses Grandmasters in Correspondence Chess",
+          body: "Modern AI engines now evaluate positions to depths that no human can verify, raising new questions about computer-assisted play.",
+          details: "The rise of neural network-based engines like Stockfish 16 and its successors has transformed correspondence chess. These engines evaluate positions at depths exceeding 40 plies, uncovering refutations to long-established opening theory. The International Correspondence Chess Federation (ICCF) has introduced strict anti-cheating measures as the boundary between human creativity and engine assistance becomes increasingly blurred. Many top correspondents argue that the future of the format lies in embracing AI as a collaborative tool, mirroring how other competitive fields have adapted to technological advancement. New questions about what constitutes \"human play\" are now central to the sport's governing bodies."
+        },
+        {
+          title: "Record Prize Fund at Candidates Tournament 2025",
+          body: "FIDE announced the largest-ever prize pool for the Candidates Tournament, attracting unprecedented global attention.",
+          details: "FIDE's announcement of a record-breaking prize fund signals a new era of professional chess investment. The Candidates Tournament features eight of the world's top players competing in a double round-robin format, with the winner earning the right to challenge the reigning World Champion. The increased prize money reflects the growing commercial appeal of chess, driven by streaming platforms, record online viewership, and major sponsor interest. Players such as Gukesh Dommaraju — the youngest-ever Candidates winner at just 17 — Fabiano Caruana, Hikaru Nakamura, and Alireza Firouzja are at the centre of the competition. The tournament is broadcast live with AI-powered commentary for a global audience."
+        },
+        {
+          title: "Chess Popularity Surges Among Gen Z",
+          body: "Following the success of 'The Queen's Gambit' and online platforms, chess sees its highest youth participation numbers in decades.",
+          details: "Chess.com and Lichess have both reported record-breaking new account registrations, with the majority of new players under the age of 25. The Netflix series 'The Queen's Gambit' sparked a cultural moment that mainstream media has sustained for years. Schools and youth programs report waiting lists for chess clubs that were half-empty a decade ago. Top streamers like Hikaru Nakamura and GothamChess (Levy Rozman) have made learning chess entertaining and accessible, attracting millions of viewers who go on to become active players. FIDE has launched youth development initiatives in response, aiming to identify and train the next generation of grandmasters from India, the US, and beyond."
+        },
+        {
+          title: "New Opening Theory: The Anti-London Variation",
+          body: "Top theoreticians are publishing fresh ideas against the London System, as Black players seek dynamic counterplay.",
+          details: "The London System (1.d4 2.Nf3 3.Bf4) has become one of the most popular openings at all levels due to its solid, low-theory nature. However, Black players at the top level have been developing sharp, dynamic responses to unbalance the game early. Ideas involving ...c5, ...Nc6, and early queenside expansion have been shown to yield rich middlegame play with full equality. Grandmasters like Maxime Vachier-Lagrave and Ian Nepomniachtchi have published analysis demonstrating that Black can achieve dynamic counterplay with precise preparation. Opening preparation software has accelerated this theoretical arms race, with new ideas being shared and refined within days of publication at the elite level."
+        }
       ];
 
       function navigateToTab(tabName) {
@@ -900,7 +920,7 @@
           area.innerHTML = `<h4>♟ Chess Joke</h4><p style="margin:0;">${joke}</p>`;
         } else if (type === 'news') {
           const item = CHESS_NEWS_ITEMS[Math.floor(Math.random() * CHESS_NEWS_ITEMS.length)];
-          area.innerHTML = `<h4>📰 ${item.title}</h4><p style="margin:0;">${item.body}</p>`;
+          area.innerHTML = `<h4>📰 ${item.title}</h4><p style="margin:0 0 8px;">${item.body}</p><div id="news-details" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid #ddd;color:#444;line-height:1.6;font-size:0.92em;">${item.details}</div><a href="#" id="news-read-more" onclick="toggleNewsDetails(event)" style="font-size:0.85em;color:#1565c0;text-decoration:none;font-weight:500;">Read More →</a>`;
         } else if (type === 'openings') {
           area.innerHTML = `<h4>📖 Practice Openings</h4>
               <ul>
@@ -925,9 +945,41 @@
                   <span style="font-size:1.2em;">♙</span>
                   <span><strong>King &amp; Pawn vs King</strong><br><small>Opposition &amp; key squares</small></span>
                 </button>
-                <button class="endgame-drill-btn endgame-drill-locked" disabled title="Coming soon">
+                <button class="endgame-drill-btn" onclick="loadEndgamePosition(
+                  '4k3/8/8/8/4K3/8/8/R7 w - - 0 1',
+                  'King &amp; Rook vs King',
+                  ['White to move. Drive the black king to the edge and deliver checkmate.',
+                   'Tip: Use your king actively — the rook alone cannot force mate.',
+                   'Key concept: Cut off the black king rank by rank using the rook.',
+                   'Bring your king toward the black king to tighten the net.',
+                   'Final mate typically occurs on the edge or corner of the board.']
+                )">
                   <span style="font-size:1.2em;">♖</span>
-                  <span><strong>Rook Endgames</strong><br><small>Lucena &amp; Philidor — coming soon</small></span>
+                  <span><strong>King &amp; Rook vs King</strong><br><small>Basic mating pattern</small></span>
+                </button>
+                <button class="endgame-drill-btn" onclick="loadEndgamePosition(
+                  '1K1k4/1P6/8/8/8/8/r7/2R5 w - - 0 1',
+                  'Lucena Position',
+                  ['White to move and win. The pawn is on the 7th rank — promote it!',
+                   'Key technique: Build a bridge to shelter your king from rook checks.',
+                   'Step 1: Play Rc4 to prepare to block the black rook\'s checks.',
+                   'Step 2: Advance your king from b8 with the rook shielding on c4.',
+                   'Step 3: Once the king is safe, the pawn will queen.']
+                )">
+                  <span style="font-size:1.2em;">♖</span>
+                  <span><strong>Lucena Position</strong><br><small>Build a bridge — winning technique</small></span>
+                </button>
+                <button class="endgame-drill-btn" onclick="loadEndgamePosition(
+                  '4k3/8/r7/4PK2/8/8/8/5R2 b - - 0 1',
+                  'Philidor Position',
+                  ['Black to move and draw! This is the classic Philidor defensive technique.',
+                   'Key concept: Keep your rook on the 6th rank (rank 3) to cut off White\'s king.',
+                   'Do NOT let the white king advance past the 6th rank.',
+                   'When the pawn advances to e6, switch immediately to checking from behind (Ra1, Rb1 etc).',
+                   'Checks from behind force the white king in front of the pawn, blocking its own rook.']
+                )">
+                  <span style="font-size:1.2em;">♖</span>
+                  <span><strong>Philidor Position</strong><br><small>Drawing defence with a rook</small></span>
                 </button>
                 <button class="endgame-drill-btn endgame-drill-locked" disabled title="Coming soon">
                   <span style="font-size:1.2em;">♕</span>
@@ -937,6 +989,16 @@
         }
         area.classList.add('visible');
       }
+
+          function toggleNewsDetails(e) {
+            e.preventDefault();
+            const details = document.getElementById('news-details');
+            const link = document.getElementById('news-read-more');
+            if (!details || !link) return;
+            const expanded = details.style.display !== 'none';
+            details.style.display = expanded ? 'none' : 'block';
+            link.textContent = expanded ? 'Read More \u2192' : '\u2190 Show Less';
+          }
 
       function loadEndgamePosition(fen, title, hints) {
         // Reset game state to the given FEN
