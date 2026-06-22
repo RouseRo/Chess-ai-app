@@ -6,7 +6,7 @@ import os
 import sqlite3
 import bcrypt
 import json
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 app = FastAPI(
     title="Chess AI Admin Service",
@@ -39,6 +39,12 @@ class UserResponse(BaseModel):
     is_admin: bool
     verified: bool
     games_count: int
+    last_login: Optional[str] = None
+    last_activity: Optional[str] = None
+    current_activity: Optional[str] = None
+    is_online: bool = False
+    status_label: str = "Offline"
+    game_status: str = ""
 
 class UserDetailResponse(BaseModel):
     username: str
@@ -84,6 +90,87 @@ def get_user(username: str) -> Optional[dict]:
     except Exception as e:
         print(f"Error reading user: {e}")
         return None
+
+def _get_game_status(username: str, conn) -> str:
+    """Derive a human-readable game activity status from recent community messages."""
+    try:
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+        cursor = conn.cursor()
+
+        # Ensure table exists before querying
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS community_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sender TEXT NOT NULL,
+                content TEXT NOT NULL,
+                message_type TEXT DEFAULT 'chat',
+                target_users TEXT DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        events = []
+
+        # Did this user send a game invite?
+        cursor.execute(
+            """SELECT target_users, created_at FROM community_messages
+               WHERE sender = ? AND message_type = 'game_invite' AND created_at >= ?
+               ORDER BY created_at DESC LIMIT 1""",
+            (username, cutoff)
+        )
+        invite_sent = cursor.fetchone()
+        if invite_sent:
+            try:
+                targets = json.loads(invite_sent["target_users"] or "[]")
+                target = next((t for t in targets if t != username), None)
+            except Exception:
+                target = None
+            label = f"Invited {target} to play chess" if target else "Sent a game invitation"
+            events.append((invite_sent["created_at"], label))
+
+        # Did this user accept an invite (sent a DM with acceptance text)?
+        cursor.execute(
+            """SELECT content, target_users, created_at FROM community_messages
+               WHERE sender = ? AND message_type = 'dm'
+               AND content LIKE '%I accepted your game invitation%' AND created_at >= ?
+               ORDER BY created_at DESC LIMIT 1""",
+            (username, cutoff)
+        )
+        acceptance_sent = cursor.fetchone()
+        if acceptance_sent:
+            content = acceptance_sent["content"]
+            color = "White" if "play as White" in content else ("Black" if "play as Black" in content else "?")
+            try:
+                targets = json.loads(acceptance_sent["target_users"] or "[]")
+                inviter = next((t for t in targets if t != username), None)
+            except Exception:
+                inviter = None
+            label = f"Accepted invite from {inviter}, playing as {color}" if inviter else f"Accepted an invite, playing as {color}"
+            events.append((acceptance_sent["created_at"], label))
+
+        # Did this user receive an acceptance DM?
+        cursor.execute(
+            """SELECT sender, content, created_at FROM community_messages
+               WHERE message_type = 'dm' AND target_users LIKE ?
+               AND content LIKE '%I accepted your game invitation%' AND created_at >= ?
+               ORDER BY created_at DESC LIMIT 1""",
+            (f'%"{username}"%', cutoff)
+        )
+        acceptance_received = cursor.fetchone()
+        if acceptance_received:
+            content = acceptance_received["content"]
+            accepter = acceptance_received["sender"]
+            color = "White" if "play as White" in content else ("Black" if "play as Black" in content else "?")
+            events.append((acceptance_received["created_at"], f"Invite accepted by {accepter} ({color})"))
+
+        if not events:
+            return ""
+        events.sort(key=lambda x: x[0], reverse=True)
+        return events[0][1]
+    except Exception as e:
+        print(f"[game_status] Error for {username}: {e}")
+        return ""
+
 
 def list_all_users() -> list:
     """List all users from database."""
@@ -268,9 +355,42 @@ async def get_ai_models():
 async def get_all_users():
     """Get list of all users."""
     users = list_all_users()
-    
+    now = datetime.now(timezone.utc)
+    # Open a single connection for game status queries across all users
+    try:
+        _gs_conn = get_db_connection()
+        _gs_conn.row_factory = sqlite3.Row
+    except Exception:
+        _gs_conn = None
+
     user_responses = []
     for user in users:
+        last_activity = user.get("last_activity")
+        current_activity = user.get("current_activity") or "offline"
+        is_online = False
+        status_label = "Offline"
+
+        if last_activity:
+            try:
+                dt = datetime.fromisoformat(last_activity)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                minutes_ago = (now - dt).total_seconds() / 60
+                if minutes_ago <= 5:
+                    is_online = True
+                    if current_activity == "playing":
+                        status_label = "Playing a Game"
+                    else:
+                        status_label = "Online"
+                elif minutes_ago <= 60:
+                    mins = int(minutes_ago)
+                    status_label = f"Last seen {mins}m ago"
+                else:
+                    hours = int(minutes_ago / 60)
+                    status_label = f"Last seen {hours}h ago"
+            except Exception:
+                pass
+
         user_responses.append(
             UserResponse(
                 username=user.get("username"),
@@ -278,10 +398,18 @@ async def get_all_users():
                 created_at=user.get("created_at", ""),
                 is_admin=bool(user.get("is_admin", 0)),
                 verified=bool(user.get("is_verified", 0)),
-                games_count=user.get("games_count", 0)
+                games_count=user.get("games_count", 0),
+                last_login=user.get("last_login"),
+                last_activity=last_activity,
+                current_activity=current_activity,
+                is_online=is_online,
+                status_label=status_label,
+                game_status=_get_game_status(user.get("username"), _gs_conn) if _gs_conn else ""
             )
         )
-    
+
+    if _gs_conn:
+        _gs_conn.close()
     return user_responses
 
 @app.get("/admin/users/{username}", response_model=UserDetailResponse)

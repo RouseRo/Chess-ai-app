@@ -473,6 +473,88 @@
     .stat-l { color: #c62828; font-weight: 600; }
     .stat-d { color: #f57f17; font-weight: 600; }
     .stats-empty { color: #999; font-size: 0.9em; text-align: center; padding: 20px 0; }
+    /* Community Tab */
+    #community-panel { display: flex; flex-direction: column; min-height: 0; gap: 0; }
+    .community-layout { display: flex; gap: 10px; flex: 1; min-height: 0; }
+    .community-users-sidebar {
+      width: 130px; flex-shrink: 0; border: 1px solid #e0e0e0; border-radius: 4px;
+      background: #fafafa; overflow-y: auto; padding: 6px 0;
+    }
+    .community-users-sidebar h4 { font-size: 0.78em; color: #888; text-transform: uppercase;
+      padding: 0 8px 6px; margin: 0; border-bottom: 1px solid #eee; }
+    .community-user-item { display: flex; align-items: center; gap: 6px; padding: 5px 8px; font-size: 0.85em; }
+    .community-user-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .cu-online  { background: #4CAF50; }
+    .cu-playing { background: #ff9800; }
+    .cu-me { font-weight: 700; color: #1565c0; }
+    .community-chat-area { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .community-messages {
+      flex: 1; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 4px;
+      padding: 8px; background: white; font-size: 0.88em; line-height: 1.5; min-height: 0;
+    }
+    .comm-msg { padding: 4px 6px; border-radius: 4px; margin-bottom: 4px; }
+    .comm-msg-chat { background: #f5f5f5; }
+    .comm-msg-chat.comm-msg-own { background: #e3f2fd; }
+    .comm-msg-announcement {
+      background: #fff8e1; border-left: 3px solid #ff9800;
+      font-weight: 500; padding: 6px 8px; margin-bottom: 6px;
+    }
+    .comm-msg-header { display: flex; justify-content: space-between; font-size: 0.82em; color: #888; margin-bottom: 1px; }
+    .comm-msg-sender { font-weight: 600; color: #333; }
+    .comm-msg-announcement .comm-msg-sender { color: #e65100; }
+    .comm-msg-announcement .comm-msg-header::before { content: '📢 '; }
+    .comm-msg-text { word-break: break-word; }
+    .community-input-row { display: flex; gap: 6px; margin-top: 6px; flex-shrink: 0; }
+    .community-input-row input {
+      flex: 1; padding: 7px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9em;
+    }
+    .community-send-btn {
+      padding: 7px 14px; background: #2196F3; color: white; border: none;
+      border-radius: 4px; cursor: pointer; font-weight: 500; font-size: 0.9em;
+    }
+    .community-send-btn:hover { background: #1976D2; }
+    .comm-empty { color: #999; font-size: 0.88em; text-align: center; padding: 20px 0; }
+    .comm-unread-badge {
+      display: inline-block; background: #f44336; color: white; border-radius: 10px;
+      font-size: 0.7em; padding: 1px 5px; margin-left: 4px; vertical-align: middle; line-height: 1.4;
+    }
+    /* Direct Message styling */
+    .comm-msg-dm { background: #f3e5f5; border-left: 3px solid #9c27b0; }
+    .comm-msg-dm .comm-msg-sender { color: #6a1b9a; }
+    .comm-msg-dm-tag { font-size: 0.72em; background: #9c27b0; color: white; border-radius: 3px; padding: 1px 4px; margin-left: 4px; vertical-align: middle; }
+    /* Game invite styling */
+    .comm-msg-game-invite { background: #e8f5e9; border-left: 3px solid #4CAF50; padding: 8px 10px; margin-bottom: 4px; border-radius: 4px; font-size: 0.9em; }
+    .game-invite-actions { display: flex; gap: 6px; margin-top: 6px; }
+    .game-invite-accept-btn { padding: 4px 12px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em; font-weight: 500; }
+    .game-invite-accept-btn:hover { background: #388e3c; }
+    .game-invite-decline-btn { padding: 4px 12px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em; font-weight: 500; }
+    .game-invite-decline-btn:hover { background: #c62828; }
+    /* Color choice modal */
+    .color-choice-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+    .color-choice-modal { background: #fff; border-radius: 8px; padding: 24px; max-width: 340px; width: 90%; box-shadow: 0 8px 32px rgba(0,0,0,0.25); }
+    .color-choice-modal h3 { margin: 0 0 8px; font-size: 1.1em; }
+    .color-choice-modal p { margin: 0 0 16px; color: #555; font-size: 0.9em; }
+    .color-choice-options { display: flex; flex-direction: column; gap: 8px; }
+    .color-choice-btn { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 2px solid #e0e0e0; border-radius: 6px; background: #fafafa; cursor: pointer; font-size: 0.95em; font-weight: 600; color: #333; transition: all 0.15s; width: 100%; }
+    .color-choice-btn:hover { background: #f0f0f0; border-color: #aaa; }
+    .color-choice-btn.ccb-white { border-color: #bbb; background: #fff; }
+    .color-choice-btn.ccb-white:hover { background: #f5f5f5; border-color: #888; }
+    .color-choice-btn.ccb-black { border-color: #444; background: #333; color: #fff; }
+    .color-choice-btn.ccb-black:hover { background: #111; border-color: #000; }
+    .color-choice-btn.ccb-random { border-color: #2196F3; background: #e3f2fd; color: #1565c0; }
+    .color-choice-btn.ccb-random:hover { background: #bbdefb; border-color: #1565c0; }
+    .color-choice-cancel { margin-top: 10px; width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer; color: #666; font-size: 0.88em; }
+    .color-choice-cancel:hover { background: #f5f5f5; }
+    /* User action buttons in sidebar */
+    .user-actions { display: none; gap: 3px; margin-left: auto; }
+    .community-user-item:hover .user-actions { display: flex; }
+    .user-action-btn { padding: 2px 5px; font-size: 0.72em; border: 1px solid #ddd; border-radius: 3px; cursor: pointer; background: white; line-height: 1.3; }
+    .user-action-btn:hover { background: #e3f2fd; border-color: #90caf9; }
+    /* DM compose area */
+    #dm-compose { display: none; background: #f3e5f5; border: 1px solid #ce93d8; border-radius: 4px; padding: 6px 8px; margin-top: 6px; flex-shrink: 0; }
+    #dm-compose .dm-compose-header { font-size: 0.82em; color: #6a1b9a; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+    #dm-compose .dm-input-row { display: flex; gap: 5px; }
+    #dm-compose-input { flex: 1; padding: 5px 8px; border: 1px solid #ce93d8; border-radius: 4px; font-size: 0.9em; }
   </style>
 </head>
 <body>
@@ -495,6 +577,16 @@
         let currentOpponent = null; // set at start of each game
         let currentPlayerColor = null; // 'white' or 'black'
         let gameResultRecorded = false;
+          // H vs H board sync
+          let syncGameId = null;
+          let isSyncGame = false;
+          let syncMyColor = null;   // 'white' or 'black' for the current user in a sync game
+          let lastSyncFen = null;
+          let syncPollInterval = null;
+          let respondedInvites = new Set(JSON.parse(localStorage.getItem('respondedInvites') || '[]'));
+          let dmRecipient = null;
+          let _pendingInviteId = null;
+          let _pendingInviterUsername = null;
 
     function checkAuthentication() {
       const token = localStorage.getItem('authToken');
@@ -744,6 +836,374 @@
           if (badge) badge.textContent = '(0 messages)';
         }
 
+                          // ─── Community Panel ──────────────────────────────────────────────────
+
+                          let communityMessages = [];
+                          let communityLastId = 0;
+                          let communityPollTimer = null;
+                          let communityUsersPollTimer = null;
+                          let communityTabOpen = false;
+                          let communityUnreadCount = 0;
+                          let communityHideBefore = parseInt(localStorage.getItem('communityHideBefore') || '0', 10);
+
+                          function openCommunityTab() {
+                            communityTabOpen = true;
+                            communityUnreadCount = 0;
+                            renderCommunityUnreadBadge();
+                            refreshCommunityMessages();
+                            refreshOnlineUsers();
+                            if (!communityPollTimer) {
+                              communityPollTimer = setInterval(refreshCommunityMessages, 5000);
+                            }
+                            if (!communityUsersPollTimer) {
+                              communityUsersPollTimer = setInterval(refreshOnlineUsers, 12000);
+                            }
+                          }
+
+                          function closeCommunityTab() {
+                            communityTabOpen = false;
+                          }
+
+                          function renderCommunityUnreadBadge() {
+                            const badge = document.getElementById('community-unread-badge');
+                            if (!badge) return;
+                            if (communityUnreadCount > 0) {
+                              badge.textContent = communityUnreadCount > 9 ? '9+' : communityUnreadCount;
+                              badge.style.display = 'inline-block';
+                            } else {
+                              badge.style.display = 'none';
+                            }
+                          }
+
+                          function refreshCommunityMessages() {
+                            if (!authToken) return;
+                            fetch('http://localhost:8002/community/messages?limit=60', {
+                              headers: { 'Authorization': 'Bearer ' + authToken }
+                            })
+                              .then(r => r.json())
+                              .then(data => {
+                                if (!data.success) return;
+                                const msgs = data.messages || [];
+                                // Find any new messages since our last known id
+                                const newMsgs = msgs.filter(m => m.id > communityLastId);
+                                if (newMsgs.length > 0) {
+                                  communityMessages = msgs;
+                                  communityLastId = msgs.length > 0 ? Math.max(...msgs.map(m => m.id)) : communityLastId;
+                                  renderCommunityMessages();
+                                  if (!communityTabOpen) {
+                                    communityUnreadCount += newMsgs.length;
+                                    renderCommunityUnreadBadge();
+                                  }
+                                } else if (communityMessages.length === 0 && msgs.length > 0) {
+                                  communityMessages = msgs;
+                                  communityLastId = Math.max(...msgs.map(m => m.id));
+                                  renderCommunityMessages();
+                                } else if (communityMessages.length === 0) {
+                                  communityLastId = 0;
+                                }
+                              })
+                              .catch(() => { });
+                          }
+
+                          function clearCommunityMessages() {
+                            communityHideBefore = Date.now();
+                            localStorage.setItem('communityHideBefore', communityHideBefore);
+                            renderCommunityMessages();
+                          }
+
+                          function renderCommunityMessages() {
+                            const container = document.getElementById('community-messages');
+                            if (!container) return;
+                            const visible = communityMessages.filter(m => new Date(m.created_at).getTime() >= communityHideBefore);
+                            if (visible.length === 0) {
+                              container.innerHTML = '<div class="comm-empty">No messages yet. Say hello!</div>';
+                              return;
+                            }
+                            const html = visible.map(m => {
+                              const isOwn = m.sender === currentUser;
+                              const isAnn = m.message_type === 'announcement';
+                              const isDm = m.message_type === 'dm';
+                              const isInvite = m.message_type === 'game_invite';
+                              const time = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                              const safeContent = m.content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                              const safeSender = m.sender.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+                              if (isInvite) {
+                                const alreadyResponded = respondedInvites.has(m.id);
+                                const buttonsHtml = (!isOwn && !alreadyResponded)
+                                  ? `<div class="game-invite-actions">
+                       <button class="game-invite-accept-btn" onclick="acceptGameInvite(${m.id})">✓ Accept</button>
+                       <button class="game-invite-decline-btn" onclick="declineGameInvite(${m.id})">✗ Decline</button>
+                     </div>`
+                                  : (alreadyResponded ? '<div style="color:#888;font-size:0.82em;margin-top:4px;">Responded</div>' : '');
+                                return `<div class="comm-msg comm-msg-game-invite">
+                  <div class="comm-msg-header"><span class="comm-msg-sender">♟ Game Invitation from ${safeSender}</span><span>${time}</span></div>
+                  <div class="comm-msg-text">${safeSender} has invited you to play chess!</div>
+                  ${buttonsHtml}
+                </div>`;
+                              }
+
+                              if (isDm) {
+                                const targets = m.target_users || [];
+                                const otherUser = targets.find(u => u !== currentUser) || m.sender;
+                                const safeOther = otherUser.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                const dmLabel = isOwn ? `You → ${safeOther}` : safeSender;
+                                const isAcceptanceDm = !isOwn && m.content.includes('I accepted your game invitation!');
+                                const acceptanceBtn = isAcceptanceDm
+                                  ? `<div class="game-invite-actions"><button class="game-invite-accept-btn" onclick="setupGameFromAcceptance(${m.id})">♟ Set Up Game</button></div>`
+                                  : '';
+                                return `<div class="comm-msg comm-msg-dm${isOwn ? ' comm-msg-own' : ''}">
+                  <div class="comm-msg-header">
+                    <span class="comm-msg-sender">${dmLabel}<span class="comm-msg-dm-tag">DM</span></span>
+                    <span>${time}</span>
+                  </div>
+                  <div class="comm-msg-text">${safeContent}</div>
+                  ${acceptanceBtn}
+                </div>`;
+                              }
+
+                              const cls = isAnn ? 'comm-msg comm-msg-announcement'
+                                : ('comm-msg comm-msg-chat' + (isOwn ? ' comm-msg-own' : ''));
+                              return `<div class="${cls}">
+              <div class="comm-msg-header"><span class="comm-msg-sender">${safeSender}</span><span>${time}</span></div>
+              <div class="comm-msg-text">${safeContent}</div>
+            </div>`;
+                            }).join('');
+                            const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 60;
+                            container.innerHTML = html;
+                            if (atBottom) container.scrollTop = container.scrollHeight;
+                          }
+
+                          function sendCommunityMessage() {
+                            const input = document.getElementById('community-input');
+                            if (!input) return;
+                            const content = input.value.trim();
+                            if (!content || !authToken) return;
+                            input.value = '';
+                            fetch('http://localhost:8002/community/messages', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                              body: JSON.stringify({ content })
+                            })
+                              .then(r => r.json())
+                              .then(data => {
+                                if (data.success) refreshCommunityMessages();
+                              })
+                              .catch(() => { });
+                          }
+
+                          // ─── Direct Messages & Game Invites ──────────────────────────────────
+
+                          function openDmCompose(recipient) {
+                            dmRecipient = recipient;
+                            const compose = document.getElementById('dm-compose');
+                            const label = document.getElementById('dm-recipient-label');
+                            if (label) label.textContent = recipient;
+                            if (compose) { compose.style.display = 'block'; }
+                            const input = document.getElementById('dm-compose-input');
+                            if (input) { input.value = ''; input.focus(); }
+                          }
+
+                          function closeDmCompose() {
+                            dmRecipient = null;
+                            const compose = document.getElementById('dm-compose');
+                            if (compose) compose.style.display = 'none';
+                          }
+
+                          function sendDm() {
+                            if (!dmRecipient || !authToken) return;
+                            const input = document.getElementById('dm-compose-input');
+                            if (!input) return;
+                            const content = input.value.trim();
+                            if (!content) return;
+                            input.value = '';
+                            fetch('http://localhost:8002/community/dm', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                              body: JSON.stringify({ recipient: dmRecipient, content })
+                            })
+                              .then(r => r.json())
+                              .then(data => {
+                                if (data.success) {
+                                  closeDmCompose();
+                                  refreshCommunityMessages();
+                                } else {
+                                  alert(data.message || 'Failed to send message.');
+                                }
+                              })
+                              .catch(() => alert('Network error. Could not send message.'));
+                          }
+
+                          function sendGameInvite(recipient) {
+                            if (!authToken) return;
+                            fetch('http://localhost:8002/community/game-invite', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                              body: JSON.stringify({ recipient })
+                            })
+                              .then(r => r.json())
+                              .then(data => {
+                                if (data.success) {
+                                  refreshCommunityMessages();
+                                  updateStatusBox('Game invitation sent to ' + recipient, 'success');
+                                } else {
+                                  alert(data.message || 'Failed to send game invitation.');
+                                }
+                              })
+                              .catch(() => alert('Network error. Could not send game invitation.'));
+                          }
+
+                          function acceptGameInvite(inviteId) {
+                            const invite = communityMessages.find(m => m.id === inviteId);
+                            const inviterUsername = invite ? invite.sender : '';
+                            _pendingInviteId = inviteId;
+                            _pendingInviterUsername = inviterUsername;
+                            document.getElementById('color-choice-inviter').textContent = inviterUsername || 'your opponent';
+                            document.getElementById('color-choice-overlay').style.display = 'flex';
+                          }
+
+                          function closeColorChoiceModal() {
+                            document.getElementById('color-choice-overlay').style.display = 'none';
+                            _pendingInviteId = null;
+                            _pendingInviterUsername = null;
+                          }
+
+                          function confirmColorChoice(colorPref) {
+                            const inviteId = _pendingInviteId;
+                            const inviterUsername = _pendingInviterUsername;
+                            closeColorChoiceModal();
+
+                            // Resolve random to a definite color
+                            const resolvedColor = colorPref === 'random'
+                              ? (Math.random() < 0.5 ? 'white' : 'black')
+                              : colorPref;
+                            const opponentColor = resolvedColor === 'white' ? 'black' : 'white';
+                            const myLabel = resolvedColor === 'white' ? 'White ♔' : 'Black ♚';
+                            const opponentLabel = opponentColor === 'white' ? 'White ♔' : 'Black ♚';
+                            const randomNote = colorPref === 'random' ? ' (randomly assigned)' : '';
+
+                            // Mark invite as responded
+                            respondedInvites.add(inviteId);
+                            localStorage.setItem('respondedInvites', JSON.stringify([...respondedInvites]));
+
+                            // Pre-configure Player Setup: both players are human
+                            const whiteEl = document.getElementById('white-player');
+                            const blackEl = document.getElementById('black-player');
+                            if (whiteEl) whiteEl.value = 'human';
+                            if (blackEl) blackEl.value = 'human';
+                            if (typeof updatePlayerConfig === 'function') updatePlayerConfig();
+
+                            // Set player names based on who accepted which color
+                            const whiteNameEl = document.getElementById('white-human-name');
+                            const blackNameEl = document.getElementById('black-human-name');
+                            if (resolvedColor === 'white') {
+                              if (whiteNameEl) whiteNameEl.value = currentUser || '';
+                              if (blackNameEl) blackNameEl.value = inviterUsername || '';
+                            } else {
+                              if (whiteNameEl) whiteNameEl.value = inviterUsername || '';
+                              if (blackNameEl) blackNameEl.value = currentUser || '';
+                            }
+                            if (typeof updatePlayerDisplay === 'function') updatePlayerDisplay();
+
+                            // Notify inviter via DM
+                            if (authToken && inviterUsername) {
+                              const dmContent = `I accepted your game invitation! I will play as ${myLabel}${randomNote} — you will play as ${opponentLabel}.`;
+                              fetch('http://localhost:8002/community/dm', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                                body: JSON.stringify({ recipient: inviterUsername, content: dmContent })
+                              }).catch(() => { });
+                            }
+
+                            renderCommunityMessages();
+                            navigateToTab('player-setup-panel');
+                            updateStatusBox(
+                              `Game accepted! You are playing as ${myLabel}${randomNote}. ${inviterUsername} will play as ${opponentLabel}.`,
+                              'success'
+                            );
+                          }
+
+                          function setupGameFromAcceptance(msgId) {
+                            const msg = communityMessages.find(m => m.id === msgId);
+                            if (!msg) return;
+                            const accepterUsername = msg.sender;
+                            const myColor = msg.content.includes('you will play as White') ? 'white' : 'black';
+
+                            const whiteEl = document.getElementById('white-player');
+                            const blackEl = document.getElementById('black-player');
+                            if (whiteEl) whiteEl.value = 'human';
+                            if (blackEl) blackEl.value = 'human';
+                            if (typeof updatePlayerConfig === 'function') updatePlayerConfig();
+
+                            const whiteNameEl = document.getElementById('white-human-name');
+                            const blackNameEl = document.getElementById('black-human-name');
+                            if (myColor === 'white') {
+                              if (whiteNameEl) whiteNameEl.value = currentUser || '';
+                              if (blackNameEl) blackNameEl.value = accepterUsername || '';
+                            } else {
+                              if (whiteNameEl) whiteNameEl.value = accepterUsername || '';
+                              if (blackNameEl) blackNameEl.value = currentUser || '';
+                            }
+                            if (typeof updatePlayerDisplay === 'function') updatePlayerDisplay();
+
+                            navigateToTab('player-setup-panel');
+                            updateStatusBox(
+                              `Game setup ready! You are playing as ${myColor === 'white' ? 'White ♔' : 'Black ♚'}. ${accepterUsername} will play as ${myColor === 'white' ? 'Black ♚' : 'White ♔'}.`,
+                              'success'
+                            );
+                          }
+
+                          function declineGameInvite(inviteId) {
+                            const invite = communityMessages.find(m => m.id === inviteId);
+                            const inviterUsername = invite ? invite.sender : '';
+                            respondedInvites.add(inviteId);
+                            localStorage.setItem('respondedInvites', JSON.stringify([...respondedInvites]));
+                            // Send a DM reply to the inviter
+                            if (authToken && inviterUsername) {
+                              fetch('http://localhost:8002/community/dm', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                                body: JSON.stringify({ recipient: inviterUsername, content: 'Sorry, I declined your chess game invitation.' })
+                              }).catch(() => { });
+                            }
+                            renderCommunityMessages();
+                          }
+
+                          function refreshOnlineUsers() {
+                            if (!authToken) return;
+                            fetch('http://localhost:8002/community/online-users', {
+                              headers: { 'Authorization': 'Bearer ' + authToken }
+                            })
+                              .then(r => r.json())
+                              .then(data => {
+                                if (!data.success) return;
+                                const listEl = document.getElementById('community-users-list');
+                                if (!listEl) return;
+                                const users = data.users || [];
+                                if (users.length === 0) {
+                                  listEl.innerHTML = '<div class="community-user-item" style="color:#bbb;font-size:0.82em;">None</div>';
+                                  return;
+                                }
+                                listEl.innerHTML = users.map(u => {
+                                  const dotCls = u.activity === 'playing' ? 'community-user-dot cu-playing' : 'community-user-dot cu-online';
+                                  const nameCls = u.username === currentUser ? 'cu-me' : '';
+                                  const safeU = u.username.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                  const safeUAttr = u.username.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+                                  const label = u.username === currentUser ? safeU + ' (you)' : safeU;
+                                  const actionsHtml = u.username !== currentUser
+                                    ? `<span class="user-actions">
+                        <button class="user-action-btn" title="Send direct message" onclick="openDmCompose('${safeUAttr}')">✉</button>
+                        <button class="user-action-btn" title="Invite to game" onclick="sendGameInvite('${safeUAttr}')">♟</button>
+                      </span>`
+                                    : '';
+                                  return `<div class="community-user-item"><span class="${dotCls}"></span><span class="${nameCls}">${label}</span>${actionsHtml}</div>`;
+                                }).join('');
+                                const statusEl = document.getElementById('community-status-dot');
+                                if (statusEl) statusEl.textContent = users.length + ' online';
+                              })
+                              .catch(() => { });
+                          }
+
           // Captured-pieces helpers
           const PIECE_SYMBOLS = {
             p: { w: '♙', b: '♟' },
@@ -847,6 +1307,9 @@
                                 }
                               }
                             }
+
+                            // Track community tab open state
+                            communityTabOpen = (tabName === 'community-panel');
 
                             // Highlight active button
                             event.target.classList.add('active');
@@ -1043,6 +1506,13 @@
     function getOpponentLabel() {
       const whitePlayer = document.getElementById('white-player').value;
       const blackPlayer = document.getElementById('black-player').value;
+
+      // Human vs Human
+      if (whitePlayer === 'human' && blackPlayer === 'human') {
+        const blackNameEl = document.getElementById('black-human-name');
+        return (blackNameEl && blackNameEl.value.trim()) ? blackNameEl.value.trim() : 'Player 2';
+      }
+
       // The human plays as white if white=human, else plays as black
       const humanIsWhite = (whitePlayer === 'human');
       const aiSide = humanIsWhite ? 'black' : 'white';
@@ -1061,6 +1531,7 @@
       // result: 'win' | 'loss' | 'draw' (from the human's perspective)
       if (gameResultRecorded) return;
       gameResultRecorded = true;
+      postActivity('online'); // game over — revert to online
       const key = currentOpponent || 'Unknown';
       if (!playerStats[key]) {
         playerStats[key] = { wins: 0, losses: 0, draws: 0, lastPlayed: null };
@@ -1132,15 +1603,19 @@
       renderStatsPanel();
     }
 
-          // ─── Save / Load Game ─────────────────────────────────────────────────────
+                              // ─── Save / Load Game (multi-slot) ──────────────────────────────────────────
 
-          function _savedGameKey() {
-            return 'chessSavedGame_' + (currentUser || 'guest');
+                              function _savesKey() {
+                                return 'chessSaves_' + (currentUser || 'guest');
           }
 
-          function saveGame() {
-            if (!game || moveHistory.length === 0) return;
-            const state = {
+                              function _getAllSaves() {
+                                try { return JSON.parse(localStorage.getItem(_savesKey()) || '{}'); }
+                                catch (e) { return {}; }
+                              }
+
+                              function _buildSaveState() {
+                                return {
               fen: game.fen(),
               moveHistory: moveHistory,
               capturedByWhite: capturedByWhite,
@@ -1155,51 +1630,96 @@
                 blackAiType: document.getElementById('black-ai-type') ? document.getElementById('black-ai-type').value : 'stockfish',
                 whiteSkill: document.getElementById('white-skill-level') ? document.getElementById('white-skill-level').value : '10',
                 blackSkill: document.getElementById('black-skill-level') ? document.getElementById('black-skill-level').value : '10',
+                whiteHumanName: document.getElementById('white-human-name') ? document.getElementById('white-human-name').value : '',
+                blackHumanName: document.getElementById('black-human-name') ? document.getElementById('black-human-name').value : '',
               }
-            };
-            localStorage.setItem(_savedGameKey(), JSON.stringify(state));
-            _updateContinueButton();
+                              };
           }
 
-          function getSavedGame() {
-            try {
-              const raw = localStorage.getItem(_savedGameKey());
-              return raw ? JSON.parse(raw) : null;
-            } catch (e) {
-              return null;
+                              function saveGame() {
+                                if (!game || moveHistory.length === 0) return;
+                                const saves = _getAllSaves();
+                                saves['Autosave'] = _buildSaveState();
+                                localStorage.setItem(_savesKey(), JSON.stringify(saves));
+                                _updateMySavesBtn();
             }
+
+  function saveGameAs() {
+    if (!game || moveHistory.length === 0) {
+      updateStatusBox('No moves to save yet.', 'error');
+      return;
+    }
+    const name = prompt('Save game as:');
+    if (!name || !name.trim()) return;
+    const trimmed = name.trim().substring(0, 40);
+    const saves = _getAllSaves();
+    saves[trimmed] = _buildSaveState();
+    localStorage.setItem(_savesKey(), JSON.stringify(saves));
+    _updateMySavesBtn();
+    updateStatusBox('Game saved as "' + trimmed + '"', 'success');
           }
 
-          function clearSavedGame() {
-            localStorage.removeItem(_savedGameKey());
-            _updateContinueButton();
+                              function deleteSave(name) {
+                                const saves = _getAllSaves();
+                                delete saves[name];
+                                localStorage.setItem(_savesKey(), JSON.stringify(saves));
+                                showMySaves();
+                                _updateMySavesBtn();
           }
 
-          function _updateContinueButton() {
-            const btn = document.getElementById('continue-game-btn');
+                              function _updateMySavesBtn() {
+                                const btn = document.getElementById('my-saves-btn');
             if (!btn) return;
-            const saved = getSavedGame();
-            if (saved) {
-              const d = new Date(saved.savedAt);
-              const label = d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-              btn.innerHTML = '<span class="wb-icon">▶</span> Continue Game<br><small style="font-weight:normal;font-size:0.82em;opacity:0.8;">Saved ' + label + '</small>';
-              btn.style.opacity = '1';
-              btn.disabled = false;
-            } else {
-              btn.innerHTML = '<span class="wb-icon">▶</span> Continue Game';
-              btn.style.opacity = '0.45';
-              btn.disabled = true;
-            }
+                              const saves = _getAllSaves();
+                              const count = Object.keys(saves).length;
+                              btn.innerHTML = '<span class="wb-icon">📂</span> My Saves' +
+                                (count > 0 ? '<br><small style="font-weight:normal;font-size:0.82em;opacity:0.8;">' + count + ' save' + (count !== 1 ? 's' : '') + '</small>' : '');
+                              btn.style.opacity = count > 0 ? '1' : '0.45';
           }
 
-          function loadSavedGame() {
-            const saved = getSavedGame();
-            if (!saved) {
-              updateStatusBox('No saved game found.', 'error');
+                              function showMySaves() {
+                                const saves = _getAllSaves();
+                                const area = document.getElementById('welcome-info-area');
+                                if (!area) return;
+                                const keys = Object.keys(saves);
+                                if (keys.length === 0) {
+                                  area.innerHTML = '<h4 style="margin:0 0 8px;">📂 My Saves</h4><p style="color:#999;margin:0;">No saved games yet. Play a game and click 💾 Save As\u2026 to save.</p>';
+                                  area.classList.add('visible');
               return;
             }
+                              keys.sort((a, b) => new Date(saves[b].savedAt) - new Date(saves[a].savedAt));
+                              const rows = keys.map(n => {
+                                const s = saves[n];
+                                const d = new Date(s.savedAt);
+                                const label = d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                                const moves = (s.moveHistory || []).length;
+                                const safeN = n.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                                const jsN = n.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                                return '<tr>' +
+                                  '<td style="padding:5px 6px;"><strong>' + safeN + '</strong></td>' +
+                                  '<td style="padding:5px 6px;color:#777;font-size:0.85em;">' + label + '</td>' +
+                                  '<td style="padding:5px 6px;color:#777;font-size:0.85em;">' + moves + ' move' + (moves !== 1 ? 's' : '') + '</td>' +
+                                  '<td style="padding:5px 6px;">' +
+                                  '<button onclick="loadSavedGame(\'' + jsN + '\')" style="padding:3px 10px;background:#2196F3;color:white;border:none;border-radius:3px;cursor:pointer;font-size:0.82em;">Load</button>' +
+                                  ' <button onclick="deleteSave(\'' + jsN + '\')" style="padding:3px 8px;background:#f44336;color:white;border:none;border-radius:3px;cursor:pointer;font-size:0.82em;">✕</button>' +
+                                  '</td></tr>';
+                              }).join('');
+                              area.innerHTML = '<h4 style="margin:0 0 10px;">📂 My Saves</h4>' +
+                                '<table style="width:100%;border-collapse:collapse;font-size:0.88em;">' +
+                                '<thead><tr>' +
+                                '<th style="text-align:left;padding:4px 6px;border-bottom:2px solid #ddd;">Name</th>' +
+                                '<th style="text-align:left;padding:4px 6px;border-bottom:2px solid #ddd;">Saved</th>' +
+                                '<th style="text-align:left;padding:4px 6px;border-bottom:2px solid #ddd;">Moves</th>' +
+                                '<th style="padding:4px 6px;border-bottom:2px solid #ddd;"></th>' +
+                                '</tr></thead><tbody>' + rows + '</tbody></table>';
+                              area.classList.add('visible');
+                            }
 
-            // Restore game state
+                                                function loadSavedGame(name) {
+                                                  const saves = _getAllSaves();
+                                                  const saved = saves[name];
+                                                  if (!saved) { updateStatusBox('Save not found.', 'error'); return; }
+
             game = new Chess();
             game.load(saved.fen);
             moveHistory = saved.moveHistory || [];
@@ -1209,7 +1729,6 @@
             currentPlayerColor = saved.currentPlayerColor;
             gameResultRecorded = false;
 
-            // Restore player setup dropdowns
             const p = saved.players || {};
             const wp = document.getElementById('white-player');
             const bp = document.getElementById('black-player');
@@ -1223,12 +1742,14 @@
             if (bat) bat.value = p.blackAiType || 'stockfish';
             if (wsl) wsl.value = p.whiteSkill || '10';
             if (bsl) bsl.value = p.blackSkill || '10';
+                                                const whn = document.getElementById('white-human-name');
+                                                const bhn = document.getElementById('black-human-name');
+                                                if (whn) whn.value = p.whiteHumanName || '';
+                                                if (bhn) bhn.value = p.blackHumanName || '';
             updatePlayerConfig();
 
-            // Restore board
             if (board) board.position(saved.fen);
 
-            // Restore move history display
             const historyDiv = document.getElementById('move-history');
             if (historyDiv) {
               let html = '';
@@ -1245,7 +1766,7 @@
             checkGameStatus();
             renderCapturedPieces();
             updateExpertContextBadge();
-            updateStatusBox('Game restored — ' + moveHistory.length + ' move(s) played.', 'success');
+                                                updateStatusBox('Loaded "' + name + '" \u2014 ' + moveHistory.length + ' move(s).', 'success');
             navigateToTab('move-history-panel');
           }
 
@@ -1311,6 +1832,7 @@
                   <button class="tab-panel-button" onclick="switchTab('player-setup-panel')">Player Setup</button>
                   <button class="tab-panel-button" onclick="switchTab('move-history-panel')">Move History</button>
                   <button class="tab-panel-button" onclick="switchTab('expert-panel')">Ask Expert</button>
+                  <button class="tab-panel-button" onclick="switchTab('community-panel'); openCommunityTab();">Community<span id="community-unread-badge" class="comm-unread-badge" style="display:none;"></span></button>
                   <button class="tab-panel-button" onclick="switchTab('comm-panel')">Comm</button>
                   <button class="tab-panel-button" onclick="switchTab('stats-panel'); renderStatsPanel();">Stats</button>
                 </div>
@@ -1326,8 +1848,8 @@
                     <button class="welcome-tab-btn wb-primary" onclick="startNewGame(); navigateToTab('player-setup-panel');">
                       <span class="wb-icon">♙</span> Start New Game
                     </button>
-                    <button id="continue-game-btn" class="welcome-tab-btn wb-continue" onclick="loadSavedGame()">
-                      <span class="wb-icon">▶</span> Continue Game
+                    <button id="my-saves-btn" class="welcome-tab-btn wb-continue" onclick="showMySaves()">
+                      <span class="wb-icon">📂</span> My Saves
                     </button>
                     <button class="welcome-tab-btn" onclick="showWelcomeInfo('openings')">
                       <span class="wb-icon">📖</span> Practice Openings
@@ -1358,6 +1880,12 @@
                         <option value="ai">AI</option>
                       </select>
                     </label>
+                    <div id="white-human-config" style="display: block;">
+                      <label style="display: block; margin: 10px 0;">
+                        Player Name:
+                        <input type="text" id="white-human-name" placeholder="Enter player name" oninput="updatePlayerDisplay()" style="width: 100%; padding: 5px; box-sizing: border-box;">
+                      </label>
+                    </div>
                     <div id="white-ai-config" style="display: none;">
                       <label style="display: block; margin: 10px 0;">
                         AI Type:
@@ -1384,6 +1912,12 @@
                         <option value="ai" selected>AI</option>
                       </select>
                     </label>
+                    <div id="black-human-config" style="display: none;">
+                      <label style="display: block; margin: 10px 0;">
+                        Player Name:
+                        <input type="text" id="black-human-name" placeholder="Enter player name" oninput="updatePlayerDisplay()" style="width: 100%; padding: 5px; box-sizing: border-box;">
+                      </label>
+                    </div>
                     <div id="black-ai-config" style="display: block;">
                       <label style="display: block; margin: 10px 0;">
                         AI Type:
@@ -1429,7 +1963,7 @@
                 <div id="move-history-panel" class="tab-panel-content">
                   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                     <h3 style="margin:0;">Move History</h3>
-                    <button onclick="saveGame(); updateStatusBox('Game saved.', 'success');" style="padding:5px 12px; font-size:0.82em; background:#ff9800; color:white; border:none; border-radius:4px; cursor:pointer;">💾 Save Game</button>
+                    <button onclick="saveGameAs()" style="padding:5px 12px; font-size:0.82em; background:#ff9800; color:white; border:none; border-radius:4px; cursor:pointer;">💾 Save As…</button>
                   </div>
                   <div id="move-history">
                     <p style="color: #999;">No moves yet</p>
@@ -1480,6 +2014,52 @@
                   <div id="stats-opponent-list"><p class="stats-empty">No games played yet.</p></div>
                 </div>
 
+                <!-- Community Tab -->
+                <div id="community-panel" class="tab-panel-content">
+                  <div style="display:flex; flex-direction:column; height:100%; min-height:0;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-shrink:0;">
+                      <h3 style="margin:0;">Community</h3>
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <span id="community-status-dot" style="font-size:0.82em; color:#888;"></span>
+                        <button onclick="clearCommunityMessages()" title="Hide all messages older than now" style="padding:3px 9px; font-size:0.82em; background:#f44336; color:white; border:none; border-radius:3px; cursor:pointer;">Clear</button>
+                      </div>
+                    </div>
+                    <div class="community-layout">
+                      <!-- Online users sidebar -->
+                      <div class="community-users-sidebar">
+                        <h4>Online</h4>
+                        <div id="community-users-list">
+                          <div class="comm-empty" style="padding:10px 8px;">—</div>
+                        </div>
+                      </div>
+                      <!-- Chat area -->
+                      <div class="community-chat-area">
+                        <div id="community-messages" class="community-messages">
+                          <div class="comm-empty">No messages yet. Say hello!</div>
+                        </div>
+                        <div class="community-input-row">
+                          <input id="community-input" type="text" maxlength="500"
+                            placeholder="Type a message…"
+                            onkeydown="if(event.key==='Enter') sendCommunityMessage()">
+                          <button class="community-send-btn" onclick="sendCommunityMessage()">Send</button>
+                        </div>
+                        <div id="dm-compose">
+                          <div class="dm-compose-header">
+                            <span>Direct message to: <strong id="dm-recipient-label"></strong></span>
+                            <button onclick="closeDmCompose()" style="background:none;border:none;cursor:pointer;color:#6a1b9a;font-size:1.1em;padding:0 2px;" title="Cancel">✕</button>
+                          </div>
+                          <div class="dm-input-row">
+                            <input id="dm-compose-input" type="text" maxlength="500"
+                              placeholder="Type a private message…"
+                              onkeydown="if(event.key==='Enter') sendDm()">
+                            <button class="community-send-btn" style="background:#9c27b0;" onclick="sendDm()">Send</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <!-- Comm Tab -->
                 <div id="comm-panel" class="tab-panel-content">
                   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-shrink:0;">
@@ -1516,7 +2096,27 @@
         updateStatusBox('Chessboard initialized successfully', 'success');
         updateFenDisplay();
         updatePlayerDisplay();
-        _updateContinueButton();
+                                    _updateMySavesBtn();
+                                    // Start background community polling (unread badge while not on tab)
+                                    communityLastId = 0;
+                                    communityMessages = [];
+                                    communityUnreadCount = 0;
+                                    refreshCommunityMessages();
+                                    refreshOnlineUsers();
+                                    communityPollTimer = setInterval(refreshCommunityMessages, 5000);
+                                    communityUsersPollTimer = setInterval(refreshOnlineUsers, 12000);
+                                    // Heartbeat: keep the user's online status fresh (every 60 s)
+                                    postActivity('online');
+                                    setInterval(() => postActivity('online'), 60000);
+                                  }
+
+                                  function postActivity(status) {
+                                    if (!authToken) return;
+                                    fetch('http://localhost:8002/auth/activity', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                                      body: JSON.stringify({ activity: status })
+                                    }).catch(() => { });
       }
 
           function onDragStart(source, piece, position, orientation) {
@@ -1550,6 +2150,11 @@
             updateCapturedPieces(move);
             updateFenDisplay();
             updateExpertContextBadge();
+
+            // Publish move to sync store for H vs H games
+            if (isSyncGame) {
+              publishGameSync(source + target, move.san, currentUser);
+            }
 
             // Check if we need AI to respond
             const blackPlayer = document.getElementById('black-player').value;
@@ -1608,19 +2213,27 @@
 
           const whiteAiConfig = document.getElementById('white-ai-config');
           const blackAiConfig = document.getElementById('black-ai-config');
+          const whiteHumanConfig = document.getElementById('white-human-config');
+          const blackHumanConfig = document.getElementById('black-human-config');
 
           // Show/hide White AI config based on selection
           if (whitePlayer === 'ai') {
             whiteAiConfig.style.display = 'block';
+            if (whiteHumanConfig) whiteHumanConfig.style.display = 'none';
           } else {
             whiteAiConfig.style.display = 'none';
+            if (whiteHumanConfig) whiteHumanConfig.style.display = 'block';
+            const whiteName = document.getElementById('white-human-name');
+            if (whiteName && !whiteName.value && currentUser) whiteName.value = currentUser;
           }
 
           // Show/hide Black AI config based on selection
           if (blackPlayer === 'ai') {
             blackAiConfig.style.display = 'block';
+            if (blackHumanConfig) blackHumanConfig.style.display = 'none';
           } else {
             blackAiConfig.style.display = 'none';
+            if (blackHumanConfig) blackHumanConfig.style.display = 'block';
           }
 
     // Update the player display
@@ -1631,8 +2244,13 @@
     const whitePlayer = document.getElementById('white-player').value;
     const blackPlayer = document.getElementById('black-player').value;
 
-    let whiteDisplay = whitePlayer === 'human' ? `Human (${currentUser})` : 'AI';
-    let blackDisplay = blackPlayer === 'human' ? `Human (${currentUser})` : 'AI';
+    const whiteNameEl = document.getElementById('white-human-name');
+    const blackNameEl = document.getElementById('black-human-name');
+    const whiteName = (whiteNameEl && whiteNameEl.value.trim()) ? whiteNameEl.value.trim() : (currentUser || 'Player 1');
+    const blackName = (blackNameEl && blackNameEl.value.trim()) ? blackNameEl.value.trim() : 'Player 2';
+
+    let whiteDisplay = whitePlayer === 'human' ? `Human (${whiteName})` : 'AI';
+    let blackDisplay = blackPlayer === 'human' ? `Human (${blackName})` : 'AI';
 
     if (whitePlayer === 'ai') {
       const whiteAiType = document.getElementById('white-ai-type').value;
@@ -1653,8 +2271,7 @@
     if (blackDisplayEl) blackDisplayEl.textContent = blackDisplay;
         }
 
-      function startNewGame() {
-        clearSavedGame();
+                          function startNewGame() {
         const whitePlayer = document.getElementById('white-player').value;
         const blackPlayer = document.getElementById('black-player').value;
 
@@ -1662,6 +2279,7 @@
         currentPlayerColor = (whitePlayer === 'human') ? 'white' : 'black';
         currentOpponent = getOpponentLabel();
         gameResultRecorded = false;
+                          postActivity('playing');
 
       game = new Chess();
       moveHistory = [];
@@ -1681,6 +2299,27 @@
         renderCapturedPieces();
         updateExpertContextBadge();
       updateStatusBox(`New game started: White=${whitePlayer}, Black=${blackPlayer}`, 'success');
+
+                          // ---- H vs H board sync setup ----
+                          if (syncPollInterval) { clearInterval(syncPollInterval); syncPollInterval = null; }
+                          const whiteNameEl = document.getElementById('white-human-name');
+                          const blackNameEl = document.getElementById('black-human-name');
+                          const whiteName = whiteNameEl ? whiteNameEl.value.trim() : '';
+                          const blackName = blackNameEl ? blackNameEl.value.trim() : '';
+                          if (whitePlayer === 'human' && blackPlayer === 'human' && whiteName && blackName && whiteName !== blackName) {
+                            isSyncGame = true;
+                            const players = [whiteName, blackName].sort();
+                            syncGameId = players[0] + '_' + players[1];
+                            syncMyColor = (whiteName === currentUser) ? 'white' : 'black';
+                            lastSyncFen = null;
+                            publishGameSync('', '', currentUser);
+                            syncPollInterval = setInterval(pollGameSync, 2000);
+                          } else {
+                            isSyncGame = false;
+                            syncGameId = null;
+                            syncMyColor = null;
+                            lastSyncFen = null;
+                          }
 
         // If White is AI, request the first move
         if (whitePlayer === 'ai') {
@@ -1823,6 +2462,74 @@
         });
     }
 
+          // ---- H vs H board sync helpers ----
+
+          function publishGameSync(lastMove, lastMoveSan, movedBy) {
+            if (!syncGameId || !authToken || !game) return;
+            const whiteNameEl = document.getElementById('white-human-name');
+            const blackNameEl = document.getElementById('black-human-name');
+            fetch('http://localhost:8000/game/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+              body: JSON.stringify({
+                game_id: syncGameId,
+                fen: game.fen(),
+                last_move: lastMove,
+                last_move_san: lastMoveSan,
+                moved_by: movedBy,
+                white_player: whiteNameEl ? whiteNameEl.value.trim() : '',
+                black_player: blackNameEl ? blackNameEl.value.trim() : ''
+              })
+            }).catch(() => { });
+          }
+
+          function pollGameSync() {
+            if (!syncGameId || !authToken || !isSyncGame || !game) return;
+            fetch('http://localhost:8000/game/sync/' + syncGameId, {
+              headers: { 'Authorization': 'Bearer ' + authToken }
+            })
+              .then(r => r.json())
+              .then(data => {
+                if (!data.found || !data.fen) return;
+                // Skip if this is our own last published state or nothing changed
+                if (data.fen === lastSyncFen) return;
+                if (data.fen === game.fen()) { lastSyncFen = data.fen; return; }
+                // Skip if we were the one who made this move
+                if (data.moved_by === currentUser) { lastSyncFen = data.fen; return; }
+
+                lastSyncFen = data.fen;
+
+                // Try to apply via the stored last_move
+                let applied = false;
+                if (data.last_move && data.last_move.length >= 4) {
+                  const from = data.last_move.substring(0, 2);
+                  const to = data.last_move.substring(2, 4);
+                  const promotion = data.last_move.length > 4 ? data.last_move[4] : 'q';
+                  const result = game.move({ from, to, promotion });
+                  if (result) {
+                    applied = true;
+                    board.position(game.fen());
+                    updateMoveHistory(data.last_move_san || result.san, true);
+                    updateCapturedPieces(result);
+                    updateFenDisplay();
+                    updateStatusBox((data.moved_by || 'Opponent') + ' played: ' + (data.last_move_san || result.san), 'info');
+                    checkGameStatus();
+                    saveGame();
+                    updateExpertContextBadge();
+                  }
+                }
+                if (!applied) {
+                  // Fallback: load the FEN directly
+                  game.load(data.fen);
+                  board.position(data.fen);
+                  updateFenDisplay();
+                  checkGameStatus();
+                  updateStatusBox('Board synced with opponent', 'info');
+                }
+              })
+              .catch(() => { });
+          }
+
         function buildExpertGameContext() {
           if (!game) return null;
           const sanMoves = moveHistory.map(m => m.move);
@@ -1942,6 +2649,8 @@
 
       function handleLogout() {
         if (confirm('Are you sure you want to logout?')) {
+          if (syncPollInterval) { clearInterval(syncPollInterval); syncPollInterval = null; }
+          isSyncGame = false;
           logCommMessage('req', 'AUTH', '/auth/logout', {}, null);
           fetch('http://localhost:8002/auth/logout', {
             method: 'POST',
@@ -1962,5 +2671,21 @@
 
       window.onload = checkAuthentication;
   </script>
+<!-- Color Choice Modal -->
+<div id="color-choice-overlay" class="color-choice-overlay" style="display:none;"
+  onclick="if(event.target===this)closeColorChoiceModal()">
+  <div class="color-choice-modal">
+    <h3>♟ Choose Your Color</h3>
+    <p>Which color would you like to play against <strong id="color-choice-inviter"></strong>?</p>
+    <div class="color-choice-options">
+      <button class="color-choice-btn ccb-white" onclick="confirmColorChoice('white')">♔&nbsp;&nbsp;I'll play
+        White</button>
+      <button class="color-choice-btn ccb-black" onclick="confirmColorChoice('black')">♚&nbsp;&nbsp;I'll play
+        Black</button>
+      <button class="color-choice-btn ccb-random" onclick="confirmColorChoice('random')">🎲&nbsp;&nbsp;Random</button>
+    </div>
+    <button class="color-choice-cancel" onclick="closeColorChoiceModal()">Cancel</button>
+  </div>
+</div>
 </body>
 </html>

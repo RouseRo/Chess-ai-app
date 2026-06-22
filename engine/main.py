@@ -6,6 +6,7 @@ import os
 import chess
 import random
 import subprocess
+import httpx
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -93,6 +94,8 @@ def find_stockfish():
 
 STOCKFISH_PATH = find_stockfish()
 
+AUTH_SERVICE_URL = os.environ.get("AUTH_SERVICE_URL", "http://auth-service:8002")
+
 app = FastAPI(
     title="Chess AI Engine",
     description="Chess game engine and AI service",
@@ -108,6 +111,12 @@ app.add_middleware(
 )
 
 user_manager = UserManager(data_dir="user_data")
+
+# ========== H vs H Game Sync Store ==========
+# In-memory store for shared board state between two human players.
+# Keyed by game_id (derived from sorted player names so both clients compute the same key).
+import time as _time
+_game_sync_store: dict = {}
 
 # Stockfish engine instance
 stockfish_engine = None
@@ -149,6 +158,39 @@ async def health_check():
     }
 
 # ========== Game Endpoints ==========
+
+# ---- H vs H board synchronisation ----
+
+@app.post("/game/sync")
+async def update_game_sync(request_data: dict, authorization: str = Header(None)):
+    """Store the current board state so the opponent can poll for it."""
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing authorization token")
+    game_id = request_data.get("game_id")
+    if not game_id:
+        raise HTTPException(status_code=400, detail="game_id required")
+    _game_sync_store[game_id] = {
+        "game_id": game_id,
+        "fen": request_data.get("fen", ""),
+        "last_move": request_data.get("last_move", ""),
+        "last_move_san": request_data.get("last_move_san", ""),
+        "moved_by": request_data.get("moved_by", ""),
+        "white_player": request_data.get("white_player", ""),
+        "black_player": request_data.get("black_player", ""),
+        "updated_at": _time.time(),
+    }
+    return {"success": True}
+
+
+@app.get("/game/sync/{game_id}")
+async def get_game_sync(game_id: str, authorization: str = Header(None)):
+    """Return the current shared board state for a H vs H game."""
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing authorization token")
+    state = _game_sync_store.get(game_id)
+    if not state:
+        return {"found": False}
+    return {"found": True, **state}
 
 @app.post("/move")
 async def make_move(request_data: dict, authorization: str = Header(None)):
@@ -265,6 +307,19 @@ async def make_move(request_data: dict, authorization: str = Header(None)):
             "source": "chess-engine-1"
         }
         print(f"[MOVE] Response: ai_move={ai_move_uci}, status={status}")
+
+        # Update user activity status (fire-and-forget; don't block response)
+        if authorization and authorization.startswith("Bearer "):
+            try:
+                async with httpx.AsyncClient(timeout=2.0) as client:
+                    await client.post(
+                        f"{AUTH_SERVICE_URL}/auth/activity",
+                        json={"activity": "playing"},
+                        headers={"Authorization": authorization}
+                    )
+            except Exception:
+                pass  # Never fail a move request due to activity tracking
+
         return JSONResponse(response)
         
     except Exception as e:
