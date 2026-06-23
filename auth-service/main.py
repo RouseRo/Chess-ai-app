@@ -273,19 +273,22 @@ async def register(request: RegisterRequest):
 
 
 @app.post("/auth/verify")
-async def verify(request: TokenRequest):
-    """Verify a JWT token."""
-    payload = verify_jwt_token(request.token)
-    
+async def verify(authorization: str = Header(None)):
+    """Verify a JWT token provided as a Bearer token in the Authorization header."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+    token = authorization[len("Bearer "):]
+    payload = verify_jwt_token(token)
+
     if payload:
         return {
-            "valid": True,
+            "success": True,
             "username": payload.get("username"),
             "is_admin": payload.get("is_admin", False),
             "email": payload.get("email", "")
         }
-    
-    return {"valid": False, "message": "Invalid or expired token."}
+
+    return {"success": False, "message": "Invalid or expired token."}
 
 
 @app.post("/auth/verify-email")
@@ -718,3 +721,26 @@ async def send_game_invite(
     msg_id = cursor.lastrowid
     conn.close()
     return {"success": True, "id": msg_id, "recipient": actual_recipient}
+
+
+@app.post("/community/clear-activity")
+async def clear_game_activity(authorization: Optional[str] = Header(None)):
+    """Clear the current user's game activity status shown to admins."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+
+    username = payload.get("username")
+    conn = get_db()
+    _init_community_tables(conn)
+    cursor = conn.cursor()
+    now = datetime.now(timezone.utc).isoformat()
+    cursor.execute(
+        "INSERT INTO community_messages (sender, content, message_type, created_at) VALUES (?, ?, 'game_status_clear', ?)",
+        (username, '', now)
+    )
+    conn.commit()
+    conn.close()
+    return {"success": True}

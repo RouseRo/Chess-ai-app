@@ -23,7 +23,9 @@ The application is for people that are new to the game of chess and want to lear
 ## Features
 
 - **Interactive Web UI**: Drag-and-drop chessboard with real-time updates
-- **Command-Line Interface (CLI)**: Full-featured terminal-based chess game
+- **Human vs Human (H vs H) Sync**: Two players can play against each other from separate browser sessions with automatic board synchronization every 2 seconds
+- **Game ID Banner**: A unique sync game ID is displayed above the board during H vs H games
+- **Community Panel**: See who is online, send public chat messages, send direct messages to other players, and send/receive game invitations
 - **Multiple AI Engines**: 
   - Stockfish (local, fast, strong)
   - OpenAI GPT models
@@ -40,10 +42,11 @@ The application is for people that are new to the game of chess and want to lear
 - **Endgame Practice Drills**: Guided endgame positions (King & Pawn vs King, King & Rook vs King, Lucena Position, Philidor Position)
 - **Player Stats**: Win/loss/draw record per opponent, stored locally in the browser
 - **Chess News & Jokes**: Built-in rotating chess news articles and jokes
-- **Comm Log**: Diagnostics panel showing all API requests and responses
+- **Comm Log**: Diagnostics panel showing all API requests and responses, including H vs H sync events (purple)
+- **Clear Activity**: Button in the header lets a player reset their game activity status visible to admins
 - **User Authentication**: Secure JWT-based authentication with bcrypt hashing
 - **Unified User Storage**: Single SQLite database shared across all clients
-- **Admin Dashboard**: Manage users and system settings
+- **Admin Dashboard**: Manage users and system settings; User Management shows real-time online status, game activity, and a Refresh Status button
 - **Microservices Architecture**: Scalable, modular design with separate services
 - **Docker Support**: Complete containerization with docker-compose
 
@@ -67,6 +70,8 @@ The application is for people that are new to the game of chess and want to lear
    - 1.4 Demote administrators to regular user status
    - 1.5 Verify user email addresses
    - 1.6 Delete user accounts
+   - 1.7 View real-time online status and game activity for each user
+   - 1.8 Refresh user statuses on demand with the Refresh Status button
 
 2. **System Statistics**
    - 2.1 View dashboard statistics (total users, admin count, verified users, total games played)
@@ -288,6 +293,19 @@ All clients (CLI, Web UI, Admin Dashboard) authenticate through the same auth-se
 | `/auth/logout` | POST | End session |
 | `/auth/change-password` | POST | Update password |
 | `/auth/refresh` | POST | Refresh JWT token |
+| `/auth/activity` | POST | Update online/playing status |
+
+### Community API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/community/online-users` | GET | List currently online users |
+| `/community/messages` | GET | Get recent chat messages and DMs |
+| `/community/messages` | POST | Post a public chat message |
+| `/community/announcements` | POST | Post an announcement (admin only) |
+| `/community/dm` | POST | Send a direct message |
+| `/community/game-invite` | POST | Send a game invitation |
+| `/community/clear-activity` | POST | Clear own game activity status |
 
 ### Login Example (API)
 
@@ -345,9 +363,23 @@ Access at **http://localhost:8080/admin.html**
 | Tab | Description |
 |-----|-------------|
 | **Dashboard** | System statistics (users, games, models) |
-| **User Management** | Create, delete, promote/demote users |
+| **User Management** | Create, delete, promote/demote users; view online status and game activity |
 | **AI Models** | Configure AI model settings |
 | **Settings** | Change admin password |
+
+### User Management Panel
+
+The User Management table displays:
+
+| Column | Description |
+|--------|-------------|
+| **Username** | Player's username |
+| **Email** | Registered email |
+| **Status** | Online / Last seen X min ago / Offline |
+| **Game Activity** | Current game activity (only shown when player is online) |
+| **Actions** | Promote, Demote, Verify, Delete |
+
+The **&#8635; Refresh Status** button refreshes the user list and online statuses on demand.
 
 ### Admin API Endpoints
 
@@ -431,10 +463,22 @@ Invoke-RestMethod -Uri "http://localhost:8000/move" `
 | **Move History** | Full move list for the current game |
 | **Ask Expert** | Chat with the AI chess expert; quick-action buttons for position analysis |
 | **Stats** | Win/loss/draw record per opponent stored in the browser |
-| **Comm** | Diagnostics log of all API requests and responses |
+| **Community** | See online users, send public chat, send DMs, send/accept game invitations |
+| **Comm** | Diagnostics log of all API requests and responses (sync events shown in purple) |
 
 3. Go to the **Player Setup** tab, configure both players and click **Start New Game**
 4. Drag pieces to make moves; the AI responds automatically
+
+### Human vs Human (H vs H) Sync
+
+Two players can play against each other from different browser tabs or computers on the same network:
+
+1. Both players log in and go to **Player Setup**
+2. Set **White** and **Black** both to **Human**, entering both players' usernames
+3. Click **Start New Game** — a **Game ID** appears above the board
+4. The other player loads their saved game (or sets up the same names) — the board syncs automatically every 2 seconds
+5. Each player can only move their own pieces
+6. After a game, click **Clear Activity** in the header to reset your game status
 
 ### CLI Interface
 
@@ -696,9 +740,10 @@ CREATE TABLE users (
 - [ ] PGN export/import
 - [ ] Game replay/analysis
 - [ ] ELO rating system
-- [ ] Multiplayer support
+- [x] Human vs Human multiplayer (browser-to-browser sync)
+- [x] Community chat, DMs, and game invitations
 - [ ] PostgreSQL database
-- [ ] WebSocket for real-time updates
+- [ ] WebSocket for real-time updates (currently uses 2-second polling)
 - [ ] Mobile responsive design
 - [ ] Opening book integration
 - [ ] Tournament mode

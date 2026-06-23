@@ -334,6 +334,10 @@
       border-left: 3px solid #e65100;
       background: #fff3e0;
     }
+    .comm-entry.comm-info {
+      border-left: 3px solid #6a1b9a;
+      background: #f3e5f5;
+    }
     .comm-timestamp { color: #757575; font-size: 11px; }
     .comm-direction { font-weight: bold; }
     .comm-body {
@@ -805,6 +809,9 @@
           } else if (msg.direction === 'res') {
             entryClass += 'comm-res ' + (msg.statusCode && msg.statusCode >= 400 ? 'err' : 'ok');
             dirLabel = '← RES';
+          } else if (msg.direction === 'info') {
+            entryClass += 'comm-info';
+            dirLabel = 'ℹ SYNC';
           } else {
             entryClass += 'comm-conn-err';
             dirLabel = '✕ ERR';
@@ -1748,6 +1755,27 @@
                                                 if (bhn) bhn.value = p.blackHumanName || '';
             updatePlayerConfig();
 
+                                                  // Restore H vs H sync state if this was a sync game
+                                                  if (syncPollInterval) { clearInterval(syncPollInterval); syncPollInterval = null; }
+                                                  const _wName = p.whiteHumanName || '';
+                                                  const _bName = p.blackHumanName || '';
+                                                  if (p.white === 'human' && p.black === 'human' && _wName && _bName && _wName !== _bName) {
+                                                    isSyncGame = true;
+                                                    const _players = [_wName, _bName].sort();
+                                                    syncGameId = _players[0] + '_' + _players[1];
+                                                    syncMyColor = (_wName === currentUser) ? 'white' : 'black';
+                                                    lastSyncFen = null;
+                                                    updateSyncGameIdDisplay();
+                                                    pollGameSync();
+                                                    syncPollInterval = setInterval(pollGameSync, 2000);
+                                                  } else {
+                                                    isSyncGame = false;
+                                                    syncGameId = null;
+                                                    syncMyColor = null;
+                                                    lastSyncFen = null;
+                                                    updateSyncGameIdDisplay();
+                                                  }
+
             if (board) board.position(saved.fen);
 
             const historyDiv = document.getElementById('move-history');
@@ -1778,12 +1806,16 @@
           <h1>Chess AI App</h1>
           <div style="display: flex; gap: 15px; align-items: center;">
             <span>Welcome, <strong>${currentUser}</strong></span>
+            <button onclick="clearMyGameActivity()" title="Clear your game activity status" style="padding:6px 12px; font-size:0.85em; background:#607d8b; color:white; border:none; border-radius:4px; cursor:pointer;">Clear Activity</button>
             <button onclick="handleLogout()" class="btn-danger">Logout</button>
           </div>
         </header>
 
         <div class="main-container">
           <div class="chessboard-section">
+            <div id="sync-game-id-box" style="display:none; width:400px; margin:0 auto 8px; padding:5px 12px; background:#fff8e1; border:1px solid #f9a825; border-radius:4px; font-family:monospace; font-size:12px; text-align:center;">
+              <strong>Game ID:</strong> <span id="sync-game-id-value"></span>
+            </div>
             <div id="board"></div>
 
             <!-- FEN Notation (Moved from game-panel to here) -->
@@ -2119,6 +2151,23 @@
                                     }).catch(() => { });
       }
 
+                                    function clearMyGameActivity() {
+                                      if (!authToken) return;
+                                      logCommMessage('req', 'AUTH', '/community/clear-activity', {}, null);
+                                      fetch('http://localhost:8002/community/clear-activity', {
+                                        method: 'POST',
+                                        headers: { 'Authorization': 'Bearer ' + authToken }
+                                      })
+                                        .then(r => r.json())
+                                        .then(data => {
+                                          logCommMessage('resp', 'AUTH', '/community/clear-activity', data, null);
+                                          if (data.success) {
+                                            postActivity('online');
+                                          }
+                                        })
+                                        .catch(e => console.error('Clear activity error:', e));
+                                    }
+
           function onDragStart(source, piece, position, orientation) {
             if (game.game_over()) {
               updateStatusBox('Game is over!', 'error');
@@ -2128,6 +2177,12 @@
             if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
               (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
               return false;
+            }
+
+            // In a sync game, prevent a player from moving the opponent's pieces
+            if (isSyncGame && syncMyColor) {
+              if (syncMyColor === 'white' && game.turn() !== 'w') return false;
+              if (syncMyColor === 'black' && game.turn() !== 'b') return false;
             }
 
             return true;
@@ -2312,13 +2367,23 @@
                             syncGameId = players[0] + '_' + players[1];
                             syncMyColor = (whiteName === currentUser) ? 'white' : 'black';
                             lastSyncFen = null;
-                            publishGameSync('', '', currentUser);
+                            updateSyncGameIdDisplay();
+                            logCommMessage('info', 'SYNC', '/game/sync', {
+                              game_id: syncGameId,
+                              my_color: syncMyColor,
+                              white: whiteName,
+                              black: blackName
+                            }, null);
+                            // Poll immediately to catch up with any moves already made by the opponent
+                            // (do NOT publish here — writing startFEN would overwrite opponent's live state)
+                            pollGameSync();
                             syncPollInterval = setInterval(pollGameSync, 2000);
                           } else {
                             isSyncGame = false;
                             syncGameId = null;
                             syncMyColor = null;
                             lastSyncFen = null;
+                            updateSyncGameIdDisplay();
                           }
 
         // If White is AI, request the first move
@@ -2464,6 +2529,18 @@
 
           // ---- H vs H board sync helpers ----
 
+                function updateSyncGameIdDisplay() {
+                  const box = document.getElementById('sync-game-id-box');
+                  const val = document.getElementById('sync-game-id-value');
+                  if (!box || !val) return;
+                  if (isSyncGame && syncGameId) {
+                    val.textContent = syncGameId;
+                    box.style.display = 'block';
+                  } else {
+                    box.style.display = 'none';
+                  }
+                }
+
           function publishGameSync(lastMove, lastMoveSan, movedBy) {
             if (!syncGameId || !authToken || !game) return;
             const whiteNameEl = document.getElementById('white-human-name');
@@ -2513,6 +2590,11 @@
                     updateCapturedPieces(result);
                     updateFenDisplay();
                     updateStatusBox((data.moved_by || 'Opponent') + ' played: ' + (data.last_move_san || result.san), 'info');
+                    logCommMessage('info', 'SYNC', '/game/sync/' + syncGameId, {
+                      move_from: data.moved_by || 'opponent',
+                      move: data.last_move_san || result.san,
+                      uci: data.last_move
+                    }, null);
                     checkGameStatus();
                     saveGame();
                     updateExpertContextBadge();

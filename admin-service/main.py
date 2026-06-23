@@ -139,7 +139,8 @@ def _get_game_status(username: str, conn) -> str:
         acceptance_sent = cursor.fetchone()
         if acceptance_sent:
             content = acceptance_sent["content"]
-            color = "White" if "play as White" in content else ("Black" if "play as Black" in content else "?")
+            # "I will play as White/Black" refers to the accepter's own color
+            color = "White" if "I will play as White" in content else ("Black" if "I will play as Black" in content else "?")
             try:
                 targets = json.loads(acceptance_sent["target_users"] or "[]")
                 inviter = next((t for t in targets if t != username), None)
@@ -160,13 +161,26 @@ def _get_game_status(username: str, conn) -> str:
         if acceptance_received:
             content = acceptance_received["content"]
             accepter = acceptance_received["sender"]
-            color = "White" if "play as White" in content else ("Black" if "play as Black" in content else "?")
+            # "I will play as White/Black" refers to the accepter's color
+            color = "White" if "I will play as White" in content else ("Black" if "I will play as Black" in content else "?")
             events.append((acceptance_received["created_at"], f"Invite accepted by {accepter} ({color})"))
+
+        # Did this user clear their activity?
+        cursor.execute(
+            """SELECT created_at FROM community_messages
+               WHERE sender = ? AND message_type = 'game_status_clear' AND created_at >= ?
+               ORDER BY created_at DESC LIMIT 1""",
+            (username, cutoff)
+        )
+        clear_event = cursor.fetchone()
+        if clear_event:
+            events.append((clear_event["created_at"], None))  # None = cleared
 
         if not events:
             return ""
         events.sort(key=lambda x: x[0], reverse=True)
-        return events[0][1]
+        label = events[0][1]
+        return label if label else ""
     except Exception as e:
         print(f"[game_status] Error for {username}: {e}")
         return ""
@@ -404,7 +418,7 @@ async def get_all_users():
                 current_activity=current_activity,
                 is_online=is_online,
                 status_label=status_label,
-                game_status=_get_game_status(user.get("username"), _gs_conn) if _gs_conn else ""
+                game_status=_get_game_status(user.get("username"), _gs_conn) if (_gs_conn and is_online) else ""
             )
         )
 
