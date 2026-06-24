@@ -549,6 +549,26 @@
     .color-choice-btn.ccb-random:hover { background: #bbdefb; border-color: #1565c0; }
     .color-choice-cancel { margin-top: 10px; width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer; color: #666; font-size: 0.88em; }
     .color-choice-cancel:hover { background: #f5f5f5; }
+    /* AI Game Setup Modal */
+    #ai-game-setup-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001; display: flex; align-items: center; justify-content: center; }
+    .ai-game-setup-modal { background: #fff; border-radius: 8px; padding: 22px 24px; max-width: 360px; width: 90%; box-shadow: 0 8px 32px rgba(0,0,0,0.25); }
+    .ai-game-setup-modal h3 { margin: 0 0 6px; font-size: 1.05em; }
+    .ai-game-setup-modal > p { margin: 0 0 14px; color: #555; font-size: 0.88em; }
+    .ags-field { margin-bottom: 13px; }
+    .ags-field label { display: block; font-size: 0.85em; color: #555; margin-bottom: 5px; font-weight: 600; }
+    .ags-field select, .ags-field input[type="number"] { width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9em; box-sizing: border-box; }
+    .ags-color-options { display: flex; gap: 7px; }
+    .ags-color-btn { flex: 1; padding: 8px 4px; border: 2px solid #e0e0e0; border-radius: 5px; background: #fafafa; cursor: pointer; font-size: 0.84em; font-weight: 600; transition: all 0.15s; text-align: center; }
+    .ags-color-btn.ags-active { border-color: #1976D2; background: #e3f2fd; color: #1565c0; }
+    .ags-c-white.ags-active { border-color: #555; background: #f5f5f5; color: #333; }
+    .ags-c-black.ags-active { border-color: #222; background: #333; color: #fff; }
+    .ags-c-random.ags-active { border-color: #2196F3; background: #e3f2fd; color: #1565c0; }
+    .ags-actions { display: flex; gap: 8px; margin-top: 16px; }
+    .ags-start-btn { flex: 1; padding: 10px; background: #2e7d32; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; font-size: 0.93em; }
+    .ags-start-btn:hover { background: #1b5e20; }
+    .ags-cancel-btn { padding: 10px 16px; background: white; border: 1px solid #ddd; border-radius: 5px; cursor: pointer; color: #666; font-size: 0.88em; }
+    .ags-cancel-btn:hover { background: #f5f5f5; }
+    .cu-ai { background: #7b1fa2; }
     /* User action buttons in sidebar */
     .user-actions { display: none; gap: 3px; margin-left: auto; }
     .community-user-item:hover .user-actions { display: flex; }
@@ -591,6 +611,7 @@
           let dmRecipient = null;
           let _pendingInviteId = null;
           let _pendingInviterUsername = null;
+            let _aiGameSetupColor = 'random';
 
     function checkAuthentication() {
       const token = localStorage.getItem('authToken');
@@ -1176,6 +1197,108 @@
                             renderCommunityMessages();
                           }
 
+                            // ─── AI Game Setup (from Community panel) ────────────────────────────
+
+                            function openAiGameSetup() {
+                              _aiGameSetupColor = 'random';
+                              document.querySelectorAll('.ags-color-btn').forEach(b => b.classList.remove('ags-active'));
+                              const randBtn = document.getElementById('ags-btn-random');
+                              if (randBtn) randBtn.classList.add('ags-active');
+                              const skillEl = document.getElementById('ags-skill-level');
+                              if (skillEl) skillEl.value = 5;
+                              updateAiGameSetupStrategy();
+                              const overlay = document.getElementById('ai-game-setup-overlay');
+                              if (overlay) overlay.style.display = 'flex';
+                            }
+
+                            function closeAiGameSetup() {
+                              const overlay = document.getElementById('ai-game-setup-overlay');
+                              if (overlay) overlay.style.display = 'none';
+                            }
+
+                            function selectAiColor(color) {
+                              _aiGameSetupColor = color;
+                              document.querySelectorAll('.ags-color-btn').forEach(b => b.classList.remove('ags-active'));
+                              const btn = document.getElementById('ags-btn-' + color);
+                              if (btn) btn.classList.add('ags-active');
+                              updateAiGameSetupStrategy();
+                            }
+
+                            function updateAiGameSetupStrategy() {
+                              const sel = document.getElementById('ags-strategy');
+                              const lbl = document.getElementById('ags-strategy-label');
+                              if (!sel || !lbl) return;
+                              if (_aiGameSetupColor === 'white') {
+                                lbl.textContent = 'Opening for AI (White):';
+                                sel.innerHTML = '<option value="">No Opening</option>'
+                                  + '<option value="ruy-lopez">Ruy Lopez</option>'
+                                  + '<option value="italian">Italian Game</option>';
+                              } else if (_aiGameSetupColor === 'black') {
+                                lbl.textContent = 'Defense for AI (Black):';
+                                sel.innerHTML = '<option value="">No Defense</option>'
+                                  + '<option value="sicilian">Sicilian Defense</option>'
+                                  + '<option value="french">French Defense</option>';
+                              } else {
+                                lbl.textContent = 'Preferred Strategy:';
+                                sel.innerHTML = '<option value="">No Preference</option>'
+                                  + '<option value="ruy-lopez">Ruy Lopez (White Opening)</option>'
+                                  + '<option value="italian">Italian Game (White Opening)</option>'
+                                  + '<option value="sicilian">Sicilian Defense (Black Defense)</option>'
+                                  + '<option value="french">French Defense (Black Defense)</option>';
+                              }
+                            }
+
+                            function confirmAiGameSetup() {
+                              const resolvedColor = _aiGameSetupColor === 'random'
+                                ? (Math.random() < 0.5 ? 'white' : 'black')
+                                : _aiGameSetupColor;
+                              const skillRaw = parseInt(document.getElementById('ags-skill-level').value, 10) || 5;
+                              const skillLevel = Math.max(1, Math.min(10, skillRaw));
+                              const strategy = document.getElementById('ags-strategy').value;
+                              closeAiGameSetup();
+
+                              const whiteEl = document.getElementById('white-player');
+                              const blackEl = document.getElementById('black-player');
+                              if (!whiteEl || !blackEl) return;
+
+                              if (resolvedColor === 'white') {
+                                whiteEl.value = 'ai';
+                                blackEl.value = 'human';
+                                const blackNameEl = document.getElementById('black-human-name');
+                                if (blackNameEl) blackNameEl.value = currentUser || '';
+                                const whiteAiType = document.getElementById('white-ai-type');
+                                const whiteSkill = document.getElementById('white-skill-level');
+                                if (whiteAiType) whiteAiType.value = 'stockfish';
+                                if (whiteSkill) whiteSkill.value = skillLevel;
+                                const whiteStrat = document.getElementById('white-strategy');
+                                const blackStrat = document.getElementById('black-strategy');
+                                const isOpening = strategy === 'ruy-lopez' || strategy === 'italian';
+                                if (whiteStrat) whiteStrat.value = isOpening ? strategy : '';
+                                if (blackStrat) blackStrat.value = '';
+                              } else {
+                                whiteEl.value = 'human';
+                                blackEl.value = 'ai';
+                                const whiteNameEl = document.getElementById('white-human-name');
+                                if (whiteNameEl) whiteNameEl.value = currentUser || '';
+                                const blackAiType = document.getElementById('black-ai-type');
+                                const blackSkill = document.getElementById('black-skill-level');
+                                if (blackAiType) blackAiType.value = 'stockfish';
+                                if (blackSkill) blackSkill.value = skillLevel;
+                                const whiteStrat = document.getElementById('white-strategy');
+                                const blackStrat = document.getElementById('black-strategy');
+                                const isDefense = strategy === 'sicilian' || strategy === 'french';
+                                if (whiteStrat) whiteStrat.value = '';
+                                if (blackStrat) blackStrat.value = isDefense ? strategy : '';
+                              }
+
+                              if (typeof updatePlayerConfig === 'function') updatePlayerConfig();
+                              navigateToTab('player-setup-panel');
+                              updateStatusBox(
+                                `Stockfish AI set to play as ${resolvedColor === 'white' ? 'White ♔' : 'Black ♚'} at skill level ${skillLevel}. Click "Start New Game" to begin!`,
+                                'success'
+                              );
+                            }
+
                           function refreshOnlineUsers() {
                             if (!authToken) return;
                             fetch('http://localhost:8002/community/online-users', {
@@ -1187,24 +1310,28 @@
                                 const listEl = document.getElementById('community-users-list');
                                 if (!listEl) return;
                                 const users = data.users || [];
-                                if (users.length === 0) {
-                                  listEl.innerHTML = '<div class="community-user-item" style="color:#bbb;font-size:0.82em;">None</div>';
-                                  return;
-                                }
-                                listEl.innerHTML = users.map(u => {
+                                // Always show Stockfish AI at the top of the online users list
+                                const aiEntry = `<div class="community-user-item">`
+                                  + `<span class="community-user-dot cu-ai"></span>`
+                                  + `<span style="color:#6a1b9a;font-size:0.84em;">🤖 Stockfish</span>`
+                                  + `<span class="user-actions" style="display:flex;margin-left:auto;">`
+                                  + `<button class="user-action-btn" title="Challenge AI" onclick="openAiGameSetup()" style="color:#6a1b9a;">♟</button>`
+                                  + `</span></div>`;
+                                const userItems = users.map(u => {
                                   const dotCls = u.activity === 'playing' ? 'community-user-dot cu-playing' : 'community-user-dot cu-online';
                                   const nameCls = u.username === currentUser ? 'cu-me' : '';
                                   const safeU = u.username.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                                   const safeUAttr = u.username.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
                                   const label = u.username === currentUser ? safeU + ' (you)' : safeU;
                                   const actionsHtml = u.username !== currentUser
-                                    ? `<span class="user-actions">
-                        <button class="user-action-btn" title="Send direct message" onclick="openDmCompose('${safeUAttr}')">✉</button>
-                        <button class="user-action-btn" title="Invite to game" onclick="sendGameInvite('${safeUAttr}')">♟</button>
-                      </span>`
+                                    ? `<span class="user-actions">`
+                                    + `<button class="user-action-btn" title="Send direct message" onclick="openDmCompose('${safeUAttr}')">✉</button>`
+                                    + `<button class="user-action-btn" title="Invite to game" onclick="sendGameInvite('${safeUAttr}')">♟</button>`
+                                    + `</span>`
                                     : '';
                                   return `<div class="community-user-item"><span class="${dotCls}"></span><span class="${nameCls}">${label}</span>${actionsHtml}</div>`;
                                 }).join('');
+                                listEl.innerHTML = aiEntry + userItems;
                                 const statusEl = document.getElementById('community-status-dot');
                                 if (statusEl) statusEl.textContent = users.length + ' online';
                               })
@@ -2767,6 +2894,39 @@
       <button class="color-choice-btn ccb-random" onclick="confirmColorChoice('random')">🎲&nbsp;&nbsp;Random</button>
     </div>
     <button class="color-choice-cancel" onclick="closeColorChoiceModal()">Cancel</button>
+  </div>
+</div>
+<div id="ai-game-setup-overlay" style="display:none;" onclick="if(event.target===this)closeAiGameSetup()">
+  <div class="ai-game-setup-modal">
+    <h3>🤖 Challenge Stockfish AI</h3>
+    <p>Set up your game against Stockfish:</p>
+    <div class="ags-field">
+      <label>AI plays as:</label>
+      <div class="ags-color-options">
+        <button class="ags-color-btn ags-c-white" id="ags-btn-white" onclick="selectAiColor('white')">♔ White</button>
+        <button class="ags-color-btn ags-c-black" id="ags-btn-black" onclick="selectAiColor('black')">♚ Black</button>
+        <button class="ags-color-btn ags-c-random ags-active" id="ags-btn-random" onclick="selectAiColor('random')">🎲
+          Random</button>
+      </div>
+    </div>
+    <div class="ags-field">
+      <label for="ags-skill-level">Skill Level (1–10):</label>
+      <input type="number" id="ags-skill-level" value="5" min="1" max="10">
+    </div>
+    <div class="ags-field">
+      <label id="ags-strategy-label" for="ags-strategy">Preferred Strategy:</label>
+      <select id="ags-strategy">
+        <option value="">No Preference</option>
+        <option value="ruy-lopez">Ruy Lopez (White Opening)</option>
+        <option value="italian">Italian Game (White Opening)</option>
+        <option value="sicilian">Sicilian Defense (Black Defense)</option>
+        <option value="french">French Defense (Black Defense)</option>
+      </select>
+    </div>
+    <div class="ags-actions">
+      <button class="ags-start-btn" onclick="confirmAiGameSetup()">▶ Start Game</button>
+      <button class="ags-cancel-btn" onclick="closeAiGameSetup()">Cancel</button>
+    </div>
   </div>
 </div>
 </body>
