@@ -1397,8 +1397,8 @@
             }
           }
 
-      function updateMoveHistory(move, isAI = false) {
-        const player = isAI ? 'AI' : 'You';
+          function updateMoveHistory(move, playerLabel = 'You') {
+            const player = playerLabel;
         moveHistory.push({ move, player });
 
         const historyDiv = document.getElementById('move-history');
@@ -2290,6 +2290,13 @@
                                           logCommMessage('resp', 'AUTH', '/community/clear-activity', data, null);
                                           if (data.success) {
                                             postActivity('online');
+                                            // Clear the Game Banner
+                                            isSyncGame = false;
+                                            syncGameId = null;
+                                            updateSyncGameIdDisplay();
+                                            // Reset Game Status
+                                            const statusDiv = document.getElementById('game-status');
+                                            if (statusDiv) statusDiv.innerHTML = '<p>Game Status: <strong>Ready to play</strong></p>';
                                           }
                                         })
                                         .catch(e => console.error('Clear activity error:', e));
@@ -2328,7 +2335,7 @@
             }
 
             updateStatusBox(`You played: ${move.san}`, 'info');
-            updateMoveHistory(move.san, false);
+            updateMoveHistory(move.san, 'You');
             updateCapturedPieces(move);
             updateFenDisplay();
             updateExpertContextBadge();
@@ -2610,7 +2617,7 @@
 
               // Update move history with SAN notation
               const sanMove = data.ai_move_san || aiMoveResult.san;
-              updateMoveHistory(sanMove, true);
+              updateMoveHistory(sanMove, currentOpponent || 'AI');
               updateFenDisplay();
               updateStatusBox(`AI played: ${sanMove} (${data.ai_type})`, 'info');
               checkGameStatus();
@@ -2713,7 +2720,7 @@
                   if (result) {
                     applied = true;
                     board.position(game.fen());
-                    updateMoveHistory(data.last_move_san || result.san, true);
+                    updateMoveHistory(data.last_move_san || result.san, data.moved_by || 'Opponent');
                     updateCapturedPieces(result);
                     updateFenDisplay();
                     updateStatusBox((data.moved_by || 'Opponent') + ' played: ' + (data.last_move_san || result.san), 'info');
