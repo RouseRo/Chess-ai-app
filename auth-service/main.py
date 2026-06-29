@@ -82,9 +82,23 @@ def init_db():
             is_verified BOOLEAN DEFAULT 0,
             verification_token TEXT,
             games_count INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_login TIMESTAMP,
+            last_activity TIMESTAMP,
+            current_activity TEXT DEFAULT 'offline'
         )
     ''')
+
+    # Migration: add new columns to existing databases
+    cursor.execute("PRAGMA table_info(users)")
+    existing_columns = [col[1] for col in cursor.fetchall()]
+    for col, definition in [
+        ('last_login', 'TIMESTAMP'),
+        ('last_activity', 'TIMESTAMP'),
+        ('current_activity', "TEXT DEFAULT 'offline'"),
+    ]:
+        if col not in existing_columns:
+            cursor.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
     
     # Create default admin if not exists
     cursor.execute("SELECT id FROM users WHERE username = ?", ("admin",))
@@ -95,6 +109,16 @@ def init_db():
             VALUES (?, ?, ?, ?, ?)
         ''', ("admin", "admin@chess.local", password_hash, True, True))
         print("[AUTH] Created default admin user")
+
+    # Create default test user if not exists
+    cursor.execute("SELECT id FROM users WHERE username = ?", ("testuser",))
+    if not cursor.fetchone():
+        password_hash = bcrypt.hashpw(b"Chess123", bcrypt.gensalt()).decode()
+        cursor.execute('''
+            INSERT INTO users (username, email, password_hash, is_admin, is_verified)
+            VALUES (?, ?, ?, ?, ?)
+        ''', ("testuser", "testuser@chess.local", password_hash, False, True))
+        print("[AUTH] Created default test user")
     
     conn.commit()
     conn.close()
@@ -180,7 +204,18 @@ async def login(request: LoginRequest):
     
     # Create token
     token = create_token(user["username"], bool(user["is_admin"]), user["email"])
-    
+
+    # Track login activity
+    conn2 = get_db()
+    cur2 = conn2.cursor()
+    now = datetime.now(timezone.utc).isoformat()
+    cur2.execute(
+        "UPDATE users SET last_login = ?, last_activity = ?, current_activity = 'online' WHERE username = ?",
+        (now, now, user["username"])
+    )
+    conn2.commit()
+    conn2.close()
+
     return {
         "success": True,
         "message": f"Welcome back, {user['username']}!",
@@ -238,19 +273,22 @@ async def register(request: RegisterRequest):
 
 
 @app.post("/auth/verify")
-async def verify(request: TokenRequest):
-    """Verify a JWT token."""
-    payload = verify_jwt_token(request.token)
-    
+async def verify(authorization: str = Header(None)):
+    """Verify a JWT token provided as a Bearer token in the Authorization header."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+    token = authorization[len("Bearer "):]
+    payload = verify_jwt_token(token)
+
     if payload:
         return {
-            "valid": True,
+            "success": True,
             "username": payload.get("username"),
             "is_admin": payload.get("is_admin", False),
             "email": payload.get("email", "")
         }
-    
-    return {"valid": False, "message": "Invalid or expired token."}
+
+    return {"success": False, "message": "Invalid or expired token."}
 
 
 @app.post("/auth/verify-email")
@@ -286,7 +324,53 @@ async def verify_email(request: VerifyEmailRequest):
 @app.post("/auth/logout")
 async def logout(request: TokenRequest):
     """Logout user."""
+    payload = verify_jwt_token(request.token)
+    if payload:
+        username = payload.get("username")
+        conn = get_db()
+        cursor = conn.cursor()
+        now = datetime.now(timezone.utc).isoformat()
+        cursor.execute(
+            "UPDATE users SET last_activity = ?, current_activity = 'offline' WHERE username = ?",
+            (now, username)
+        )
+        conn.commit()
+        conn.close()
     return {"success": True, "message": "Logged out successfully."}
+
+
+class ActivityRequest(BaseModel):
+    activity: str  # 'online', 'playing', 'idle'
+
+
+@app.post("/auth/activity")
+async def update_activity(
+    request: ActivityRequest,
+    authorization: Optional[str] = Header(None)
+):
+    """Update the current user's activity status."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+
+    token = authorization.replace("Bearer ", "")
+    payload = verify_jwt_token(token)
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+
+    username = payload.get("username")
+    allowed = ('online', 'playing', 'idle', 'offline')
+    activity = request.activity if request.activity in allowed else 'online'
+
+    conn = get_db()
+    cursor = conn.cursor()
+    now = datetime.now(timezone.utc).isoformat()
+    cursor.execute(
+        "UPDATE users SET last_activity = ?, current_activity = ? WHERE username = ?",
+        (now, activity, username)
+    )
+    conn.commit()
+    conn.close()
+    return {"success": True, "activity": activity}
 
 
 @app.post("/auth/change-password")
@@ -345,3 +429,318 @@ async def refresh_token(request: TokenRequest):
     )
     
     return {"success": True, "token": new_token, "message": "Token refreshed successfully."}
+
+
+# ========== Community Endpoints ==========
+
+import json as _json_module
+
+def _init_community_tables(conn: sqlite3.Connection):
+    """Ensure community_messages table exists."""
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS community_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender TEXT NOT NULL,
+            content TEXT NOT NULL,
+            message_type TEXT DEFAULT 'chat',
+            target_users TEXT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+
+
+def _is_online(last_activity_str: Optional[str], current_activity: Optional[str]) -> bool:
+    """Return True if user has been active within the last 5 minutes."""
+    if current_activity == 'offline':
+        return False
+    if not last_activity_str:
+        return False
+    try:
+        last = datetime.fromisoformat(last_activity_str.replace('Z', '+00:00'))
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - last) < timedelta(minutes=5)
+    except Exception:
+        return False
+
+
+class CommunityMessageRequest(BaseModel):
+    content: str
+
+
+class AnnouncementRequest(BaseModel):
+    content: str
+    target_users: Optional[list] = None  # None = broadcast to all
+
+
+@app.get("/community/online-users")
+async def get_online_users(authorization: Optional[str] = Header(None)):
+    """Return list of currently online users."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT username, current_activity, last_activity FROM users WHERE is_verified = 1"
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    online = []
+    for row in rows:
+        if _is_online(row["last_activity"], row["current_activity"]):
+            online.append({
+                "username": row["username"],
+                "activity": row["current_activity"] or "online"
+            })
+    return {"success": True, "users": online}
+
+
+@app.get("/community/messages")
+async def get_community_messages(
+    limit: int = 50,
+    authorization: Optional[str] = Header(None)
+):
+    """Return recent community chat messages and announcements visible to this user."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+
+    username = payload.get("username")
+    conn = get_db()
+    _init_community_tables(conn)
+    cursor = conn.cursor()
+
+    # Fetch recent messages (chat + announcements targeting this user or all)
+    cursor.execute(
+        '''SELECT id, sender, content, message_type, target_users, created_at
+           FROM community_messages
+           ORDER BY created_at DESC
+           LIMIT ?''',
+        (max(1, min(limit, 200)),)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    messages = []
+    for row in rows:
+        target = row["target_users"]
+        # Include if: it's a chat message, or it's an announcement for all (target is NULL),
+        # or it targets this specific user.
+        if row["message_type"] == "chat":
+            include = True
+        elif target is None:
+            include = True
+        else:
+            try:
+                targets = _json_module.loads(target)
+                include = username in targets
+            except Exception:
+                include = False
+        if include:
+            messages.append({
+                "id": row["id"],
+                "sender": row["sender"],
+                "content": row["content"],
+                "message_type": row["message_type"],
+                "target_users": _json_module.loads(row["target_users"]) if row["target_users"] else None,
+                "created_at": row["created_at"]
+            })
+
+    # Return in chronological order (oldest first)
+    messages.reverse()
+    return {"success": True, "messages": messages}
+
+
+@app.post("/community/messages")
+async def post_community_message(
+    request: CommunityMessageRequest,
+    authorization: Optional[str] = Header(None)
+):
+    """Post a chat message to the community."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+
+    content = request.content.strip()
+    if not content:
+        return {"success": False, "message": "Message cannot be empty."}
+    if len(content) > 500:
+        return {"success": False, "message": "Message too long (max 500 characters)."}
+
+    username = payload.get("username")
+    conn = get_db()
+    _init_community_tables(conn)
+    cursor = conn.cursor()
+    now = datetime.now(timezone.utc).isoformat()
+    cursor.execute(
+        "INSERT INTO community_messages (sender, content, message_type, created_at) VALUES (?, ?, 'chat', ?)",
+        (username, content, now)
+    )
+    conn.commit()
+    msg_id = cursor.lastrowid
+    conn.close()
+    return {"success": True, "id": msg_id}
+
+
+@app.post("/community/announcements")
+async def post_announcement(
+    request: AnnouncementRequest,
+    authorization: Optional[str] = Header(None)
+):
+    """Post an admin announcement (admin only). target_users=None means all users."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+    if not payload.get("is_admin"):
+        return {"success": False, "message": "Admin privileges required."}
+
+    content = request.content.strip()
+    if not content:
+        return {"success": False, "message": "Announcement cannot be empty."}
+    if len(content) > 1000:
+        return {"success": False, "message": "Announcement too long (max 1000 characters)."}
+
+    username = payload.get("username")
+    target_json = _json_module.dumps(request.target_users) if request.target_users else None
+    conn = get_db()
+    _init_community_tables(conn)
+    cursor = conn.cursor()
+    now = datetime.now(timezone.utc).isoformat()
+    cursor.execute(
+        "INSERT INTO community_messages (sender, content, message_type, target_users, created_at) VALUES (?, ?, 'announcement', ?, ?)",
+        (username, content, target_json, now)
+    )
+    conn.commit()
+    msg_id = cursor.lastrowid
+    conn.close()
+    return {"success": True, "id": msg_id}
+
+
+class DirectMessageRequest(BaseModel):
+    recipient: str
+    content: str
+
+
+class GameInviteRequest(BaseModel):
+    recipient: str
+
+
+@app.post("/community/dm")
+async def send_direct_message(
+    request: DirectMessageRequest,
+    authorization: Optional[str] = Header(None)
+):
+    """Send a direct message to a specific user."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+
+    sender = payload.get("username")
+    recipient = request.recipient.strip()
+    content = request.content.strip()
+
+    if not content:
+        return {"success": False, "message": "Message cannot be empty."}
+    if len(content) > 500:
+        return {"success": False, "message": "Message too long (max 500 characters)."}
+    if sender.lower() == recipient.lower():
+        return {"success": False, "message": "Cannot send a message to yourself."}
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT username FROM users WHERE LOWER(username) = LOWER(?)", (recipient,))
+    recipient_row = cursor.fetchone()
+    if not recipient_row:
+        conn.close()
+        return {"success": False, "message": "Recipient not found."}
+
+    actual_recipient = recipient_row["username"]
+    _init_community_tables(conn)
+    now = datetime.now(timezone.utc).isoformat()
+    target_json = _json_module.dumps([sender, actual_recipient])
+    cursor.execute(
+        "INSERT INTO community_messages (sender, content, message_type, target_users, created_at) VALUES (?, ?, 'dm', ?, ?)",
+        (sender, content, target_json, now)
+    )
+    conn.commit()
+    msg_id = cursor.lastrowid
+    conn.close()
+    return {"success": True, "id": msg_id}
+
+
+@app.post("/community/game-invite")
+async def send_game_invite(
+    request: GameInviteRequest,
+    authorization: Optional[str] = Header(None)
+):
+    """Send a game invitation to a specific user."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+
+    sender = payload.get("username")
+    recipient = request.recipient.strip()
+
+    if sender.lower() == recipient.lower():
+        return {"success": False, "message": "Cannot invite yourself."}
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT username FROM users WHERE LOWER(username) = LOWER(?)", (recipient,))
+    recipient_row = cursor.fetchone()
+    if not recipient_row:
+        conn.close()
+        return {"success": False, "message": "User not found."}
+
+    actual_recipient = recipient_row["username"]
+    _init_community_tables(conn)
+    now = datetime.now(timezone.utc).isoformat()
+    target_json = _json_module.dumps([sender, actual_recipient])
+    content = f"{sender} has invited you to play a game of chess!"
+    cursor.execute(
+        "INSERT INTO community_messages (sender, content, message_type, target_users, created_at) VALUES (?, ?, 'game_invite', ?, ?)",
+        (sender, content, target_json, now)
+    )
+    conn.commit()
+    msg_id = cursor.lastrowid
+    conn.close()
+    return {"success": True, "id": msg_id, "recipient": actual_recipient}
+
+
+@app.post("/community/clear-activity")
+async def clear_game_activity(authorization: Optional[str] = Header(None)):
+    """Clear the current user's game activity status shown to admins."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+
+    username = payload.get("username")
+    conn = get_db()
+    _init_community_tables(conn)
+    cursor = conn.cursor()
+    now = datetime.now(timezone.utc).isoformat()
+    cursor.execute(
+        "INSERT INTO community_messages (sender, content, message_type, created_at) VALUES (?, ?, 'game_status_clear', ?)",
+        (username, '', now)
+    )
+    conn.commit()
+    conn.close()
+    return {"success": True}

@@ -49,6 +49,13 @@
     .badge-user { background-color: #2196F3; color: white; }
     .badge-enabled { background-color: #4CAF50; color: white; }
     .badge-disabled { background-color: #f44336; color: white; }
+    .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+    .status-online { background-color: #4CAF50; }
+    .status-playing { background-color: #ff9800; }
+    .status-offline { background-color: #9e9e9e; }
+    .badge-online { background-color: #4CAF50; color: white; }
+    .badge-playing { background-color: #ff9800; color: white; }
+    .badge-offline { background-color: #9e9e9e; color: white; }
     .action-buttons { display: flex; gap: 8px; }
     .form-group { margin-bottom: 20px; }
     .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #333; }
@@ -91,6 +98,7 @@
       <ul class="sidebar-menu">
         <li><a class="nav-link active" onclick="switchTab('dashboard')">Dashboard</a></li>
         <li><a class="nav-link" onclick="switchTab('users')">User Management</a></li>
+        <li><a class="nav-link" onclick="switchTab('announcements'); loadAnnouncementsSection();">Announcements</a></li>
         <li><a class="nav-link" onclick="switchTab('models')">AI Models</a></li>
         <li><a class="nav-link" onclick="switchTab('settings')">Settings</a></li>
       </ul>
@@ -119,15 +127,30 @@
             <div class="search-box">
               <input type="text" id="user-search" placeholder="Search users..." onkeyup="filterUsers()">
             </div>
-            <button class="btn btn-primary" onclick="openAddUserModal()">+ Add User</button>
+            <div style="display: flex; gap: 10px;">
+              <button class="btn btn-secondary" onclick="loadUsers()" title="Refresh user list and statuses">&#8635; Refresh
+                Status</button>
+              <button class="btn btn-primary" onclick="openAddUserModal()">+ Add User</button>
+            </div>
           </div>
           <div class="table-responsive">
             <table id="users-table">
               <thead>
-                <tr><th>Username</th><th>Email</th><th>Role</th><th>Games Played</th><th>Created</th><th>Actions</th></tr>
+                <tr>
+                  <th>Username</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Games</th>
+                  <th>Created</th>
+                  <th>Game Activity</th>
+                  <th>Actions</th>
+                </tr>
               </thead>
               <tbody id="users-tbody">
-                <tr><td colspan="6" class="loading">Loading users...</td></tr>
+                <tr>
+                  <td colspan="8" class="loading">Loading users...</td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -152,6 +175,47 @@
               </tbody>
             </table>
           </div>
+        </div>
+      </section>
+
+      <section id="announcements" class="content-section">
+        <h2 class="page-title">Announcements</h2>
+        <p class="page-subtitle">Send messages to all players or a selected group</p>
+      
+        <div class="card">
+          <h3>Send Announcement</h3>
+          <div class="form-group">
+            <label for="ann-content">Message</label>
+            <textarea id="ann-content" rows="3" placeholder="Type your announcement here…" maxlength="1000"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Recipients</label>
+            <div style="display:flex; gap:15px; align-items:center; flex-wrap:wrap;">
+              <label style="font-weight:normal; display:flex; align-items:center; gap:6px; cursor:pointer;">
+                <input type="radio" name="ann-target" value="all" checked onchange="toggleAnnRecipients()"> All online players
+              </label>
+              <label style="font-weight:normal; display:flex; align-items:center; gap:6px; cursor:pointer;">
+                <input type="radio" name="ann-target" value="select" onchange="toggleAnnRecipients()"> Select users
+              </label>
+            </div>
+            <div id="ann-user-select" style="display:none; margin-top:10px;">
+              <div id="ann-user-checkboxes"
+                style="display:flex; flex-wrap:wrap; gap:10px; padding:10px; border:1px solid #ddd; border-radius:4px; background:#fafafa; max-height:160px; overflow-y:auto;">
+                <span style="color:#999;">Loading users…</span>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="sendAnnouncement()">📢 Send Announcement</button>
+        </div>
+      
+        <div class="card">
+          <h3>Announcement History</h3>
+          <div id="ann-history" style="max-height:400px; overflow-y:auto;">
+            <div class="loading">
+              <div class="spinner"></div>Loading…
+            </div>
+          </div>
+          <button class="btn btn-secondary" style="margin-top:10px;" onclick="loadAnnouncementHistory()">Refresh</button>
         </div>
       </section>
 
@@ -251,6 +315,7 @@
     var currentAdminUser = null;
     var API_ADMIN = 'http://localhost:8001';
     var API_AUTH = 'http://localhost:8002';
+            var usersRefreshTimer = null;
 
     window.onload = function() {
       var token = localStorage.getItem('authToken');
@@ -265,6 +330,14 @@
       adminToken = token;
       currentAdminUser = user;
       document.getElementById('admin-username').textContent = user;
+
+      // Mark the admin as online so User Management shows correct status
+      fetch(API_AUTH + '/auth/activity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ activity: 'online' })
+      }).catch(function () { });
+
       loadDashboard();
     };
 
@@ -282,9 +355,17 @@
       document.getElementById(tabName).classList.add('active');
       event.target.classList.add('active');
 
-      if (tabName === 'users') { loadUsers(); }
+      // Stop any existing auto-refresh
+      if (usersRefreshTimer) { clearInterval(usersRefreshTimer); usersRefreshTimer = null; }
+
+      if (tabName === 'users') {
+        loadUsers();
+        // Auto-refresh user status every 30 seconds
+        usersRefreshTimer = setInterval(loadUsers, 30000);
+      }
       else if (tabName === 'models') { loadModels(); }
       else if (tabName === 'dashboard') { loadDashboard(); }
+      // announcements section loads via its own onclick handler
     }
 
     function loadDashboard() {
@@ -329,7 +410,7 @@
     function displayUsers(users) {
       var tbody = document.getElementById('users-tbody');
       if (users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No users found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No users found</td></tr>';
         return;
       }
 
@@ -340,12 +421,29 @@
         var roleText = user.is_admin ? 'Admin' : 'User';
         var createdDate = new Date(user.created_at).toLocaleDateString();
 
+        // Status badge
+        var statusLabel = user.status_label || 'Offline';
+        var statusClass = 'badge-offline';
+        var dotClass = 'status-offline';
+        if (user.is_online) {
+          if (user.current_activity === 'playing') {
+            statusClass = 'badge-playing';
+            dotClass = 'status-playing';
+          } else {
+            statusClass = 'badge-online';
+            dotClass = 'status-online';
+          }
+        }
+
         html += '<tr>';
         html += '<td><strong>' + user.username + '</strong></td>';
         html += '<td>' + user.email + '</td>';
         html += '<td><span class="badge ' + roleClass + '">' + roleText + '</span></td>';
+        html += '<td><span class="badge ' + statusClass + '"><span class="status-dot ' + dotClass + '"></span>' + statusLabel + '</span></td>';
         html += '<td>' + (user.games_count || 0) + '</td>';
         html += '<td>' + createdDate + '</td>';
+        var gameStatus = user.game_status || '';
+        html += '<td style="font-size:0.85em;color:#555;">' + (gameStatus ? '<span title="' + gameStatus + '">' + gameStatus + '</span>' : '<span style="color:#bbb;">—</span>') + '</td>';
         html += '<td><div class="action-buttons">';
 
         if (user.username !== 'admin') {
@@ -369,6 +467,7 @@
       var rows = document.querySelectorAll('#users-tbody tr');
       for (var i = 0; i < rows.length; i++) {
         var row = rows[i];
+        if (row.cells.length < 2) { continue; }
         var username = row.cells[0].textContent.toLowerCase();
         var email = row.cells[1].textContent.toLowerCase();
         row.style.display = (username.indexOf(searchTerm) >= 0 || email.indexOf(searchTerm) >= 0) ? '' : 'none';
@@ -613,6 +712,102 @@
       alertDiv.className = 'alert alert-' + type + ' show';
       setTimeout(function() { alertDiv.classList.remove('show'); }, 4000);
     }
+
+        // ─── Announcements ────────────────────────────────────────────────────────
+
+        var allUsersList = [];
+
+        function loadAnnouncementsSection() {
+          loadAnnouncementUserList();
+          loadAnnouncementHistory();
+        }
+
+        function toggleAnnRecipients() {
+          var mode = document.querySelector('input[name="ann-target"]:checked').value;
+          document.getElementById('ann-user-select').style.display = (mode === 'select') ? 'block' : 'none';
+        }
+
+        function loadAnnouncementUserList() {
+          fetch(API_ADMIN + '/admin/users')
+            .then(function (r) { return r.json(); })
+            .then(function (users) {
+              if (!Array.isArray(users)) return;
+              allUsersList = users;
+              var html = '';
+              for (var i = 0; i < users.length; i++) {
+                var u = users[i];
+                var safeU = u.username.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                html += '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:0.9em;"><input type="checkbox" class="ann-user-cb" value="' + safeU + '"> ' + safeU + '</label>';
+              }
+              document.getElementById('ann-user-checkboxes').innerHTML = html || '<span style="color:#999;">No users found</span>';
+            })
+            .catch(function () { });
+        }
+
+        function sendAnnouncement() {
+          var content = document.getElementById('ann-content').value.trim();
+          if (!content) { showAlert('Please enter an announcement message.', 'error'); return; }
+
+          var mode = document.querySelector('input[name="ann-target"]:checked').value;
+          var targetUsers = null;
+          if (mode === 'select') {
+            var checked = document.querySelectorAll('.ann-user-cb:checked');
+            if (checked.length === 0) { showAlert('Please select at least one user.', 'error'); return; }
+            targetUsers = [];
+            for (var i = 0; i < checked.length; i++) { targetUsers.push(checked[i].value); }
+          }
+
+          fetch(API_AUTH + '/community/announcements', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + adminToken },
+            body: JSON.stringify({ content: content, target_users: targetUsers })
+          })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              if (data.success) {
+                showAlert('Announcement sent!', 'success');
+                document.getElementById('ann-content').value = '';
+                loadAnnouncementHistory();
+              } else {
+                showAlert(data.message || 'Failed to send announcement', 'error');
+              }
+            })
+            .catch(function (err) { showAlert('Error: ' + err.message, 'error'); });
+        }
+
+        function loadAnnouncementHistory() {
+          var histEl = document.getElementById('ann-history');
+          if (!histEl) return;
+          histEl.innerHTML = '<div class="loading"><div class="spinner"></div>Loading…</div>';
+          fetch(API_AUTH + '/community/messages?limit=50', {
+            headers: { 'Authorization': 'Bearer ' + adminToken }
+          })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              if (!data.success) { histEl.innerHTML = '<p style="color:#999;">Could not load history.</p>'; return; }
+              var msgs = (data.messages || []).filter(function (m) { return m.message_type === 'announcement'; });
+              if (msgs.length === 0) { histEl.innerHTML = '<p style="color:#999;">No announcements sent yet.</p>'; return; }
+              // Show newest first
+              msgs = msgs.slice().reverse();
+              var html = '';
+              for (var i = 0; i < msgs.length; i++) {
+                var m = msgs[i];
+                var time = new Date(m.created_at).toLocaleString();
+                var safeC = m.content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                var targetLabel = m.target_users ? 'Selected users' : 'All users';
+                if (m.target_users) {
+                  try { var arr = JSON.parse(m.target_users); targetLabel = arr.join(', '); } catch (e) { }
+                }
+                html += '<div style="border:1px solid #ffe082; border-radius:6px; padding:12px 14px; margin-bottom:10px; background:#fffde7;">';
+                html += '<div style="display:flex; justify-content:space-between; font-size:0.82em; color:#888; margin-bottom:6px;"><span>📢 By <strong>' + m.sender + '</strong></span><span>' + time + '</span></div>';
+                html += '<div style="margin-bottom:4px;">' + safeC + '</div>';
+                html += '<div style="font-size:0.8em; color:#bbb;">Recipients: ' + targetLabel + '</div>';
+                html += '</div>';
+              }
+              histEl.innerHTML = html;
+            })
+            .catch(function () { histEl.innerHTML = '<p style="color:#999;">Error loading history.</p>'; });
+        }
 
     function handleLogout() {
       if (!confirm('Are you sure you want to logout?')) return;

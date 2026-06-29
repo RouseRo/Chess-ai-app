@@ -46,9 +46,14 @@
       flex: 1.5;
       padding: 20px;
       background-color: #f9f9f9;
-      overflow-y: auto;
       display: flex;
       flex-direction: column;
+      min-height: 0;
+    }
+    .game-panel > h2 {
+      margin-top: 0;
+      margin-bottom: 15px;
+      flex-shrink: 0;
     }
     /* Grid layout - remove to make tab-panel full width */
     .panel-grid {
@@ -62,12 +67,20 @@
       margin-bottom: 0;
     }
     
-    /* New grid layout for Strategy + TabPanel side by side */
+    /* New grid layout - now single column for TabPanel only */
     .game-content-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr;
       gap: 15px;
-      margin-bottom: 20px;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      align-items: stretch;
+    }
+    
+    .game-content-grid > * {
+      min-height: 0;
+      overflow: hidden;
     }
     
     .game-content-grid .section-box {
@@ -82,6 +95,7 @@
       border-radius: 4px;
       background-color: white;
       overflow: hidden;
+      min-height: 0;
     }
     .tab-panel-list {
       display: flex;
@@ -112,6 +126,11 @@
       padding: 15px;
       flex: 1;
       overflow-y: auto;
+      display: none;
+      min-height: 0;
+    }
+    .tab-panel-content[style*="display: block"] {
+      display: block !important;
     }
     /* Move history styling */
     #move-history {
@@ -148,6 +167,36 @@
     .expert-send-btn:hover {
       background-color: #1976D2;
     }
+    .expert-quick-btn {
+      padding: 5px 10px;
+      font-size: 0.8em;
+      background-color: #f0f0f0;
+      border: 1px solid #ccc;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+    .expert-quick-btn:hover {
+      background-color: #e0e0e0;
+    }
+    .expert-qa-entry {
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      overflow: hidden;
+      font-size: 0.9em;
+    }
+    .expert-qa-question {
+      padding: 7px 10px;
+      background: #e3f2fd;
+      color: #1565c0;
+      font-weight: 500;
+    }
+    .expert-qa-answer {
+      padding: 8px 10px;
+      background: white;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
     #expert-response {
       min-height: 80px;
       padding: 10px;
@@ -170,6 +219,14 @@
       background-color: white;
       border-radius: 4px;
       border: 1px solid #ddd;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .section-box h3 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      flex-shrink: 0;
     }
     #board {
       width: 400px;
@@ -188,6 +245,16 @@
       min-height: 60px;
       max-height: 120px;
       overflow-y: auto;
+    }
+    #status-box-left {
+      padding: 12px;
+      background-color: white;
+      font-family: monospace;
+      font-size: 15px;
+      flex: 1;
+      overflow-y: scroll;
+      line-height: 1.8;
+      min-height: 0;
     }
     #status-box .status-success {
       color: #2e7d32;
@@ -235,6 +302,283 @@
       max-height: 80px;
       overflow-y: auto;
     }
+    /* Comm diagnostics panel */
+    .comm-log {
+      overflow-y: auto;
+      max-height: 420px;
+      font-family: monospace;
+      font-size: 12px;
+      background: #fafafa;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      flex: 1;
+      min-height: 0;
+    }
+    .comm-entry {
+      border-bottom: 1px solid #e8e8e8;
+      padding: 6px 8px;
+    }
+    .comm-entry.comm-req {
+      border-left: 3px solid #1565c0;
+      background: #e3f2fd;
+    }
+    .comm-entry.comm-res.ok {
+      border-left: 3px solid #2e7d32;
+      background: #e8f5e9;
+    }
+    .comm-entry.comm-res.err {
+      border-left: 3px solid #c62828;
+      background: #ffebee;
+    }
+    .comm-entry.comm-conn-err {
+      border-left: 3px solid #e65100;
+      background: #fff3e0;
+    }
+    .comm-entry.comm-info {
+      border-left: 3px solid #6a1b9a;
+      background: #f3e5f5;
+    }
+    .comm-timestamp { color: #757575; font-size: 11px; }
+    .comm-direction { font-weight: bold; }
+    .comm-body {
+      margin-top: 4px;
+      word-break: break-all;
+      white-space: pre-wrap;
+      max-height: 80px;
+      overflow-y: auto;
+      background: rgba(0,0,0,0.04);
+      border-radius: 3px;
+      padding: 3px 5px;
+    }
+    #comm-panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    /* Welcome Tab */
+    .welcome-tab-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin: 12px 0;
+    }
+    .welcome-tab-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      background: #fafafa;
+      cursor: pointer;
+      font-size: 0.88em;
+      font-weight: 600;
+      color: #333;
+      text-align: left;
+      transition: all 0.15s ease;
+    }
+    .welcome-tab-btn:hover {
+      border-color: #2196F3;
+      background: #e3f2fd;
+      color: #1565c0;
+    }
+    .welcome-tab-btn .wb-icon { font-size: 1.3em; }
+    .welcome-tab-btn.wb-primary { border-color: #4CAF50; background: #f1f8f1; color: #2e7d32; }
+    .welcome-tab-btn.wb-primary:hover { background: #c8e6c9; border-color: #388e3c; color: #1b5e20; }
+    .welcome-tab-btn.wb-continue { border-color: #ff9800; background: #fff8f0; color: #e65100; }
+    .welcome-tab-btn.wb-continue:hover { background: #ffe0b2; border-color: #f57c00; }
+    #welcome-info-area {
+      margin-top: 12px;
+      padding: 12px 14px;
+      background: #f5f5f5;
+      border-radius: 6px;
+      border: 1px solid #e0e0e0;
+      font-size: 0.9em;
+      line-height: 1.6;
+      display: none;
+    }
+    #welcome-info-area.visible { display: block; }
+    #welcome-info-area h4 { margin: 0 0 6px; }
+    #welcome-info-area ul { margin: 4px 0; padding-left: 18px; }
+    .endgame-drill-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 2px solid #4CAF50;
+      border-radius: 8px;
+      background: #f1f8f1;
+      cursor: pointer;
+      font-size: 0.88em;
+      color: #2e7d32;
+      text-align: left;
+      width: 100%;
+      transition: all 0.15s ease;
+    }
+    .endgame-drill-btn:hover {
+      background: #c8e6c9;
+      border-color: #388e3c;
+    }
+    .endgame-drill-btn.endgame-drill-locked {
+      border-color: #ccc;
+      background: #f5f5f5;
+      color: #aaa;
+      cursor: not-allowed;
+    }
+    /* Stats Tab */
+    .stats-summary-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .stats-summary-card {
+      text-align: center;
+      padding: 10px 6px;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+    }
+    .stats-summary-card .sc-value {
+      font-size: 1.8em;
+      font-weight: 700;
+      line-height: 1.1;
+    }
+    .stats-summary-card .sc-label {
+      font-size: 0.78em;
+      color: #777;
+      margin-top: 2px;
+    }
+    .stats-summary-card.sc-win  { background: #e8f5e9; border-color: #a5d6a7; }
+    .stats-summary-card.sc-win  .sc-value { color: #2e7d32; }
+    .stats-summary-card.sc-loss { background: #ffebee; border-color: #ef9a9a; }
+    .stats-summary-card.sc-loss .sc-value { color: #c62828; }
+    .stats-summary-card.sc-draw { background: #fff8e1; border-color: #ffe082; }
+    .stats-summary-card.sc-draw .sc-value { color: #f57f17; }
+    .stats-opponent-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85em;
+    }
+    .stats-opponent-table th {
+      background: #f5f5f5;
+      padding: 6px 8px;
+      text-align: left;
+      border-bottom: 2px solid #ddd;
+      font-weight: 600;
+    }
+    .stats-opponent-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #eee;
+      vertical-align: middle;
+    }
+    .stats-opponent-table tr:last-child td { border-bottom: none; }
+    .stats-opponent-table tr:hover td { background: #fafafa; }
+    .stat-w { color: #2e7d32; font-weight: 600; }
+    .stat-l { color: #c62828; font-weight: 600; }
+    .stat-d { color: #f57f17; font-weight: 600; }
+    .stats-empty { color: #999; font-size: 0.9em; text-align: center; padding: 20px 0; }
+    /* Community Tab */
+    #community-panel { display: flex; flex-direction: column; min-height: 0; gap: 0; }
+    .community-layout { display: flex; gap: 10px; flex: 1; min-height: 0; }
+    .community-users-sidebar {
+      width: 130px; flex-shrink: 0; border: 1px solid #e0e0e0; border-radius: 4px;
+      background: #fafafa; overflow-y: auto; padding: 6px 0;
+    }
+    .community-users-sidebar h4 { font-size: 0.78em; color: #888; text-transform: uppercase;
+      padding: 0 8px 6px; margin: 0; border-bottom: 1px solid #eee; }
+    .community-user-item { display: flex; align-items: center; gap: 6px; padding: 5px 8px; font-size: 0.85em; }
+    .community-user-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .cu-online  { background: #4CAF50; }
+    .cu-playing { background: #ff9800; }
+    .cu-me { font-weight: 700; color: #1565c0; }
+    .community-chat-area { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .community-messages {
+      flex: 1; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 4px;
+      padding: 8px; background: white; font-size: 0.88em; line-height: 1.5; min-height: 0;
+    }
+    .comm-msg { padding: 4px 6px; border-radius: 4px; margin-bottom: 4px; }
+    .comm-msg-chat { background: #f5f5f5; }
+    .comm-msg-chat.comm-msg-own { background: #e3f2fd; }
+    .comm-msg-announcement {
+      background: #fff8e1; border-left: 3px solid #ff9800;
+      font-weight: 500; padding: 6px 8px; margin-bottom: 6px;
+    }
+    .comm-msg-header { display: flex; justify-content: space-between; font-size: 0.82em; color: #888; margin-bottom: 1px; }
+    .comm-msg-sender { font-weight: 600; color: #333; }
+    .comm-msg-announcement .comm-msg-sender { color: #e65100; }
+    .comm-msg-announcement .comm-msg-header::before { content: '📢 '; }
+    .comm-msg-text { word-break: break-word; }
+    .community-input-row { display: flex; gap: 6px; margin-top: 6px; flex-shrink: 0; }
+    .community-input-row input {
+      flex: 1; padding: 7px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9em;
+    }
+    .community-send-btn {
+      padding: 7px 14px; background: #2196F3; color: white; border: none;
+      border-radius: 4px; cursor: pointer; font-weight: 500; font-size: 0.9em;
+    }
+    .community-send-btn:hover { background: #1976D2; }
+    .comm-empty { color: #999; font-size: 0.88em; text-align: center; padding: 20px 0; }
+    .comm-unread-badge {
+      display: inline-block; background: #f44336; color: white; border-radius: 10px;
+      font-size: 0.7em; padding: 1px 5px; margin-left: 4px; vertical-align: middle; line-height: 1.4;
+    }
+    /* Direct Message styling */
+    .comm-msg-dm { background: #f3e5f5; border-left: 3px solid #9c27b0; }
+    .comm-msg-dm .comm-msg-sender { color: #6a1b9a; }
+    .comm-msg-dm-tag { font-size: 0.72em; background: #9c27b0; color: white; border-radius: 3px; padding: 1px 4px; margin-left: 4px; vertical-align: middle; }
+    /* Game invite styling */
+    .comm-msg-game-invite { background: #e8f5e9; border-left: 3px solid #4CAF50; padding: 8px 10px; margin-bottom: 4px; border-radius: 4px; font-size: 0.9em; }
+    .game-invite-actions { display: flex; gap: 6px; margin-top: 6px; }
+    .game-invite-accept-btn { padding: 4px 12px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em; font-weight: 500; }
+    .game-invite-accept-btn:hover { background: #388e3c; }
+    .game-invite-decline-btn { padding: 4px 12px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em; font-weight: 500; }
+    .game-invite-decline-btn:hover { background: #c62828; }
+    /* Color choice modal */
+    .color-choice-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+    .color-choice-modal { background: #fff; border-radius: 8px; padding: 24px; max-width: 340px; width: 90%; box-shadow: 0 8px 32px rgba(0,0,0,0.25); }
+    .color-choice-modal h3 { margin: 0 0 8px; font-size: 1.1em; }
+    .color-choice-modal p { margin: 0 0 16px; color: #555; font-size: 0.9em; }
+    .color-choice-options { display: flex; flex-direction: column; gap: 8px; }
+    .color-choice-btn { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 2px solid #e0e0e0; border-radius: 6px; background: #fafafa; cursor: pointer; font-size: 0.95em; font-weight: 600; color: #333; transition: all 0.15s; width: 100%; }
+    .color-choice-btn:hover { background: #f0f0f0; border-color: #aaa; }
+    .color-choice-btn.ccb-white { border-color: #bbb; background: #fff; }
+    .color-choice-btn.ccb-white:hover { background: #f5f5f5; border-color: #888; }
+    .color-choice-btn.ccb-black { border-color: #444; background: #333; color: #fff; }
+    .color-choice-btn.ccb-black:hover { background: #111; border-color: #000; }
+    .color-choice-btn.ccb-random { border-color: #2196F3; background: #e3f2fd; color: #1565c0; }
+    .color-choice-btn.ccb-random:hover { background: #bbdefb; border-color: #1565c0; }
+    .color-choice-cancel { margin-top: 10px; width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer; color: #666; font-size: 0.88em; }
+    .color-choice-cancel:hover { background: #f5f5f5; }
+    /* AI Game Setup Modal */
+    #ai-game-setup-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001; display: flex; align-items: center; justify-content: center; }
+    .ai-game-setup-modal { background: #fff; border-radius: 8px; padding: 22px 24px; max-width: 360px; width: 90%; box-shadow: 0 8px 32px rgba(0,0,0,0.25); }
+    .ai-game-setup-modal h3 { margin: 0 0 6px; font-size: 1.05em; }
+    .ai-game-setup-modal > p { margin: 0 0 14px; color: #555; font-size: 0.88em; }
+    .ags-field { margin-bottom: 13px; }
+    .ags-field label { display: block; font-size: 0.85em; color: #555; margin-bottom: 5px; font-weight: 600; }
+    .ags-field select, .ags-field input[type="number"] { width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9em; box-sizing: border-box; }
+    .ags-color-options { display: flex; gap: 7px; }
+    .ags-color-btn { flex: 1; padding: 8px 4px; border: 2px solid #e0e0e0; border-radius: 5px; background: #fafafa; cursor: pointer; font-size: 0.84em; font-weight: 600; transition: all 0.15s; text-align: center; }
+    .ags-color-btn.ags-active { border-color: #1976D2; background: #e3f2fd; color: #1565c0; }
+    .ags-c-white.ags-active { border-color: #555; background: #f5f5f5; color: #333; }
+    .ags-c-black.ags-active { border-color: #222; background: #333; color: #fff; }
+    .ags-c-random.ags-active { border-color: #2196F3; background: #e3f2fd; color: #1565c0; }
+    .ags-actions { display: flex; gap: 8px; margin-top: 16px; }
+    .ags-start-btn { flex: 1; padding: 10px; background: #2e7d32; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; font-size: 0.93em; }
+    .ags-start-btn:hover { background: #1b5e20; }
+    .ags-cancel-btn { padding: 10px 16px; background: white; border: 1px solid #ddd; border-radius: 5px; cursor: pointer; color: #666; font-size: 0.88em; }
+    .ags-cancel-btn:hover { background: #f5f5f5; }
+    .cu-ai { background: #7b1fa2; }
+    /* User action buttons in sidebar */
+    .user-actions { display: none; gap: 3px; margin-left: auto; }
+    .community-user-item:hover .user-actions { display: flex; }
+    .user-action-btn { padding: 2px 5px; font-size: 0.72em; border: 1px solid #ddd; border-radius: 3px; cursor: pointer; background: white; line-height: 1.3; }
+    .user-action-btn:hover { background: #e3f2fd; border-color: #90caf9; }
+    /* DM compose area */
+    #dm-compose { display: none; background: #f3e5f5; border: 1px solid #ce93d8; border-radius: 4px; padding: 6px 8px; margin-top: 6px; flex-shrink: 0; }
+    #dm-compose .dm-compose-header { font-size: 0.82em; color: #6a1b9a; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+    #dm-compose .dm-input-row { display: flex; gap: 5px; }
+    #dm-compose-input { flex: 1; padding: 5px 8px; border: 1px solid #ce93d8; border-radius: 4px; font-size: 0.9em; }
   </style>
 </head>
 <body>
@@ -250,6 +594,24 @@
     let board = null;
       let game = null;
       let moveHistory = [];
+        let commMessages = [];
+        let capturedByWhite = []; // black pieces captured by White
+        let capturedByBlack = []; // white pieces captured by Black
+        let playerStats = JSON.parse(localStorage.getItem('chessPlayerStats') || '{}');
+        let currentOpponent = null; // set at start of each game
+        let currentPlayerColor = null; // 'white' or 'black'
+        let gameResultRecorded = false;
+          // H vs H board sync
+          let syncGameId = null;
+          let isSyncGame = false;
+          let syncMyColor = null;   // 'white' or 'black' for the current user in a sync game
+          let lastSyncFen = null;
+          let syncPollInterval = null;
+          let respondedInvites = new Set(JSON.parse(localStorage.getItem('respondedInvites') || '[]'));
+          let dmRecipient = null;
+          let _pendingInviteId = null;
+          let _pendingInviterUsername = null;
+            let _aiGameSetupColor = 'random';
 
     function checkAuthentication() {
       const token = localStorage.getItem('authToken');
@@ -311,13 +673,16 @@
         return;
       }
 
+        logCommMessage('req', 'AUTH', '/auth/login', { username }, null);
+        let _loginStatus = null;
       fetch('http://localhost:8002/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       })
-        .then(response => response.json())
+        .then(response => { _loginStatus = response.status; return response.json(); })
         .then(data => {
+          logCommMessage('res', 'AUTH', '/auth/login', data, _loginStatus);
           if (data.success && data.token) {
             authToken = data.token;
             currentUser = username;
@@ -336,6 +701,7 @@
           }
         })
         .catch(error => {
+          logCommMessage('err', 'AUTH', '/auth/login', { message: error.message }, null);
           errorDiv.textContent = 'Error: ' + error.message;
           errorDiv.style.display = 'block';
         });
@@ -353,13 +719,16 @@
         return;
       }
 
+        logCommMessage('req', 'AUTH', '/auth/register', { username, email }, null);
+        let _registerStatus = null;
       fetch('http://localhost:8002/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email, password })
       })
-        .then(response => response.json())
+        .then(response => { _registerStatus = response.status; return response.json(); })
         .then(data => {
+          logCommMessage('res', 'AUTH', '/auth/register', data, _registerStatus);
           if (data.success) {
             alert('Registration successful! Please login.');
             showLoginInterface();
@@ -369,18 +738,22 @@
           }
         })
         .catch(error => {
+          logCommMessage('err', 'AUTH', '/auth/register', { message: error.message }, null);
           errorDiv.textContent = 'Error: ' + error.message;
           errorDiv.style.display = 'block';
         });
     }
 
       function verifyToken(token) {
+        logCommMessage('req', 'AUTH', '/auth/verify', { token: '(stored token)' }, null);
+        let _verifyStatus = null;
       fetch('http://localhost:8002/auth/verify', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + token }
       })
-        .then(response => response.json())
+        .then(response => { _verifyStatus = response.status; return response.json(); })
         .then(data => {
+          logCommMessage('res', 'AUTH', '/auth/verify', data, _verifyStatus);
           if (data.success) {
             currentUser = data.username;
             localStorage.setItem('isAdmin', data.is_admin ? 'true' : 'false');
@@ -398,6 +771,7 @@
           }
         })
         .catch(() => {
+          logCommMessage('err', 'AUTH', '/auth/verify', { message: 'Network or parse error' }, null);
           localStorage.removeItem('authToken');
           localStorage.removeItem('currentUser');
           localStorage.removeItem('isAdmin');
@@ -406,7 +780,7 @@
     }
 
       function updateStatusBox(message, type = 'info') {
-        const statusBox = document.getElementById('status-box');
+        const statusBox = document.getElementById('status-box-left');
         if (!statusBox) return;
 
         const timestamp = new Date().toLocaleTimeString();
@@ -424,8 +798,607 @@
         }
       }
 
-      function updateMoveHistory(move, isAI = false) {
-        const player = isAI ? 'AI' : 'You';
+        function logCommMessage(direction, service, endpoint, data, statusCode) {
+          const sanitized = Object.assign({}, data);
+          if (sanitized.password !== undefined) sanitized.password = '***';
+          if (sanitized.token !== undefined) sanitized.token = '(token)';
+          const msg = {
+            ts: new Date().toLocaleTimeString(),
+            direction: direction,
+            service: service,
+            endpoint: endpoint,
+            data: sanitized,
+            statusCode: statusCode
+          };
+          commMessages.push(msg);
+          if (commMessages.length > 200) commMessages.shift();
+          renderCommEntry(msg);
+        }
+
+        function renderCommEntry(msg) {
+          const log = document.getElementById('comm-log');
+          if (!log) return;
+
+          const placeholder = log.querySelector('p');
+          if (placeholder) placeholder.remove();
+
+          let entryClass = 'comm-entry ';
+          let dirLabel = '';
+          if (msg.direction === 'req') {
+            entryClass += 'comm-req';
+            dirLabel = '→ REQ';
+          } else if (msg.direction === 'res') {
+            entryClass += 'comm-res ' + (msg.statusCode && msg.statusCode >= 400 ? 'err' : 'ok');
+            dirLabel = '← RES';
+          } else if (msg.direction === 'info') {
+            entryClass += 'comm-info';
+            dirLabel = 'ℹ SYNC';
+          } else {
+            entryClass += 'comm-conn-err';
+            dirLabel = '✕ ERR';
+          }
+
+          const statusText = msg.statusCode ? ` ${msg.statusCode}` : '';
+          const bodyText = JSON.stringify(msg.data, null, 2);
+          const safeBody = bodyText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+          const entry = document.createElement('div');
+          entry.className = entryClass;
+          entry.innerHTML =
+            `<span class="comm-timestamp">[${msg.ts}]</span> ` +
+            `<span class="comm-direction">${dirLabel}</span> ` +
+            `<strong>${msg.service}</strong>${statusText} <code>${msg.endpoint}</code>` +
+            `<div class="comm-body">${safeBody}</div>`;
+
+          log.insertBefore(entry, log.firstChild);
+
+          const badge = document.getElementById('comm-count');
+          if (badge) badge.textContent = `(${commMessages.length} message${commMessages.length !== 1 ? 's' : ''})`;
+        }
+
+        function clearCommLog() {
+          commMessages = [];
+          const log = document.getElementById('comm-log');
+          if (log) log.innerHTML = '<p style="color:#999; font-size:12px;">Log cleared.</p>';
+          const badge = document.getElementById('comm-count');
+          if (badge) badge.textContent = '(0 messages)';
+        }
+
+                          // ─── Community Panel ──────────────────────────────────────────────────
+
+                          let communityMessages = [];
+                          let communityLastId = 0;
+                          let communityPollTimer = null;
+                          let communityUsersPollTimer = null;
+                          let communityTabOpen = false;
+                          let communityUnreadCount = 0;
+                          let communityHideBefore = parseInt(localStorage.getItem('communityHideBefore') || '0', 10);
+
+                          function openCommunityTab() {
+                            communityTabOpen = true;
+                            communityUnreadCount = 0;
+                            renderCommunityUnreadBadge();
+                            refreshCommunityMessages();
+                            refreshOnlineUsers();
+                            if (!communityPollTimer) {
+                              communityPollTimer = setInterval(refreshCommunityMessages, 5000);
+                            }
+                            if (!communityUsersPollTimer) {
+                              communityUsersPollTimer = setInterval(refreshOnlineUsers, 12000);
+                            }
+                          }
+
+                          function closeCommunityTab() {
+                            communityTabOpen = false;
+                          }
+
+                          function renderCommunityUnreadBadge() {
+                            const badge = document.getElementById('community-unread-badge');
+                            if (!badge) return;
+                            if (communityUnreadCount > 0) {
+                              badge.textContent = communityUnreadCount > 9 ? '9+' : communityUnreadCount;
+                              badge.style.display = 'inline-block';
+                            } else {
+                              badge.style.display = 'none';
+                            }
+                          }
+
+                          function refreshCommunityMessages() {
+                            if (!authToken) return;
+                            fetch('http://localhost:8002/community/messages?limit=60', {
+                              headers: { 'Authorization': 'Bearer ' + authToken }
+                            })
+                              .then(r => r.json())
+                              .then(data => {
+                                if (!data.success) return;
+                                const msgs = data.messages || [];
+                                // Find any new messages since our last known id
+                                const newMsgs = msgs.filter(m => m.id > communityLastId);
+                                if (newMsgs.length > 0) {
+                                  communityMessages = msgs;
+                                  communityLastId = msgs.length > 0 ? Math.max(...msgs.map(m => m.id)) : communityLastId;
+                                  renderCommunityMessages();
+                                  if (!communityTabOpen) {
+                                    communityUnreadCount += newMsgs.length;
+                                    renderCommunityUnreadBadge();
+                                  }
+                                } else if (communityMessages.length === 0 && msgs.length > 0) {
+                                  communityMessages = msgs;
+                                  communityLastId = Math.max(...msgs.map(m => m.id));
+                                  renderCommunityMessages();
+                                } else if (communityMessages.length === 0) {
+                                  communityLastId = 0;
+                                }
+                              })
+                              .catch(() => { });
+                          }
+
+                          function clearCommunityMessages() {
+                            communityHideBefore = Date.now();
+                            localStorage.setItem('communityHideBefore', communityHideBefore);
+                            renderCommunityMessages();
+                          }
+
+                          function renderCommunityMessages() {
+                            const container = document.getElementById('community-messages');
+                            if (!container) return;
+                            const visible = communityMessages.filter(m => new Date(m.created_at).getTime() >= communityHideBefore);
+                            if (visible.length === 0) {
+                              container.innerHTML = '<div class="comm-empty">No messages yet. Say hello!</div>';
+                              return;
+                            }
+                            const html = visible.map(m => {
+                              const isOwn = m.sender === currentUser;
+                              const isAnn = m.message_type === 'announcement';
+                              const isDm = m.message_type === 'dm';
+                              const isInvite = m.message_type === 'game_invite';
+                              const time = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                              const safeContent = m.content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                              const safeSender = m.sender.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+                              if (isInvite) {
+                                const alreadyResponded = respondedInvites.has(m.id);
+                                const buttonsHtml = (!isOwn && !alreadyResponded)
+                                  ? `<div class="game-invite-actions">
+                       <button class="game-invite-accept-btn" onclick="acceptGameInvite(${m.id})">✓ Accept</button>
+                       <button class="game-invite-decline-btn" onclick="declineGameInvite(${m.id})">✗ Decline</button>
+                     </div>`
+                                  : (alreadyResponded ? '<div style="color:#888;font-size:0.82em;margin-top:4px;">Responded</div>' : '');
+                                return `<div class="comm-msg comm-msg-game-invite">
+                  <div class="comm-msg-header"><span class="comm-msg-sender">♟ Game Invitation from ${safeSender}</span><span>${time}</span></div>
+                  <div class="comm-msg-text">${safeSender} has invited you to play chess!</div>
+                  ${buttonsHtml}
+                </div>`;
+                              }
+
+                              if (isDm) {
+                                const targets = m.target_users || [];
+                                const otherUser = targets.find(u => u !== currentUser) || m.sender;
+                                const safeOther = otherUser.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                const dmLabel = isOwn ? `You → ${safeOther}` : safeSender;
+                                const isAcceptanceDm = !isOwn && m.content.includes('I accepted your game invitation!');
+                                const acceptanceBtn = isAcceptanceDm
+                                  ? `<div class="game-invite-actions"><button class="game-invite-accept-btn" onclick="setupGameFromAcceptance(${m.id})">♟ Set Up Game</button></div>`
+                                  : '';
+                                return `<div class="comm-msg comm-msg-dm${isOwn ? ' comm-msg-own' : ''}">
+                  <div class="comm-msg-header">
+                    <span class="comm-msg-sender">${dmLabel}<span class="comm-msg-dm-tag">DM</span></span>
+                    <span>${time}</span>
+                  </div>
+                  <div class="comm-msg-text">${safeContent}</div>
+                  ${acceptanceBtn}
+                </div>`;
+                              }
+
+                              const cls = isAnn ? 'comm-msg comm-msg-announcement'
+                                : ('comm-msg comm-msg-chat' + (isOwn ? ' comm-msg-own' : ''));
+                              return `<div class="${cls}">
+              <div class="comm-msg-header"><span class="comm-msg-sender">${safeSender}</span><span>${time}</span></div>
+              <div class="comm-msg-text">${safeContent}</div>
+            </div>`;
+                            }).join('');
+                            const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 60;
+                            container.innerHTML = html;
+                            if (atBottom) container.scrollTop = container.scrollHeight;
+                          }
+
+                          function sendCommunityMessage() {
+                            const input = document.getElementById('community-input');
+                            if (!input) return;
+                            const content = input.value.trim();
+                            if (!content || !authToken) return;
+                            input.value = '';
+                            fetch('http://localhost:8002/community/messages', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                              body: JSON.stringify({ content })
+                            })
+                              .then(r => r.json())
+                              .then(data => {
+                                if (data.success) refreshCommunityMessages();
+                              })
+                              .catch(() => { });
+                          }
+
+                          // ─── Direct Messages & Game Invites ──────────────────────────────────
+
+                          function openDmCompose(recipient) {
+                            dmRecipient = recipient;
+                            const compose = document.getElementById('dm-compose');
+                            const label = document.getElementById('dm-recipient-label');
+                            if (label) label.textContent = recipient;
+                            if (compose) { compose.style.display = 'block'; }
+                            const input = document.getElementById('dm-compose-input');
+                            if (input) { input.value = ''; input.focus(); }
+                          }
+
+                          function closeDmCompose() {
+                            dmRecipient = null;
+                            const compose = document.getElementById('dm-compose');
+                            if (compose) compose.style.display = 'none';
+                          }
+
+                          function sendDm() {
+                            if (!dmRecipient || !authToken) return;
+                            const input = document.getElementById('dm-compose-input');
+                            if (!input) return;
+                            const content = input.value.trim();
+                            if (!content) return;
+                            input.value = '';
+                            fetch('http://localhost:8002/community/dm', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                              body: JSON.stringify({ recipient: dmRecipient, content })
+                            })
+                              .then(r => r.json())
+                              .then(data => {
+                                if (data.success) {
+                                  closeDmCompose();
+                                  refreshCommunityMessages();
+                                } else {
+                                  alert(data.message || 'Failed to send message.');
+                                }
+                              })
+                              .catch(() => alert('Network error. Could not send message.'));
+                          }
+
+                          function sendGameInvite(recipient) {
+                            if (!authToken) return;
+                            fetch('http://localhost:8002/community/game-invite', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                              body: JSON.stringify({ recipient })
+                            })
+                              .then(r => r.json())
+                              .then(data => {
+                                if (data.success) {
+                                  refreshCommunityMessages();
+                                  updateStatusBox('Game invitation sent to ' + recipient, 'success');
+                                } else {
+                                  alert(data.message || 'Failed to send game invitation.');
+                                }
+                              })
+                              .catch(() => alert('Network error. Could not send game invitation.'));
+                          }
+
+                          function acceptGameInvite(inviteId) {
+                            const invite = communityMessages.find(m => m.id === inviteId);
+                            const inviterUsername = invite ? invite.sender : '';
+                            _pendingInviteId = inviteId;
+                            _pendingInviterUsername = inviterUsername;
+                            document.getElementById('color-choice-inviter').textContent = inviterUsername || 'your opponent';
+                            document.getElementById('color-choice-overlay').style.display = 'flex';
+                          }
+
+                          function closeColorChoiceModal() {
+                            document.getElementById('color-choice-overlay').style.display = 'none';
+                            _pendingInviteId = null;
+                            _pendingInviterUsername = null;
+                          }
+
+                          function confirmColorChoice(colorPref) {
+                            const inviteId = _pendingInviteId;
+                            const inviterUsername = _pendingInviterUsername;
+                            closeColorChoiceModal();
+
+                            // Resolve random to a definite color
+                            const resolvedColor = colorPref === 'random'
+                              ? (Math.random() < 0.5 ? 'white' : 'black')
+                              : colorPref;
+                            const opponentColor = resolvedColor === 'white' ? 'black' : 'white';
+                            const myLabel = resolvedColor === 'white' ? 'White ♔' : 'Black ♚';
+                            const opponentLabel = opponentColor === 'white' ? 'White ♔' : 'Black ♚';
+                            const randomNote = colorPref === 'random' ? ' (randomly assigned)' : '';
+
+                            // Mark invite as responded
+                            respondedInvites.add(inviteId);
+                            localStorage.setItem('respondedInvites', JSON.stringify([...respondedInvites]));
+
+                            // Pre-configure Player Setup: both players are human
+                            const whiteEl = document.getElementById('white-player');
+                            const blackEl = document.getElementById('black-player');
+                            if (whiteEl) whiteEl.value = 'human';
+                            if (blackEl) blackEl.value = 'human';
+                            if (typeof updatePlayerConfig === 'function') updatePlayerConfig();
+
+                            // Set player names based on who accepted which color
+                            const whiteNameEl = document.getElementById('white-human-name');
+                            const blackNameEl = document.getElementById('black-human-name');
+                            if (resolvedColor === 'white') {
+                              if (whiteNameEl) whiteNameEl.value = currentUser || '';
+                              if (blackNameEl) blackNameEl.value = inviterUsername || '';
+                            } else {
+                              if (whiteNameEl) whiteNameEl.value = inviterUsername || '';
+                              if (blackNameEl) blackNameEl.value = currentUser || '';
+                            }
+                            if (typeof updatePlayerDisplay === 'function') updatePlayerDisplay();
+
+                            // Notify inviter via DM
+                            if (authToken && inviterUsername) {
+                              const dmContent = `I accepted your game invitation! I will play as ${myLabel}${randomNote} — you will play as ${opponentLabel}.`;
+                              fetch('http://localhost:8002/community/dm', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                                body: JSON.stringify({ recipient: inviterUsername, content: dmContent })
+                              }).catch(() => { });
+                            }
+
+                            renderCommunityMessages();
+                            navigateToTab('player-setup-panel');
+                            updateStatusBox(
+                              `Game accepted! You are playing as ${myLabel}${randomNote}. ${inviterUsername} will play as ${opponentLabel}.`,
+                              'success'
+                            );
+                          }
+
+                          function setupGameFromAcceptance(msgId) {
+                            const msg = communityMessages.find(m => m.id === msgId);
+                            if (!msg) return;
+                            const accepterUsername = msg.sender;
+                            const myColor = msg.content.includes('you will play as White') ? 'white' : 'black';
+
+                            const whiteEl = document.getElementById('white-player');
+                            const blackEl = document.getElementById('black-player');
+                            if (whiteEl) whiteEl.value = 'human';
+                            if (blackEl) blackEl.value = 'human';
+                            if (typeof updatePlayerConfig === 'function') updatePlayerConfig();
+
+                            const whiteNameEl = document.getElementById('white-human-name');
+                            const blackNameEl = document.getElementById('black-human-name');
+                            if (myColor === 'white') {
+                              if (whiteNameEl) whiteNameEl.value = currentUser || '';
+                              if (blackNameEl) blackNameEl.value = accepterUsername || '';
+                            } else {
+                              if (whiteNameEl) whiteNameEl.value = accepterUsername || '';
+                              if (blackNameEl) blackNameEl.value = currentUser || '';
+                            }
+                            if (typeof updatePlayerDisplay === 'function') updatePlayerDisplay();
+
+                            navigateToTab('player-setup-panel');
+                            updateStatusBox(
+                              `Game setup ready! You are playing as ${myColor === 'white' ? 'White ♔' : 'Black ♚'}. ${accepterUsername} will play as ${myColor === 'white' ? 'Black ♚' : 'White ♔'}.`,
+                              'success'
+                            );
+                          }
+
+                          function declineGameInvite(inviteId) {
+                            const invite = communityMessages.find(m => m.id === inviteId);
+                            const inviterUsername = invite ? invite.sender : '';
+                            respondedInvites.add(inviteId);
+                            localStorage.setItem('respondedInvites', JSON.stringify([...respondedInvites]));
+                            // Send a DM reply to the inviter
+                            if (authToken && inviterUsername) {
+                              fetch('http://localhost:8002/community/dm', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                                body: JSON.stringify({ recipient: inviterUsername, content: 'Sorry, I declined your chess game invitation.' })
+                              }).catch(() => { });
+                            }
+                            renderCommunityMessages();
+                          }
+
+                            // ─── AI Game Setup (from Community panel) ────────────────────────────
+
+                            function openAiGameSetup() {
+                              _aiGameSetupColor = 'random';
+                              document.querySelectorAll('.ags-color-btn').forEach(b => b.classList.remove('ags-active'));
+                              const randBtn = document.getElementById('ags-btn-random');
+                              if (randBtn) randBtn.classList.add('ags-active');
+                              const skillEl = document.getElementById('ags-skill-level');
+                              if (skillEl) skillEl.value = 5;
+                              updateAiGameSetupStrategy();
+                              const overlay = document.getElementById('ai-game-setup-overlay');
+                              if (overlay) overlay.style.display = 'flex';
+                            }
+
+                            function closeAiGameSetup() {
+                              const overlay = document.getElementById('ai-game-setup-overlay');
+                              if (overlay) overlay.style.display = 'none';
+                            }
+
+                            function selectAiColor(color) {
+                              _aiGameSetupColor = color;
+                              document.querySelectorAll('.ags-color-btn').forEach(b => b.classList.remove('ags-active'));
+                              const btn = document.getElementById('ags-btn-' + color);
+                              if (btn) btn.classList.add('ags-active');
+                              updateAiGameSetupStrategy();
+                            }
+
+                            function updateAiGameSetupStrategy() {
+                              const sel = document.getElementById('ags-strategy');
+                              const lbl = document.getElementById('ags-strategy-label');
+                              if (!sel || !lbl) return;
+                              if (_aiGameSetupColor === 'white') {
+                                lbl.textContent = 'Opening for AI (White):';
+                                sel.innerHTML = '<option value="">No Opening</option>'
+                                  + '<option value="ruy-lopez">Ruy Lopez</option>'
+                                  + '<option value="italian">Italian Game</option>';
+                              } else if (_aiGameSetupColor === 'black') {
+                                lbl.textContent = 'Defense for AI (Black):';
+                                sel.innerHTML = '<option value="">No Defense</option>'
+                                  + '<option value="sicilian">Sicilian Defense</option>'
+                                  + '<option value="french">French Defense</option>';
+                              } else {
+                                lbl.textContent = 'Preferred Strategy:';
+                                sel.innerHTML = '<option value="">No Preference</option>'
+                                  + '<option value="ruy-lopez">Ruy Lopez (White Opening)</option>'
+                                  + '<option value="italian">Italian Game (White Opening)</option>'
+                                  + '<option value="sicilian">Sicilian Defense (Black Defense)</option>'
+                                  + '<option value="french">French Defense (Black Defense)</option>';
+                              }
+                            }
+
+                            function confirmAiGameSetup() {
+                              const resolvedColor = _aiGameSetupColor === 'random'
+                                ? (Math.random() < 0.5 ? 'white' : 'black')
+                                : _aiGameSetupColor;
+                              const skillRaw = parseInt(document.getElementById('ags-skill-level').value, 10) || 5;
+                              const skillLevel = Math.max(1, Math.min(10, skillRaw));
+                              const strategy = document.getElementById('ags-strategy').value;
+                              closeAiGameSetup();
+
+                              const whiteEl = document.getElementById('white-player');
+                              const blackEl = document.getElementById('black-player');
+                              if (!whiteEl || !blackEl) return;
+
+                              if (resolvedColor === 'white') {
+                                whiteEl.value = 'ai';
+                                blackEl.value = 'human';
+                                const blackNameEl = document.getElementById('black-human-name');
+                                if (blackNameEl) blackNameEl.value = currentUser || '';
+                                const whiteAiType = document.getElementById('white-ai-type');
+                                const whiteSkill = document.getElementById('white-skill-level');
+                                if (whiteAiType) whiteAiType.value = 'stockfish';
+                                if (whiteSkill) whiteSkill.value = skillLevel;
+                                const whiteStrat = document.getElementById('white-strategy');
+                                const blackStrat = document.getElementById('black-strategy');
+                                const isOpening = strategy === 'ruy-lopez' || strategy === 'italian';
+                                if (whiteStrat) whiteStrat.value = isOpening ? strategy : '';
+                                if (blackStrat) blackStrat.value = '';
+                              } else {
+                                whiteEl.value = 'human';
+                                blackEl.value = 'ai';
+                                const whiteNameEl = document.getElementById('white-human-name');
+                                if (whiteNameEl) whiteNameEl.value = currentUser || '';
+                                const blackAiType = document.getElementById('black-ai-type');
+                                const blackSkill = document.getElementById('black-skill-level');
+                                if (blackAiType) blackAiType.value = 'stockfish';
+                                if (blackSkill) blackSkill.value = skillLevel;
+                                const whiteStrat = document.getElementById('white-strategy');
+                                const blackStrat = document.getElementById('black-strategy');
+                                const isDefense = strategy === 'sicilian' || strategy === 'french';
+                                if (whiteStrat) whiteStrat.value = '';
+                                if (blackStrat) blackStrat.value = isDefense ? strategy : '';
+                              }
+
+                              if (typeof updatePlayerConfig === 'function') updatePlayerConfig();
+                              navigateToTab('player-setup-panel');
+                              updateStatusBox(
+                                `Stockfish AI set to play as ${resolvedColor === 'white' ? 'White ♔' : 'Black ♚'} at skill level ${skillLevel}. Click "Start New Game" to begin!`,
+                                'success'
+                              );
+                            }
+
+                          function refreshOnlineUsers() {
+                            if (!authToken) return;
+                            fetch('http://localhost:8002/community/online-users', {
+                              headers: { 'Authorization': 'Bearer ' + authToken }
+                            })
+                              .then(r => r.json())
+                              .then(data => {
+                                if (!data.success) return;
+                                const listEl = document.getElementById('community-users-list');
+                                if (!listEl) return;
+                                const users = data.users || [];
+                                // Always show Stockfish AI at the top of the online users list
+                                const aiEntry = `<div class="community-user-item">`
+                                  + `<span class="community-user-dot cu-ai"></span>`
+                                  + `<span style="color:#6a1b9a;font-size:0.84em;">🤖 Stockfish</span>`
+                                  + `<span class="user-actions" style="display:flex;margin-left:auto;">`
+                                  + `<button class="user-action-btn" title="Challenge AI" onclick="openAiGameSetup()" style="color:#6a1b9a;">♟</button>`
+                                  + `</span></div>`;
+                                const userItems = users.map(u => {
+                                  const dotCls = u.activity === 'playing' ? 'community-user-dot cu-playing' : 'community-user-dot cu-online';
+                                  const nameCls = u.username === currentUser ? 'cu-me' : '';
+                                  const safeU = u.username.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                  const safeUAttr = u.username.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+                                  const label = u.username === currentUser ? safeU + ' (you)' : safeU;
+                                  const actionsHtml = u.username !== currentUser
+                                    ? `<span class="user-actions">`
+                                    + `<button class="user-action-btn" title="Send direct message" onclick="openDmCompose('${safeUAttr}')">✉</button>`
+                                    + `<button class="user-action-btn" title="Invite to game" onclick="sendGameInvite('${safeUAttr}')">♟</button>`
+                                    + `</span>`
+                                    : '';
+                                  return `<div class="community-user-item"><span class="${dotCls}"></span><span class="${nameCls}">${label}</span>${actionsHtml}</div>`;
+                                }).join('');
+                                listEl.innerHTML = aiEntry + userItems;
+                                const statusEl = document.getElementById('community-status-dot');
+                                if (statusEl) statusEl.textContent = users.length + ' online';
+                              })
+                              .catch(() => { });
+                          }
+
+          // Captured-pieces helpers
+          const PIECE_SYMBOLS = {
+            p: { w: '♙', b: '♟' },
+            r: { w: '♖', b: '♜' },
+            b: { w: '♗', b: '♝' },
+            n: { w: '♘', b: '♞' },
+            q: { w: '♕', b: '♛' },
+            k: { w: '♔', b: '♚' }
+          };
+          const PIECE_VALUES = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+
+          function updateCapturedPieces(move) {
+            if (!move || !move.captured) return;
+            if (move.color === 'w') {
+              capturedByWhite.push(move.captured);
+            } else {
+              capturedByBlack.push(move.captured);
+            }
+            renderCapturedPieces();
+          }
+
+          function renderCapturedPieces() {
+            const whiteEl = document.getElementById('white-captured');
+            const blackEl = document.getElementById('black-captured');
+            const advantageEl = document.getElementById('material-advantage');
+            const whiteScoreEl = document.getElementById('white-material-score');
+            const blackScoreEl = document.getElementById('black-material-score');
+            if (!whiteEl || !blackEl) return;
+
+            const sortByValue = (a, b) => PIECE_VALUES[b] - PIECE_VALUES[a];
+            const sortedWhite = [...capturedByWhite].sort(sortByValue);
+            const sortedBlack = [...capturedByBlack].sort(sortByValue);
+
+            // White captured black pieces → show black piece symbols
+            whiteEl.textContent = sortedWhite.map(p => PIECE_SYMBOLS[p]['b']).join('') || '—';
+            // Black captured white pieces → show white piece symbols
+            blackEl.textContent = sortedBlack.map(p => PIECE_SYMBOLS[p]['w']).join('') || '—';
+
+            const whiteMaterial = capturedByWhite.reduce((s, p) => s + (PIECE_VALUES[p] || 0), 0);
+            const blackMaterial = capturedByBlack.reduce((s, p) => s + (PIECE_VALUES[p] || 0), 0);
+
+            if (whiteScoreEl) whiteScoreEl.textContent = whiteMaterial > 0 ? `(+${whiteMaterial})` : '';
+            if (blackScoreEl) blackScoreEl.textContent = blackMaterial > 0 ? `(+${blackMaterial})` : '';
+
+            const diff = whiteMaterial - blackMaterial;
+            if (advantageEl) {
+              if (diff > 0) {
+                advantageEl.textContent = `White +${diff}`;
+                advantageEl.style.color = '#2e7d32';
+              } else if (diff < 0) {
+                advantageEl.textContent = `Black +${Math.abs(diff)}`;
+                advantageEl.style.color = '#1565c0';
+              } else {
+                advantageEl.textContent = whiteMaterial > 0 ? 'Equal material' : '';
+                advantageEl.style.color = '#555';
+              }
+            }
+          }
+
+          function updateMoveHistory(move, playerLabel = 'You') {
+            const player = playerLabel;
         moveHistory.push({ move, player });
 
         const historyDiv = document.getElementById('move-history');
@@ -458,9 +1431,501 @@
                               selectedPanel.style.display = 'block';
                             }
 
+                            // On first open of Comm panel, replay buffered pre-render messages
+                            if (tabName === 'comm-panel') {
+                              const log = document.getElementById('comm-log');
+                              if (log && log.querySelector('p') && commMessages.length > 0) {
+                                log.innerHTML = '';
+                                for (let i = 0; i < commMessages.length; i++) {
+                                  renderCommEntry(commMessages[i]);
+                                }
+                              }
+                            }
+
+                            // Track community tab open state
+                            communityTabOpen = (tabName === 'community-panel');
+
                             // Highlight active button
                             event.target.classList.add('active');
                           }
+
+      // ─── Welcome Tab ──────────────────────────────────────────────────────────
+
+      const CHESS_JOKES = [
+        "Why did the chess player bring a ladder? Because they heard the stakes were high!",
+        "What do you call a chess player who always talks during a game? A chess-chatting machine!",
+        "Why was the chess board so wet? Because all the players kept castling in the rain!",
+        "I used to be a chess grandmaster... then I lost my queen and my dignity in the same move.",
+        "Why do chess players make great drivers? Because they always think several moves ahead!",
+        "What's a chess player's favourite drink? Earl Grey — because it's a proper opening.",
+        "How many chess players does it take to change a lightbulb? One, but they spend 40 minutes calculating all possible solutions.",
+        "Why can't pawns play cards? Because they're always getting promoted before the game gets interesting."
+      ];
+
+      const CHESS_NEWS_ITEMS = [
+        {
+          title: "Magnus Carlsen Continues World Blitz Dominance",
+          body: "The Norwegian legend secured yet another blitz title, showing no signs of slowing down despite stepping back from classical chess.",
+          details: "Magnus Carlsen has solidified his status as the undisputed king of rapid and blitz chess. Despite abdicating the Classical World Championship title in 2023, Carlsen continues to dominate elite events across all time controls. In the most recent Grand Chess Tour events, Carlsen outclassed a field that included World Champion Ding Liren, Fabiano Caruana, and rising star Praggnanandhaa. His exceptional calculation speed, endgame mastery, and competitive drive make him the benchmark all other players are measured against. His victories in rapid and blitz events — including the Superbet Rapid &amp; Blitz Poland — reaffirm his status as the planet's strongest all-around player."
+        },
+        {
+          title: "AI Surpasses Grandmasters in Correspondence Chess",
+          body: "Modern AI engines now evaluate positions to depths that no human can verify, raising new questions about computer-assisted play.",
+          details: "The rise of neural network-based engines like Stockfish 16 and its successors has transformed correspondence chess. These engines evaluate positions at depths exceeding 40 plies, uncovering refutations to long-established opening theory. The International Correspondence Chess Federation (ICCF) has introduced strict anti-cheating measures as the boundary between human creativity and engine assistance becomes increasingly blurred. Many top correspondents argue that the future of the format lies in embracing AI as a collaborative tool, mirroring how other competitive fields have adapted to technological advancement. New questions about what constitutes \"human play\" are now central to the sport's governing bodies."
+        },
+        {
+          title: "Record Prize Fund at Candidates Tournament 2025",
+          body: "FIDE announced the largest-ever prize pool for the Candidates Tournament, attracting unprecedented global attention.",
+          details: "FIDE's announcement of a record-breaking prize fund signals a new era of professional chess investment. The Candidates Tournament features eight of the world's top players competing in a double round-robin format, with the winner earning the right to challenge the reigning World Champion. The increased prize money reflects the growing commercial appeal of chess, driven by streaming platforms, record online viewership, and major sponsor interest. Players such as Gukesh Dommaraju — the youngest-ever Candidates winner at just 17 — Fabiano Caruana, Hikaru Nakamura, and Alireza Firouzja are at the centre of the competition. The tournament is broadcast live with AI-powered commentary for a global audience."
+        },
+        {
+          title: "Chess Popularity Surges Among Gen Z",
+          body: "Following the success of 'The Queen's Gambit' and online platforms, chess sees its highest youth participation numbers in decades.",
+          details: "Chess.com and Lichess have both reported record-breaking new account registrations, with the majority of new players under the age of 25. The Netflix series 'The Queen's Gambit' sparked a cultural moment that mainstream media has sustained for years. Schools and youth programs report waiting lists for chess clubs that were half-empty a decade ago. Top streamers like Hikaru Nakamura and GothamChess (Levy Rozman) have made learning chess entertaining and accessible, attracting millions of viewers who go on to become active players. FIDE has launched youth development initiatives in response, aiming to identify and train the next generation of grandmasters from India, the US, and beyond."
+        },
+        {
+          title: "New Opening Theory: The Anti-London Variation",
+          body: "Top theoreticians are publishing fresh ideas against the London System, as Black players seek dynamic counterplay.",
+          details: "The London System (1.d4 2.Nf3 3.Bf4) has become one of the most popular openings at all levels due to its solid, low-theory nature. However, Black players at the top level have been developing sharp, dynamic responses to unbalance the game early. Ideas involving ...c5, ...Nc6, and early queenside expansion have been shown to yield rich middlegame play with full equality. Grandmasters like Maxime Vachier-Lagrave and Ian Nepomniachtchi have published analysis demonstrating that Black can achieve dynamic counterplay with precise preparation. Opening preparation software has accelerated this theoretical arms race, with new ideas being shared and refined within days of publication at the elite level."
+        }
+      ];
+
+      function navigateToTab(tabName) {
+        document.querySelectorAll('.tab-panel-content').forEach(p => p.style.display = 'none');
+        document.querySelectorAll('.tab-panel-button').forEach(b => b.classList.remove('active'));
+        const panel = document.getElementById(tabName);
+        if (panel) panel.style.display = 'block';
+        document.querySelectorAll('.tab-panel-button').forEach(b => {
+          if (b.getAttribute('onclick') && b.getAttribute('onclick').includes("'" + tabName + "'")) {
+            b.classList.add('active');
+          }
+        });
+        if (tabName === 'comm-panel') {
+          const log = document.getElementById('comm-log');
+          if (log && log.querySelector('p') && commMessages.length > 0) {
+            log.innerHTML = '';
+            commMessages.forEach(m => renderCommEntry(m));
+          }
+        }
+      }
+
+      function showWelcomeInfo(type) {
+        const area = document.getElementById('welcome-info-area');
+        if (!area) return;
+        if (type === 'joke') {
+          const joke = CHESS_JOKES[Math.floor(Math.random() * CHESS_JOKES.length)];
+          area.innerHTML = `<h4>♟ Chess Joke</h4><p style="margin:0;">${joke}</p>`;
+        } else if (type === 'news') {
+          const item = CHESS_NEWS_ITEMS[Math.floor(Math.random() * CHESS_NEWS_ITEMS.length)];
+          area.innerHTML = `<h4>📰 ${item.title}</h4><p style="margin:0 0 8px;">${item.body}</p><div id="news-details" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid #ddd;color:#444;line-height:1.6;font-size:0.92em;">${item.details}</div><a href="#" id="news-read-more" onclick="toggleNewsDetails(event)" style="font-size:0.85em;color:#1565c0;text-decoration:none;font-weight:500;">Read More →</a>`;
+        } else if (type === 'openings') {
+          area.innerHTML = `<h4>📖 Practice Openings</h4>
+              <ul>
+                <li><strong>Ruy López</strong> — 1.e4 e5 2.Nf3 Nc6 3.Bb5</li>
+                <li><strong>Sicilian Defence</strong> — 1.e4 c5</li>
+                <li><strong>Italian Game</strong> — 1.e4 e5 2.Nf3 Nc6 3.Bc4</li>
+                <li><strong>Queen's Gambit</strong> — 1.d4 d5 2.c4</li>
+                <li><strong>King's Indian Defence</strong> — 1.d4 Nf6 2.c4 g6</li>
+              </ul>
+              <p style="color:#888;margin:4px 0 0;font-size:0.9em;">Set up the position on the board using Player Setup.</p>`;
+        } else if (type === 'endgames') {
+          area.innerHTML = `<h4>🏁 Practice Endgames — choose a drill:</h4>
+              <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">
+                <button class="endgame-drill-btn" onclick="loadEndgamePosition(
+                  '8/8/4k3/4P3/4K3/8/8/8 w - - 0 1',
+                  'King &amp; Pawn vs King',
+                  ['White to move. Can the pawn promote?',
+                   'Tip: Place your king in front of the pawn to escort it.',
+                   'Key concept: Direct opposition — kings facing each other with one square between them.',
+                   'If White king reaches e6 with the pawn on e5, the pawn will promote.']
+                )">
+                  <span style="font-size:1.2em;">♙</span>
+                  <span><strong>King &amp; Pawn vs King</strong><br><small>Opposition &amp; key squares</small></span>
+                </button>
+                <button class="endgame-drill-btn" onclick="loadEndgamePosition(
+                  '4k3/8/8/8/4K3/8/8/R7 w - - 0 1',
+                  'King &amp; Rook vs King',
+                  ['White to move. Drive the black king to the edge and deliver checkmate.',
+                   'Tip: Use your king actively — the rook alone cannot force mate.',
+                   'Key concept: Cut off the black king rank by rank using the rook.',
+                   'Bring your king toward the black king to tighten the net.',
+                   'Final mate typically occurs on the edge or corner of the board.']
+                )">
+                  <span style="font-size:1.2em;">♖</span>
+                  <span><strong>King &amp; Rook vs King</strong><br><small>Basic mating pattern</small></span>
+                </button>
+                <button class="endgame-drill-btn" onclick="loadEndgamePosition(
+                  '1K1k4/1P6/8/8/8/8/r7/2R5 w - - 0 1',
+                  'Lucena Position',
+                  ['White to move and win. The pawn is on the 7th rank — promote it!',
+                   'Key technique: Build a bridge to shelter your king from rook checks.',
+                   'Step 1: Play Rc4 to prepare to block the black rook\'s checks.',
+                   'Step 2: Advance your king from b8 with the rook shielding on c4.',
+                   'Step 3: Once the king is safe, the pawn will queen.']
+                )">
+                  <span style="font-size:1.2em;">♖</span>
+                  <span><strong>Lucena Position</strong><br><small>Build a bridge — winning technique</small></span>
+                </button>
+                <button class="endgame-drill-btn" onclick="loadEndgamePosition(
+                  '4k3/8/r7/4PK2/8/8/8/5R2 b - - 0 1',
+                  'Philidor Position',
+                  ['Black to move and draw! This is the classic Philidor defensive technique.',
+                   'Key concept: Keep your rook on the 6th rank (rank 3) to cut off White\'s king.',
+                   'Do NOT let the white king advance past the 6th rank.',
+                   'When the pawn advances to e6, switch immediately to checking from behind (Ra1, Rb1 etc).',
+                   'Checks from behind force the white king in front of the pawn, blocking its own rook.']
+                )">
+                  <span style="font-size:1.2em;">♖</span>
+                  <span><strong>Philidor Position</strong><br><small>Drawing defence with a rook</small></span>
+                </button>
+                <button class="endgame-drill-btn endgame-drill-locked" disabled title="Coming soon">
+                  <span style="font-size:1.2em;">♕</span>
+                  <span><strong>Queen vs Pawn</strong><br><small>Promotion race — coming soon</small></span>
+                </button>
+              </div>`;
+        }
+        area.classList.add('visible');
+      }
+
+          function toggleNewsDetails(e) {
+            e.preventDefault();
+            const details = document.getElementById('news-details');
+            const link = document.getElementById('news-read-more');
+            if (!details || !link) return;
+            const expanded = details.style.display !== 'none';
+            details.style.display = expanded ? 'none' : 'block';
+            link.textContent = expanded ? 'Read More \u2192' : '\u2190 Show Less';
+          }
+
+      function loadEndgamePosition(fen, title, hints) {
+        // Reset game state to the given FEN
+        game = new Chess();
+        game.load(fen);
+        moveHistory = [];
+        capturedByWhite = [];
+        capturedByBlack = [];
+
+        // Track opponent for stats (same as startNewGame)
+        const whitePlayer = document.getElementById('white-player').value;
+        currentPlayerColor = (whitePlayer === 'human') ? 'white' : 'black';
+        currentOpponent = getOpponentLabel();
+        gameResultRecorded = false;
+
+        if (board) {
+          board.position(fen);
+        }
+
+        const historyEl = document.getElementById('move-history');
+        if (historyEl) historyEl.innerHTML = '<p style="color:#999;">No moves yet</p>';
+        const expertResp = document.getElementById('expert-response');
+        if (expertResp) expertResp.innerHTML = '<p style="color:#999;margin:0;">Ask a question and get expert chess analysis</p>';
+
+        updateFenDisplay();
+        checkGameStatus();
+        renderCapturedPieces();
+        updateExpertContextBadge();
+
+        // Show coaching hints in the status box
+        updateStatusBox(`Endgame drill loaded: ${title}`, 'success');
+        if (hints && hints.length) {
+          hints.forEach(h => updateStatusBox(h, 'info'));
+        }
+
+        // Switch to Move History tab so the player can start immediately
+        navigateToTab('move-history-panel');
+      }
+
+    // ─── Stats ────────────────────────────────────────────────────────────────
+
+    function getOpponentLabel() {
+      const whitePlayer = document.getElementById('white-player').value;
+      const blackPlayer = document.getElementById('black-player').value;
+
+      // Human vs Human
+      if (whitePlayer === 'human' && blackPlayer === 'human') {
+        const blackNameEl = document.getElementById('black-human-name');
+        return (blackNameEl && blackNameEl.value.trim()) ? blackNameEl.value.trim() : 'Player 2';
+      }
+
+      // The human plays as white if white=human, else plays as black
+      const humanIsWhite = (whitePlayer === 'human');
+      const aiSide = humanIsWhite ? 'black' : 'white';
+      const aiType = document.getElementById(aiSide + '-ai-type').value;
+      const aiLevel = document.getElementById(aiSide + '-skill-level').value;
+      if ((humanIsWhite && blackPlayer === 'ai') || (!humanIsWhite && whitePlayer === 'ai')) {
+        return `${aiType.charAt(0).toUpperCase() + aiType.slice(1)} (Level ${aiLevel})`;
+      }
+      // AI vs AI — label from white's perspective
+      const wType = document.getElementById('white-ai-type').value;
+      const wLevel = document.getElementById('white-skill-level').value;
+      return `AI vs AI — ${wType} L${wLevel}`;
+    }
+
+    function recordGameResult(result) {
+      // result: 'win' | 'loss' | 'draw' (from the human's perspective)
+      if (gameResultRecorded) return;
+      gameResultRecorded = true;
+      postActivity('online'); // game over — revert to online
+      const key = currentOpponent || 'Unknown';
+      if (!playerStats[key]) {
+        playerStats[key] = { wins: 0, losses: 0, draws: 0, lastPlayed: null };
+      }
+      playerStats[key][result === 'win' ? 'wins' : result === 'loss' ? 'losses' : 'draws']++;
+      playerStats[key].lastPlayed = new Date().toLocaleDateString();
+      localStorage.setItem('chessPlayerStats', JSON.stringify(playerStats));
+    }
+
+    function renderStatsPanel() {
+      let totalWins = 0, totalLosses = 0, totalDraws = 0;
+      Object.values(playerStats).forEach(s => {
+        totalWins += s.wins || 0;
+        totalLosses += s.losses || 0;
+        totalDraws += s.draws || 0;
+      });
+      const wEl = document.getElementById('stat-total-wins');
+      const lEl = document.getElementById('stat-total-losses');
+      const dEl = document.getElementById('stat-total-draws');
+      if (wEl) wEl.textContent = totalWins;
+      if (lEl) lEl.textContent = totalLosses;
+      if (dEl) dEl.textContent = totalDraws;
+
+      const listEl = document.getElementById('stats-opponent-list');
+      if (!listEl) return;
+      const keys = Object.keys(playerStats);
+      if (keys.length === 0) {
+        listEl.innerHTML = '<p class="stats-empty">No games played yet.</p>';
+        return;
+      }
+      // Sort by total games descending
+      keys.sort((a, b) => {
+        const ta = (playerStats[a].wins + playerStats[a].losses + playerStats[a].draws);
+        const tb = (playerStats[b].wins + playerStats[b].losses + playerStats[b].draws);
+        return tb - ta;
+      });
+      let rows = keys.map(k => {
+        const s = playerStats[k];
+        const total = s.wins + s.losses + s.draws;
+        const pct = total > 0 ? Math.round((s.wins / total) * 100) : 0;
+        return `<tr>
+              <td><strong>${k}</strong></td>
+              <td class="stat-w">${s.wins}</td>
+              <td class="stat-l">${s.losses}</td>
+              <td class="stat-d">${s.draws}</td>
+              <td>${total}</td>
+              <td>${pct}%</td>
+              <td style="color:#aaa;font-size:0.85em;">${s.lastPlayed || '—'}</td>
+            </tr>`;
+      }).join('');
+      listEl.innerHTML = `<table class="stats-opponent-table">
+            <thead><tr>
+              <th>Opponent</th>
+              <th class="stat-w">W</th>
+              <th class="stat-l">L</th>
+              <th class="stat-d">D</th>
+              <th>Total</th>
+              <th>Win%</th>
+              <th>Last</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>`;
+    }
+
+    function clearStats() {
+      if (!confirm('Reset all stats? This cannot be undone.')) return;
+      playerStats = {};
+      localStorage.removeItem('chessPlayerStats');
+      renderStatsPanel();
+    }
+
+                              // ─── Save / Load Game (multi-slot) ──────────────────────────────────────────
+
+                              function _savesKey() {
+                                return 'chessSaves_' + (currentUser || 'guest');
+          }
+
+                              function _getAllSaves() {
+                                try { return JSON.parse(localStorage.getItem(_savesKey()) || '{}'); }
+                                catch (e) { return {}; }
+                              }
+
+                              function _buildSaveState() {
+                                return {
+              fen: game.fen(),
+              moveHistory: moveHistory,
+              capturedByWhite: capturedByWhite,
+              capturedByBlack: capturedByBlack,
+              currentOpponent: currentOpponent,
+              currentPlayerColor: currentPlayerColor,
+              savedAt: new Date().toISOString(),
+              players: {
+                white: document.getElementById('white-player') ? document.getElementById('white-player').value : 'human',
+                black: document.getElementById('black-player') ? document.getElementById('black-player').value : 'ai',
+                whiteAiType: document.getElementById('white-ai-type') ? document.getElementById('white-ai-type').value : 'stockfish',
+                blackAiType: document.getElementById('black-ai-type') ? document.getElementById('black-ai-type').value : 'stockfish',
+                whiteSkill: document.getElementById('white-skill-level') ? document.getElementById('white-skill-level').value : '10',
+                blackSkill: document.getElementById('black-skill-level') ? document.getElementById('black-skill-level').value : '10',
+                whiteHumanName: document.getElementById('white-human-name') ? document.getElementById('white-human-name').value : '',
+                blackHumanName: document.getElementById('black-human-name') ? document.getElementById('black-human-name').value : '',
+              }
+                              };
+          }
+
+                              function saveGame() {
+                                if (!game || moveHistory.length === 0) return;
+                                const saves = _getAllSaves();
+                                saves['Autosave'] = _buildSaveState();
+                                localStorage.setItem(_savesKey(), JSON.stringify(saves));
+                                _updateMySavesBtn();
+            }
+
+  function saveGameAs() {
+    if (!game || moveHistory.length === 0) {
+      updateStatusBox('No moves to save yet.', 'error');
+      return;
+    }
+    const name = prompt('Save game as:');
+    if (!name || !name.trim()) return;
+    const trimmed = name.trim().substring(0, 40);
+    const saves = _getAllSaves();
+    saves[trimmed] = _buildSaveState();
+    localStorage.setItem(_savesKey(), JSON.stringify(saves));
+    _updateMySavesBtn();
+    updateStatusBox('Game saved as "' + trimmed + '"', 'success');
+          }
+
+                              function deleteSave(name) {
+                                const saves = _getAllSaves();
+                                delete saves[name];
+                                localStorage.setItem(_savesKey(), JSON.stringify(saves));
+                                showMySaves();
+                                _updateMySavesBtn();
+          }
+
+                              function _updateMySavesBtn() {
+                                const btn = document.getElementById('my-saves-btn');
+            if (!btn) return;
+                              const saves = _getAllSaves();
+                              const count = Object.keys(saves).length;
+                              btn.innerHTML = '<span class="wb-icon">📂</span> My Saves' +
+                                (count > 0 ? '<br><small style="font-weight:normal;font-size:0.82em;opacity:0.8;">' + count + ' save' + (count !== 1 ? 's' : '') + '</small>' : '');
+                              btn.style.opacity = count > 0 ? '1' : '0.45';
+          }
+
+                              function showMySaves() {
+                                const saves = _getAllSaves();
+                                const area = document.getElementById('welcome-info-area');
+                                if (!area) return;
+                                const keys = Object.keys(saves);
+                                if (keys.length === 0) {
+                                  area.innerHTML = '<h4 style="margin:0 0 8px;">📂 My Saves</h4><p style="color:#999;margin:0;">No saved games yet. Play a game and click 💾 Save As\u2026 to save.</p>';
+                                  area.classList.add('visible');
+              return;
+            }
+                              keys.sort((a, b) => new Date(saves[b].savedAt) - new Date(saves[a].savedAt));
+                              const rows = keys.map(n => {
+                                const s = saves[n];
+                                const d = new Date(s.savedAt);
+                                const label = d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                                const moves = (s.moveHistory || []).length;
+                                const safeN = n.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                                const jsN = n.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                                return '<tr>' +
+                                  '<td style="padding:5px 6px;"><strong>' + safeN + '</strong></td>' +
+                                  '<td style="padding:5px 6px;color:#777;font-size:0.85em;">' + label + '</td>' +
+                                  '<td style="padding:5px 6px;color:#777;font-size:0.85em;">' + moves + ' move' + (moves !== 1 ? 's' : '') + '</td>' +
+                                  '<td style="padding:5px 6px;">' +
+                                  '<button onclick="loadSavedGame(\'' + jsN + '\')" style="padding:3px 10px;background:#2196F3;color:white;border:none;border-radius:3px;cursor:pointer;font-size:0.82em;">Load</button>' +
+                                  ' <button onclick="deleteSave(\'' + jsN + '\')" style="padding:3px 8px;background:#f44336;color:white;border:none;border-radius:3px;cursor:pointer;font-size:0.82em;">✕</button>' +
+                                  '</td></tr>';
+                              }).join('');
+                              area.innerHTML = '<h4 style="margin:0 0 10px;">📂 My Saves</h4>' +
+                                '<table style="width:100%;border-collapse:collapse;font-size:0.88em;">' +
+                                '<thead><tr>' +
+                                '<th style="text-align:left;padding:4px 6px;border-bottom:2px solid #ddd;">Name</th>' +
+                                '<th style="text-align:left;padding:4px 6px;border-bottom:2px solid #ddd;">Saved</th>' +
+                                '<th style="text-align:left;padding:4px 6px;border-bottom:2px solid #ddd;">Moves</th>' +
+                                '<th style="padding:4px 6px;border-bottom:2px solid #ddd;"></th>' +
+                                '</tr></thead><tbody>' + rows + '</tbody></table>';
+                              area.classList.add('visible');
+                            }
+
+                                                function loadSavedGame(name) {
+                                                  const saves = _getAllSaves();
+                                                  const saved = saves[name];
+                                                  if (!saved) { updateStatusBox('Save not found.', 'error'); return; }
+
+            game = new Chess();
+            game.load(saved.fen);
+            moveHistory = saved.moveHistory || [];
+            capturedByWhite = saved.capturedByWhite || [];
+            capturedByBlack = saved.capturedByBlack || [];
+            currentOpponent = saved.currentOpponent;
+            currentPlayerColor = saved.currentPlayerColor;
+            gameResultRecorded = false;
+
+            const p = saved.players || {};
+            const wp = document.getElementById('white-player');
+            const bp = document.getElementById('black-player');
+            const wat = document.getElementById('white-ai-type');
+            const bat = document.getElementById('black-ai-type');
+            const wsl = document.getElementById('white-skill-level');
+            const bsl = document.getElementById('black-skill-level');
+            if (wp) wp.value = p.white || 'human';
+            if (bp) bp.value = p.black || 'ai';
+            if (wat) wat.value = p.whiteAiType || 'stockfish';
+            if (bat) bat.value = p.blackAiType || 'stockfish';
+            if (wsl) wsl.value = p.whiteSkill || '10';
+            if (bsl) bsl.value = p.blackSkill || '10';
+                                                const whn = document.getElementById('white-human-name');
+                                                const bhn = document.getElementById('black-human-name');
+                                                if (whn) whn.value = p.whiteHumanName || '';
+                                                if (bhn) bhn.value = p.blackHumanName || '';
+            updatePlayerConfig();
+
+                                                  // Restore H vs H sync state if this was a sync game
+                                                  if (syncPollInterval) { clearInterval(syncPollInterval); syncPollInterval = null; }
+                                                  const _wName = p.whiteHumanName || '';
+                                                  const _bName = p.blackHumanName || '';
+                                                  if (p.white === 'human' && p.black === 'human' && _wName && _bName && _wName !== _bName) {
+                                                    isSyncGame = true;
+                                                    const _players = [_wName, _bName].sort();
+                                                    syncGameId = _players[0] + '_' + _players[1];
+                                                    syncMyColor = (_wName === currentUser) ? 'white' : 'black';
+                                                    lastSyncFen = null;
+                                                    updateSyncGameIdDisplay();
+                                                    pollGameSync();
+                                                    syncPollInterval = setInterval(pollGameSync, 2000);
+                                                  } else {
+                                                    isSyncGame = false;
+                                                    syncGameId = null;
+                                                    syncMyColor = null;
+                                                    lastSyncFen = null;
+                                                    updateSyncGameIdDisplay();
+                                                  }
+
+            if (board) board.position(saved.fen);
+
+            const historyDiv = document.getElementById('move-history');
+            if (historyDiv) {
+              let html = '';
+              for (let i = 0; i < moveHistory.length; i += 2) {
+                const moveNum = Math.floor(i / 2) + 1;
+                const wm = moveHistory[i] ? moveHistory[i].player + ': ' + moveHistory[i].move : '';
+                const bm = moveHistory[i + 1] ? moveHistory[i + 1].player + ': ' + moveHistory[i + 1].move : '';
+                html += '<div>' + moveNum + '. ' + wm + ' ' + bm + '</div>';
+              }
+              historyDiv.innerHTML = html || '<p style="color:#999;">No moves yet</p>';
+            }
+
+            updateFenDisplay();
+            checkGameStatus();
+            renderCapturedPieces();
+            updateExpertContextBadge();
+                                                updateStatusBox('Loaded "' + name + '" \u2014 ' + moveHistory.length + ' move(s).', 'success');
+            navigateToTab('move-history-panel');
+          }
+
+            // ─── Chessboard Interface ──────────────────────────────────────────────────
 
       function loadChessboardInterface() {
         const chessboardHTML = `
@@ -468,12 +1933,16 @@
           <h1>Chess AI App</h1>
           <div style="display: flex; gap: 15px; align-items: center;">
             <span>Welcome, <strong>${currentUser}</strong></span>
+            <button onclick="clearMyGameActivity()" title="Clear your game activity status" style="padding:6px 12px; font-size:0.85em; background:#607d8b; color:white; border:none; border-radius:4px; cursor:pointer;">Clear Activity</button>
             <button onclick="handleLogout()" class="btn-danger">Logout</button>
           </div>
         </header>
 
         <div class="main-container">
           <div class="chessboard-section">
+            <div id="sync-game-id-box" style="display:none; width:400px; margin:0 auto 8px; padding:5px 12px; background:#fff8e1; border:1px solid #f9a825; border-radius:4px; font-family:monospace; font-size:12px; text-align:center;">
+              <strong>Game ID:</strong> <span id="sync-game-id-value"></span>
+            </div>
             <div id="board"></div>
 
             <!-- FEN Notation (Moved from game-panel to here) -->
@@ -484,32 +1953,81 @@
             <div id="game-status" style="margin-top: 10px; text-align: center; font-size: 16px;">
               <p>Game Status: <strong>Ready to play</strong></p>
             </div>
+
+            <!-- Player Info Display -->
+            <div id="player-info-box" style="width: 400px; margin: 15px auto; padding: 12px; background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+              <p style="margin: 5px 0;"><strong>White:</strong> <span id="white-player-display">Not configured</span></p>
+              <p style="margin: 5px 0;"><strong>Black:</strong> <span id="black-player-display">Not configured</span></p>
+            </div>
+
+            <!-- Captured Pieces Display -->
+            <div id="captured-pieces-box" style="width: 400px; margin: 10px auto; padding: 12px; background-color: #fff; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <strong>Captured Pieces</strong>
+                <span id="material-advantage" style="font-size: 12px; color: #555;"></span>
+              </div>
+              <div style="margin: 4px 0; display: flex; align-items: center; gap: 6px;">
+                <span style="font-weight: bold; min-width: 110px;">White captured:</span>
+                <span id="white-captured" style="font-size: 22px; letter-spacing: 1px;">—</span>
+                <span id="white-material-score" style="font-size: 12px; color: #888;"></span>
+              </div>
+              <div style="margin: 4px 0; display: flex; align-items: center; gap: 6px;">
+                <span style="font-weight: bold; min-width: 110px;">Black captured:</span>
+                <span id="black-captured" style="font-size: 22px; letter-spacing: 1px;">—</span>
+                <span id="black-material-score" style="font-size: 12px; color: #888;"></span>
+              </div>
+            </div>
           </div>
 
           <div class="game-panel">
             <h2>Game Panel</h2>
 
-            <!-- Grid Layout: Status box and TabPanel side by side -->
+            <!-- Grid Layout: TabPanel fills available space -->
             <div class="game-content-grid">
-              <!-- Status Box (Left) -->
-              <div class="section-box">
-                <h3>Game Log</h3>
-                <div id="status-box-left">
-                  <div><span class="status-time">[${new Date().toLocaleTimeString()}]</span> <span class="status-info">Ready to play. Start a new game or make a move.</span></div>
-                </div>
-              </div>
-
               <!-- TabPanel: Player Setup, Move History, Ask Expert & Strategy (Right) -->
               <div class="tab-panel">
                 <div class="tab-panel-list">
-                  <button class="tab-panel-button active" onclick="switchTab('player-setup-panel')">Player Setup</button>
+                  <button class="tab-panel-button active" onclick="switchTab('welcome-panel')">Welcome</button>
+                  <button class="tab-panel-button" onclick="switchTab('player-setup-panel')">Player Setup</button>
                   <button class="tab-panel-button" onclick="switchTab('move-history-panel')">Move History</button>
                   <button class="tab-panel-button" onclick="switchTab('expert-panel')">Ask Expert</button>
-                  <button class="tab-panel-button" onclick="switchTab('strategy-panel')">Strategy</button>
+                  <button class="tab-panel-button" onclick="switchTab('community-panel'); openCommunityTab();">Community<span id="community-unread-badge" class="comm-unread-badge" style="display:none;"></span></button>
+                  <button class="tab-panel-button" onclick="switchTab('comm-panel')">Comm</button>
+                  <button class="tab-panel-button" onclick="switchTab('stats-panel'); renderStatsPanel();">Stats</button>
+                </div>
+
+                <!-- Welcome Tab -->
+                <div id="welcome-panel" class="tab-panel-content" style="display: block;">
+                  <div style="text-align: center; padding: 8px 0 4px;">
+                    <span style="font-size: 2.2em; line-height: 1;">♟</span>
+                    <h3 style="margin: 4px 0 2px;">Welcome back, ${currentUser}!</h3>
+                    <p style="color: #666; margin: 0 0 4px; font-size: 0.88em;">What would you like to do?</p>
+                  </div>
+                  <div class="welcome-tab-grid">
+                    <button class="welcome-tab-btn wb-primary" onclick="startNewGame(); navigateToTab('player-setup-panel');">
+                      <span class="wb-icon">♙</span> Start New Game
+                    </button>
+                    <button id="my-saves-btn" class="welcome-tab-btn wb-continue" onclick="showMySaves()">
+                      <span class="wb-icon">📂</span> My Saves
+                    </button>
+                    <button class="welcome-tab-btn" onclick="showWelcomeInfo('openings')">
+                      <span class="wb-icon">📖</span> Practice Openings
+                    </button>
+                    <button class="welcome-tab-btn" onclick="showWelcomeInfo('endgames')">
+                      <span class="wb-icon">🏁</span> Practice Endgames
+                    </button>
+                    <button class="welcome-tab-btn" onclick="showWelcomeInfo('news')">
+                      <span class="wb-icon">📰</span> Chess News
+                    </button>
+                    <button class="welcome-tab-btn" onclick="showWelcomeInfo('joke')">
+                      <span class="wb-icon">😄</span> Chess Joke
+                    </button>
+                  </div>
+                  <div id="welcome-info-area"></div>
                 </div>
 
                 <!-- Player Setup Tab -->
-                <div id="player-setup-panel" class="tab-panel-content" style="display: block;">
+                <div id="player-setup-panel" class="tab-panel-content">
                   <h3 style="margin-top: 0;">Player Setup</h3>
                   
                   <!-- White Player Section -->
@@ -521,10 +2039,16 @@
                         <option value="ai">AI</option>
                       </select>
                     </label>
+                    <div id="white-human-config" style="display: block;">
+                      <label style="display: block; margin: 10px 0;">
+                        Player Name:
+                        <input type="text" id="white-human-name" placeholder="Enter player name" oninput="updatePlayerDisplay()" style="width: 100%; padding: 5px; box-sizing: border-box;">
+                      </label>
+                    </div>
                     <div id="white-ai-config" style="display: none;">
                       <label style="display: block; margin: 10px 0;">
                         AI Type:
-                        <select id="white-ai-type" style="width: 100%; padding: 5px;">
+                        <select id="white-ai-type" onchange="updatePlayerDisplay()" style="width: 100%; padding: 5px;">
                           <option value="stockfish" selected>Stockfish</option>
                           <option value="openai">OpenAI GPT</option>
                           <option value="deepseek">DeepSeek</option>
@@ -533,7 +2057,7 @@
                       </label>
                       <label style="display: block; margin: 10px 0;">
                         Skill Level (1-20):
-                        <input type="number" id="white-skill-level" value="10" min="1" max="20" style="width: 100%; padding: 5px;">
+                        <input type="number" id="white-skill-level" value="10" min="1" max="20" onchange="updatePlayerDisplay()" style="width: 100%; padding: 5px;">
                       </label>
                     </div>
                   </div>
@@ -547,10 +2071,16 @@
                         <option value="ai" selected>AI</option>
                       </select>
                     </label>
+                    <div id="black-human-config" style="display: none;">
+                      <label style="display: block; margin: 10px 0;">
+                        Player Name:
+                        <input type="text" id="black-human-name" placeholder="Enter player name" oninput="updatePlayerDisplay()" style="width: 100%; padding: 5px; box-sizing: border-box;">
+                      </label>
+                    </div>
                     <div id="black-ai-config" style="display: block;">
                       <label style="display: block; margin: 10px 0;">
                         AI Type:
-                        <select id="black-ai-type" style="width: 100%; padding: 5px;">
+                        <select id="black-ai-type" onchange="updatePlayerDisplay()" style="width: 100%; padding: 5px;">
                           <option value="stockfish" selected>Stockfish</option>
                           <option value="openai">OpenAI GPT</option>
                           <option value="deepseek">DeepSeek</option>
@@ -559,9 +2089,30 @@
                       </label>
                       <label style="display: block; margin: 10px 0;">
                         Skill Level (1-20):
-                        <input type="number" id="black-skill-level" value="10" min="1" max="20" style="width: 100%; padding: 5px;">
+                        <input type="number" id="black-skill-level" value="10" min="1" max="20" onchange="updatePlayerDisplay()" style="width: 100%; padding: 5px;">
                       </label>
                     </div>
+                  </div>
+
+                  <!-- Strategy Section -->
+                  <div style="border: 1px solid #ddd; padding: 10px; margin: 10px 0; border-radius: 4px;">
+                    <h4 style="margin-top: 0;">Strategy</h4>
+                    <label style="display: block; margin: 10px 0;">
+                      White Opening:
+                      <select id="white-strategy" style="width: 100%; padding: 5px;">
+                        <option value="">No Opening</option>
+                        <option value="ruy-lopez">Ruy Lopez</option>
+                        <option value="italian">Italian Game</option>
+                      </select>
+                    </label>
+                    <label style="display: block; margin: 10px 0;">
+                      Black Defense:
+                      <select id="black-strategy" style="width: 100%; padding: 5px;">
+                        <option value="">No Defense</option>
+                        <option value="sicilian">Sicilian Defense</option>
+                        <option value="french">French Defense</option>
+                      </select>
+                    </label>
                   </div>
 
                   <button onclick="startNewGame()" class="btn-primary" style="margin-top: 15px;">Start New Game</button>
@@ -569,7 +2120,10 @@
 
                 <!-- Move History Tab -->
                 <div id="move-history-panel" class="tab-panel-content">
-                  <h3 style="margin-top: 0;">Move History</h3>
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h3 style="margin:0;">Move History</h3>
+                    <button onclick="saveGameAs()" style="padding:5px 12px; font-size:0.82em; background:#ff9800; color:white; border:none; border-radius:4px; cursor:pointer;">💾 Save As…</button>
+                  </div>
                   <div id="move-history">
                     <p style="color: #999;">No moves yet</p>
                   </div>
@@ -578,34 +2132,102 @@
                 <!-- Expert Tab -->
                 <div id="expert-panel" class="tab-panel-content">
                   <h3 style="margin-top: 0;">Ask Expert</h3>
+
+                  <!-- Game context badge -->
+                  <div id="expert-game-context" style="margin-bottom: 10px; padding: 7px 10px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 4px; font-size: 12px; color: #2e7d32; display: none;">
+                    <strong>Analyzing live game</strong> — <span id="expert-context-summary"></span>
+                  </div>
+
+                  <!-- Quick action buttons -->
+                  <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;">
+                    <button class="expert-quick-btn" onclick="askExpertPreset('Analyze the current position and suggest the best plan.')">Analyze position</button>
+                    <button class="expert-quick-btn" onclick="askExpertPreset('What is the best move right now and why?')">Best move?</button>
+                    <button class="expert-quick-btn" onclick="askExpertPreset('Explain the last move that was played.')">Explain last move</button>
+                    <button class="expert-quick-btn" onclick="askExpertPreset('What threats should I be aware of in this position?')">Threats?</button>
+                    <button class="expert-quick-btn" onclick="askExpertPreset('Who is winning and what is the material balance?')">Who is winning?</button>
+                  </div>
+
                   <div class="expert-input-group">
-                    <input id="expert-input" type="text" placeholder="Ask a chess question...">
+                    <input id="expert-input" type="text" placeholder="Ask about the game or any chess question..."
+                      onkeydown="if(event.key==='Enter') askExpert()">
                     <button class="expert-send-btn" onclick="askExpert()">Send</button>
                   </div>
-                  <div id="expert-response">
-                    <p style="color: #999;">Ask a question and get expert chess advice</p>
+
+                  <!-- Conversation history -->
+                  <div id="expert-response" style="display: flex; flex-direction: column; gap: 10px;">
+                    <p style="color: #999; margin: 0;">Ask a question and get expert chess analysis</p>
                   </div>
                 </div>
 
-                <!-- Strategy Tab -->
-                <div id="strategy-panel" class="tab-panel-content">
-                  <h3 style="margin-top: 0;">Strategy</h3>
-                  <label style="display: block; margin: 10px 0;">
-                    White Opening:
-                    <select id="white-strategy" style="width: 100%; padding: 5px;">
-                      <option value="">No Opening</option>
-                      <option value="ruy-lopez">Ruy Lopez</option>
-                      <option value="italian">Italian Game</option>
-                    </select>
-                  </label>
-                  <label style="display: block; margin: 10px 0;">
-                    Black Defense:
-                    <select id="black-strategy" style="width: 100%; padding: 5px;">
-                      <option value="">No Defense</option>
-                      <option value="sicilian">Sicilian Defense</option>
-                      <option value="french">French Defense</option>
-                    </select>
-                  </label>
+                <!-- Stats Tab -->
+                <div id="stats-panel" class="tab-panel-content">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h3 style="margin:0;">My Stats</h3>
+                    <button onclick="clearStats()" style="padding:4px 10px; font-size:0.82em; background:#f44336; color:white; border:none; border-radius:3px; cursor:pointer;">Reset</button>
+                  </div>
+                  <div class="stats-summary-row">
+                    <div class="stats-summary-card sc-win"><div class="sc-value" id="stat-total-wins">0</div><div class="sc-label">Wins</div></div>
+                    <div class="stats-summary-card sc-loss"><div class="sc-value" id="stat-total-losses">0</div><div class="sc-label">Losses</div></div>
+                    <div class="stats-summary-card sc-draw"><div class="sc-value" id="stat-total-draws">0</div><div class="sc-label">Draws</div></div>
+                  </div>
+                  <div id="stats-opponent-list"><p class="stats-empty">No games played yet.</p></div>
+                </div>
+
+                <!-- Community Tab -->
+                <div id="community-panel" class="tab-panel-content">
+                  <div style="display:flex; flex-direction:column; height:100%; min-height:0;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-shrink:0;">
+                      <h3 style="margin:0;">Community</h3>
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <span id="community-status-dot" style="font-size:0.82em; color:#888;"></span>
+                        <button onclick="clearCommunityMessages()" title="Hide all messages older than now" style="padding:3px 9px; font-size:0.82em; background:#f44336; color:white; border:none; border-radius:3px; cursor:pointer;">Clear</button>
+                      </div>
+                    </div>
+                    <div class="community-layout">
+                      <!-- Online users sidebar -->
+                      <div class="community-users-sidebar">
+                        <h4>Online</h4>
+                        <div id="community-users-list">
+                          <div class="comm-empty" style="padding:10px 8px;">—</div>
+                        </div>
+                      </div>
+                      <!-- Chat area -->
+                      <div class="community-chat-area">
+                        <div id="community-messages" class="community-messages">
+                          <div class="comm-empty">No messages yet. Say hello!</div>
+                        </div>
+                        <div class="community-input-row">
+                          <input id="community-input" type="text" maxlength="500"
+                            placeholder="Type a message…"
+                            onkeydown="if(event.key==='Enter') sendCommunityMessage()">
+                          <button class="community-send-btn" onclick="sendCommunityMessage()">Send</button>
+                        </div>
+                        <div id="dm-compose">
+                          <div class="dm-compose-header">
+                            <span>Direct message to: <strong id="dm-recipient-label"></strong></span>
+                            <button onclick="closeDmCompose()" style="background:none;border:none;cursor:pointer;color:#6a1b9a;font-size:1.1em;padding:0 2px;" title="Cancel">✕</button>
+                          </div>
+                          <div class="dm-input-row">
+                            <input id="dm-compose-input" type="text" maxlength="500"
+                              placeholder="Type a private message…"
+                              onkeydown="if(event.key==='Enter') sendDm()">
+                            <button class="community-send-btn" style="background:#9c27b0;" onclick="sendDm()">Send</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Comm Tab -->
+                <div id="comm-panel" class="tab-panel-content">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-shrink:0;">
+                    <h3 style="margin:0;">Comm Log <span id="comm-count" style="font-size:0.75em; color:#757575; font-weight:normal;">(0 messages)</span></h3>
+                    <button onclick="clearCommLog()" style="padding:4px 10px; font-size:0.85em; background:#f44336; color:white; border:none; border-radius:3px; cursor:pointer;">Clear</button>
+                  </div>
+                  <div id="comm-log" class="comm-log">
+                    <p style="color:#999; font-size:12px;">No messages yet. Messages are captured from page load.</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -632,7 +2254,67 @@
         console.log('Chessboard initialized for user:', currentUser);
         updateStatusBox('Chessboard initialized successfully', 'success');
         updateFenDisplay();
+        updatePlayerDisplay();
+                                    _updateMySavesBtn();
+                                    // Start background community polling (unread badge while not on tab)
+                                    communityLastId = 0;
+                                    communityMessages = [];
+                                    communityUnreadCount = 0;
+                                    refreshCommunityMessages();
+                                    refreshOnlineUsers();
+                                    communityPollTimer = setInterval(refreshCommunityMessages, 5000);
+                                    communityUsersPollTimer = setInterval(refreshOnlineUsers, 12000);
+                                    // Heartbeat: keep the user's online status fresh (every 60 s)
+                                    postActivity('online');
+                                    setInterval(() => postActivity('online'), 60000);
+        // Ensure Welcome tab is active and in focus on login
+        navigateToTab('welcome-panel');
+        // Show Chess News on first login of the day
+        const _today = new Date().toDateString();
+        const _newsKey = 'chessNewsDailyShown_' + currentUser;
+        if (localStorage.getItem(_newsKey) !== _today) {
+          localStorage.setItem(_newsKey, _today);
+          setTimeout(() => showWelcomeInfo('news'), 150);
+        }
+                                  }
+
+                                  function postActivity(status) {
+                                    if (!authToken) return;
+                                    fetch('http://localhost:8002/auth/activity', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                                      body: JSON.stringify({ activity: status })
+                                    }).catch(() => { });
       }
+
+                                    function clearMyGameActivity() {
+                                      if (!authToken) return;
+                                      logCommMessage('req', 'AUTH', '/community/clear-activity', {}, null);
+                                      fetch('http://localhost:8002/community/clear-activity', {
+                                        method: 'POST',
+                                        headers: { 'Authorization': 'Bearer ' + authToken }
+                                      })
+                                        .then(r => r.json())
+                                        .then(data => {
+                                          logCommMessage('resp', 'AUTH', '/community/clear-activity', data, null);
+                                          if (data.success) {
+                                            postActivity('online');
+                                            // Clear the Game Banner
+                                            isSyncGame = false;
+                                            syncGameId = null;
+                                            updateSyncGameIdDisplay();
+                                            // Reset Game Status
+                                            const statusDiv = document.getElementById('game-status');
+                                            if (statusDiv) statusDiv.innerHTML = '<p>Game Status: <strong>Ready to play</strong></p>';
+                                            // Clear displayed White and Black players
+                                            const whiteDisplay = document.getElementById('white-player-display');
+                                            const blackDisplay = document.getElementById('black-player-display');
+                                            if (whiteDisplay) whiteDisplay.textContent = 'Not configured';
+                                            if (blackDisplay) blackDisplay.textContent = 'Not configured';
+                                          }
+                                        })
+                                        .catch(e => console.error('Clear activity error:', e));
+                                    }
 
           function onDragStart(source, piece, position, orientation) {
             if (game.game_over()) {
@@ -643,6 +2325,12 @@
             if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
               (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
               return false;
+            }
+
+            // In a sync game, prevent a player from moving the opponent's pieces
+            if (isSyncGame && syncMyColor) {
+              if (syncMyColor === 'white' && game.turn() !== 'w') return false;
+              if (syncMyColor === 'black' && game.turn() !== 'b') return false;
             }
 
             return true;
@@ -661,8 +2349,15 @@
             }
 
             updateStatusBox(`You played: ${move.san}`, 'info');
-            updateMoveHistory(move.san, false);
+            updateMoveHistory(move.san, 'You');
+            updateCapturedPieces(move);
             updateFenDisplay();
+            updateExpertContextBadge();
+
+            // Publish move to sync store for H vs H games
+            if (isSyncGame) {
+              publishGameSync(source + target, move.san, currentUser);
+            }
 
             // Check if we need AI to respond
             const blackPlayer = document.getElementById('black-player').value;
@@ -674,6 +2369,7 @@
             sendMoveToEngine(source + target, game.fen(), needsAI);
 
             checkGameStatus();
+            saveGame();
           }
 
                           function onSnapEnd() {
@@ -694,9 +2390,14 @@
                           if (game.in_checkmate()) {
                             status = game.turn() === 'w' ? 'Black wins by checkmate!' : 'White wins by checkmate!';
                             updateStatusBox(status, 'success');
+                            // Record result: human wins if the side that just got mated is NOT the human's side
+                            const humanWon = (currentPlayerColor === 'white' && game.turn() === 'b') ||
+                              (currentPlayerColor === 'black' && game.turn() === 'w');
+                            recordGameResult(humanWon ? 'win' : 'loss');
                           } else if (game.in_draw()) {
                             status = 'Game drawn!';
                             updateStatusBox(status, 'info');
+                            recordGameResult('draw');
                           } else if (game.in_check()) {
                             status = game.turn() === 'w' ? 'White is in check' : 'Black is in check';
                             updateStatusBox(status, 'info');
@@ -715,37 +2416,123 @@
 
           const whiteAiConfig = document.getElementById('white-ai-config');
           const blackAiConfig = document.getElementById('black-ai-config');
+          const whiteHumanConfig = document.getElementById('white-human-config');
+          const blackHumanConfig = document.getElementById('black-human-config');
 
           // Show/hide White AI config based on selection
           if (whitePlayer === 'ai') {
             whiteAiConfig.style.display = 'block';
+            if (whiteHumanConfig) whiteHumanConfig.style.display = 'none';
           } else {
             whiteAiConfig.style.display = 'none';
+            if (whiteHumanConfig) whiteHumanConfig.style.display = 'block';
+            const whiteName = document.getElementById('white-human-name');
+            if (whiteName && !whiteName.value && currentUser) whiteName.value = currentUser;
           }
 
           // Show/hide Black AI config based on selection
           if (blackPlayer === 'ai') {
             blackAiConfig.style.display = 'block';
+            if (blackHumanConfig) blackHumanConfig.style.display = 'none';
           } else {
             blackAiConfig.style.display = 'none';
+            if (blackHumanConfig) blackHumanConfig.style.display = 'block';
           }
+
+    // Update the player display
+    updatePlayerDisplay();
+  }
+
+  function updatePlayerDisplay() {
+    const whitePlayer = document.getElementById('white-player').value;
+    const blackPlayer = document.getElementById('black-player').value;
+
+    const whiteNameEl = document.getElementById('white-human-name');
+    const blackNameEl = document.getElementById('black-human-name');
+    const whiteName = (whiteNameEl && whiteNameEl.value.trim()) ? whiteNameEl.value.trim() : (currentUser || 'Player 1');
+    const blackName = (blackNameEl && blackNameEl.value.trim()) ? blackNameEl.value.trim() : 'Player 2';
+
+    let whiteDisplay = whitePlayer === 'human' ? `Human (${whiteName})` : 'AI';
+    let blackDisplay = blackPlayer === 'human' ? `Human (${blackName})` : 'AI';
+
+    if (whitePlayer === 'ai') {
+      const whiteAiType = document.getElementById('white-ai-type').value;
+      const whiteSkilLevel = document.getElementById('white-skill-level').value;
+      whiteDisplay = `AI (${whiteAiType}, Level ${whiteSkilLevel})`;
+    }
+
+    if (blackPlayer === 'ai') {
+      const blackAiType = document.getElementById('black-ai-type').value;
+      const blackSkillLevel = document.getElementById('black-skill-level').value;
+      blackDisplay = `AI (${blackAiType}, Level ${blackSkillLevel})`;
+    }
+
+    const whiteDisplayEl = document.getElementById('white-player-display');
+    const blackDisplayEl = document.getElementById('black-player-display');
+
+    if (whiteDisplayEl) whiteDisplayEl.textContent = whiteDisplay;
+    if (blackDisplayEl) blackDisplayEl.textContent = blackDisplay;
         }
 
-      function startNewGame() {
+                          function startNewGame() {
         const whitePlayer = document.getElementById('white-player').value;
         const blackPlayer = document.getElementById('black-player').value;
 
+        // Track opponent info and the human's color for stats
+        currentPlayerColor = (whitePlayer === 'human') ? 'white' : 'black';
+        currentOpponent = getOpponentLabel();
+        gameResultRecorded = false;
+                          postActivity('playing');
+
       game = new Chess();
       moveHistory = [];
+        capturedByWhite = [];
+        capturedByBlack = [];
 
       if (board) {
         board.start();
       }
 
       document.getElementById('move-history').innerHTML = '<p style="color: #999;">No moves yet</p>';
+        const expertResp = document.getElementById('expert-response');
+        if (expertResp) expertResp.innerHTML = '<p style="color: #999; margin: 0;">Ask a question and get expert chess analysis</p>';
       updateFenDisplay();
       checkGameStatus();
+        updatePlayerDisplay();
+        renderCapturedPieces();
+        updateExpertContextBadge();
       updateStatusBox(`New game started: White=${whitePlayer}, Black=${blackPlayer}`, 'success');
+
+                          // ---- H vs H board sync setup ----
+                          if (syncPollInterval) { clearInterval(syncPollInterval); syncPollInterval = null; }
+                          const whiteNameEl = document.getElementById('white-human-name');
+                          const blackNameEl = document.getElementById('black-human-name');
+                          const whiteName = whiteNameEl ? whiteNameEl.value.trim() : '';
+                          const blackName = blackNameEl ? blackNameEl.value.trim() : '';
+                          if (whitePlayer === 'human' && blackPlayer === 'human' && whiteName && blackName && whiteName !== blackName) {
+                            isSyncGame = true;
+                            const players = [whiteName, blackName].sort();
+                            syncGameId = players[0] + '_' + players[1];
+                            syncMyColor = (whiteName === currentUser) ? 'white' : 'black';
+                            lastSyncFen = null;
+                            updateSyncGameIdDisplay();
+                            logCommMessage('info', 'SYNC', '/game/sync', {
+                              game_id: syncGameId,
+                              my_color: syncMyColor,
+                              white: whiteName,
+                              black: blackName
+                            }, null);
+                            // Poll immediately to catch up with any moves already made by the opponent
+                            // (do NOT publish here — writing startFEN would overwrite opponent's live state)
+                            pollGameSync();
+                            syncPollInterval = setInterval(pollGameSync, 2000);
+                          } else {
+                            isSyncGame = false;
+                            syncGameId = null;
+                            syncMyColor = null;
+                            lastSyncFen = null;
+                            updateSyncGameIdDisplay();
+                          }
 
         // If White is AI, request the first move
         if (whitePlayer === 'ai') {
@@ -779,6 +2566,8 @@
         }
 
         console.log('[UI] Sending to engine:', { move, fen, requestAiMove, aiType, skillLevel });
+        logCommMessage('req', 'ENGINE', '/move', { move, fen, request_ai_move: requestAiMove, ai_type: aiType, skill_level: skillLevel }, null);
+        let _moveStatus = null;
     
       fetch('http://localhost:8000/move', {
         method: 'POST',
@@ -796,6 +2585,7 @@
       })
         .then(response => {
           console.log('[UI] Response status:', response.status);
+          _moveStatus = response.status;
           if (response.status === 401) {
             updateStatusBox('Authentication failed. Please login again.', 'error');
             handleLogout();
@@ -805,6 +2595,7 @@
         })
         .then(data => {
           console.log('[UI] Response data:', data);
+          logCommMessage('res', 'ENGINE', '/move', data, _moveStatus);
 
           if (data.error) {
             updateStatusBox(`Server error: ${data.error}`, 'error');
@@ -836,13 +2627,16 @@
             if (aiMoveResult) {
               // Update the board display
               board.position(game.fen());
+              updateCapturedPieces(aiMoveResult);
 
               // Update move history with SAN notation
               const sanMove = data.ai_move_san || aiMoveResult.san;
-              updateMoveHistory(sanMove, true);
+              updateMoveHistory(sanMove, currentOpponent || 'AI');
               updateFenDisplay();
               updateStatusBox(`AI played: ${sanMove} (${data.ai_type})`, 'info');
               checkGameStatus();
+              saveGame();
+              updateExpertContextBadge();
 
               // Check if game is over
               if (!game.in_checkmate() && !game.in_draw() && !game.in_stalemate()) {
@@ -876,55 +2670,218 @@
           if (error.message !== 'Unauthorized') {
             console.error('[UI] Error:', error);
             updateStatusBox(`Connection error: ${error.message}`, 'error');
+            logCommMessage('err', 'ENGINE', '/move', { message: error.message }, null);
           }
         });
     }
+
+          // ---- H vs H board sync helpers ----
+
+                function updateSyncGameIdDisplay() {
+                  const box = document.getElementById('sync-game-id-box');
+                  const val = document.getElementById('sync-game-id-value');
+                  if (!box || !val) return;
+                  if (isSyncGame && syncGameId) {
+                    val.textContent = syncGameId;
+                    box.style.display = 'block';
+                  } else {
+                    box.style.display = 'none';
+                  }
+                }
+
+          function publishGameSync(lastMove, lastMoveSan, movedBy) {
+            if (!syncGameId || !authToken || !game) return;
+            const whiteNameEl = document.getElementById('white-human-name');
+            const blackNameEl = document.getElementById('black-human-name');
+            fetch('http://localhost:8000/game/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+              body: JSON.stringify({
+                game_id: syncGameId,
+                fen: game.fen(),
+                last_move: lastMove,
+                last_move_san: lastMoveSan,
+                moved_by: movedBy,
+                white_player: whiteNameEl ? whiteNameEl.value.trim() : '',
+                black_player: blackNameEl ? blackNameEl.value.trim() : ''
+              })
+            }).catch(() => { });
+          }
+
+          function pollGameSync() {
+            if (!syncGameId || !authToken || !isSyncGame || !game) return;
+            fetch('http://localhost:8000/game/sync/' + syncGameId, {
+              headers: { 'Authorization': 'Bearer ' + authToken }
+            })
+              .then(r => r.json())
+              .then(data => {
+                if (!data.found || !data.fen) return;
+                // Skip if this is our own last published state or nothing changed
+                if (data.fen === lastSyncFen) return;
+                if (data.fen === game.fen()) { lastSyncFen = data.fen; return; }
+                // Skip if we were the one who made this move
+                if (data.moved_by === currentUser) { lastSyncFen = data.fen; return; }
+
+                lastSyncFen = data.fen;
+
+                // Try to apply via the stored last_move
+                let applied = false;
+                if (data.last_move && data.last_move.length >= 4) {
+                  const from = data.last_move.substring(0, 2);
+                  const to = data.last_move.substring(2, 4);
+                  const promotion = data.last_move.length > 4 ? data.last_move[4] : 'q';
+                  const result = game.move({ from, to, promotion });
+                  if (result) {
+                    applied = true;
+                    board.position(game.fen());
+                    updateMoveHistory(data.last_move_san || result.san, data.moved_by || 'Opponent');
+                    updateCapturedPieces(result);
+                    updateFenDisplay();
+                    updateStatusBox((data.moved_by || 'Opponent') + ' played: ' + (data.last_move_san || result.san), 'info');
+                    logCommMessage('info', 'SYNC', '/game/sync/' + syncGameId, {
+                      move_from: data.moved_by || 'opponent',
+                      move: data.last_move_san || result.san,
+                      uci: data.last_move
+                    }, null);
+                    checkGameStatus();
+                    saveGame();
+                    updateExpertContextBadge();
+                  }
+                }
+                if (!applied) {
+                  // Fallback: load the FEN directly
+                  game.load(data.fen);
+                  board.position(data.fen);
+                  updateFenDisplay();
+                  checkGameStatus();
+                  updateStatusBox('Board synced with opponent', 'info');
+                }
+              })
+              .catch(() => { });
+          }
+
+        function buildExpertGameContext() {
+          if (!game) return null;
+          const sanMoves = moveHistory.map(m => m.move);
+          return {
+            fen: game.fen(),
+            move_history: sanMoves,
+            move_count: Math.ceil(sanMoves.length / 2),
+            turn: game.turn() === 'w' ? 'white' : 'black',
+            is_check: game.in_check(),
+            is_checkmate: game.in_checkmate(),
+            is_draw: game.in_draw(),
+            captured_by_white: [...capturedByWhite],
+            captured_by_black: [...capturedByBlack]
+          };
+        }
+
+        function updateExpertContextBadge() {
+          const badge = document.getElementById('expert-game-context');
+          const summary = document.getElementById('expert-context-summary');
+          if (!badge || !summary || !game) return;
+          const moveCount = Math.ceil(moveHistory.length / 2);
+          if (moveCount === 0) {
+            badge.style.display = 'none';
+            return;
+          }
+          badge.style.display = 'block';
+          const turn = game.turn() === 'w' ? 'White' : 'Black';
+          let status = `move ${moveCount}, ${turn} to move`;
+          if (game.in_checkmate()) status = 'game over — checkmate';
+          else if (game.in_draw()) status = 'game over — draw';
+          else if (game.in_check()) status += ', in check';
+          summary.textContent = status;
+        }
+
+        function addExpertQA(question, answer, isError) {
+          const container = document.getElementById('expert-response');
+          if (!container) return;
+          // Remove placeholder
+          const placeholder = container.querySelector('p');
+          if (placeholder) placeholder.remove();
+
+          const entry = document.createElement('div');
+          entry.className = 'expert-qa-entry';
+          const qDiv = document.createElement('div');
+          qDiv.className = 'expert-qa-question';
+          qDiv.textContent = question;
+          const aDiv = document.createElement('div');
+          aDiv.className = 'expert-qa-answer';
+          if (isError) {
+            aDiv.style.color = '#c62828';
+            aDiv.textContent = answer;
+          } else {
+            aDiv.innerHTML = answer;
+          }
+          entry.appendChild(qDiv);
+          entry.appendChild(aDiv);
+          // Prepend so newest is at top
+          container.insertBefore(entry, container.firstChild);
+        }
+
+        function askExpertPreset(question) {
+          const input = document.getElementById('expert-input');
+          if (input) input.value = question;
+          askExpert();
+        }
 
       function askExpert() {
-        const question = document.getElementById('expert-input').value;
-      if (!question) {
-        updateStatusBox('Please enter a question', 'error');
-        return;
+        const question = document.getElementById('expert-input').value.trim();
+        if (!question) {
+          updateStatusBox('Please enter a question', 'error');
+          return;
+        }
+
+        updateStatusBox(`Asking expert: "${question}"`, 'info');
+        document.getElementById('expert-input').value = '';
+
+        const ctx = buildExpertGameContext();
+        const payload = { question, ...(ctx || {}) };
+
+        logCommMessage('req', 'ENGINE', '/expert/question', { question, fen: ctx ? ctx.fen : null }, null);
+        let _expertStatus = null;
+        fetch('http://localhost:8000/expert/question', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + authToken
+          },
+          body: JSON.stringify(payload)
+        })
+          .then(response => {
+            _expertStatus = response.status;
+            if (response.status === 401) {
+              updateStatusBox('Authentication failed. Please login again.', 'error');
+              handleLogout();
+              throw new Error('Unauthorized');
+            }
+            return response.json();
+          })
+          .then(data => {
+            logCommMessage('res', 'ENGINE', '/expert/question', data, _expertStatus);
+            if (data.error) {
+              addExpertQA(question, 'Error: ' + data.error, true);
+              updateStatusBox(`Expert error: ${data.error}`, 'error');
+            } else {
+              addExpertQA(question, data.response || 'No response', false);
+              updateStatusBox('Expert response received', 'success');
+            }
+          })
+          .catch(error => {
+            if (error.message !== 'Unauthorized') {
+              logCommMessage('err', 'ENGINE', '/expert/question', { message: error.message }, null);
+              addExpertQA(question, 'Connection error: ' + error.message, true);
+              updateStatusBox(`Expert connection error: ${error.message}`, 'error');
+            }
+          });
       }
-
-      updateStatusBox(`Asking expert: "${question}"`, 'info');
-
-      fetch('http://localhost:8000/expert/question', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + authToken
-        },
-        body: JSON.stringify({ question: question, fen: game.fen() })
-      })
-        .then(response => {
-          if (response.status === 401) {
-            updateStatusBox('Authentication failed. Please login again.', 'error');
-            handleLogout();
-            throw new Error('Unauthorized');
-          }
-          return response.json();
-        })
-        .then(data => {
-          if (data.error) {
-            document.getElementById('expert-response').textContent = 'Error: ' + data.error;
-            updateStatusBox(`Expert error: ${data.error}`, 'error');
-          } else {
-            document.getElementById('expert-response').innerHTML = data.response || 'No response';
-            document.getElementById('expert-input').value = '';
-            updateStatusBox('Expert response received', 'success');
-          }
-        })
-        .catch(error => {
-          if (error.message !== 'Unauthorized') {
-            document.getElementById('expert-response').textContent = 'Error: ' + error.message;
-            updateStatusBox(`Expert connection error: ${error.message}`, 'error');
-          }
-        });
-    }
 
       function handleLogout() {
         if (confirm('Are you sure you want to logout?')) {
+          if (syncPollInterval) { clearInterval(syncPollInterval); syncPollInterval = null; }
+          isSyncGame = false;
+          logCommMessage('req', 'AUTH', '/auth/logout', {}, null);
           fetch('http://localhost:8002/auth/logout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -944,5 +2901,54 @@
 
       window.onload = checkAuthentication;
   </script>
+<!-- Color Choice Modal -->
+<div id="color-choice-overlay" class="color-choice-overlay" style="display:none;"
+  onclick="if(event.target===this)closeColorChoiceModal()">
+  <div class="color-choice-modal">
+    <h3>♟ Choose Your Color</h3>
+    <p>Which color would you like to play against <strong id="color-choice-inviter"></strong>?</p>
+    <div class="color-choice-options">
+      <button class="color-choice-btn ccb-white" onclick="confirmColorChoice('white')">♔&nbsp;&nbsp;I'll play
+        White</button>
+      <button class="color-choice-btn ccb-black" onclick="confirmColorChoice('black')">♚&nbsp;&nbsp;I'll play
+        Black</button>
+      <button class="color-choice-btn ccb-random" onclick="confirmColorChoice('random')">🎲&nbsp;&nbsp;Random</button>
+    </div>
+    <button class="color-choice-cancel" onclick="closeColorChoiceModal()">Cancel</button>
+  </div>
+</div>
+<div id="ai-game-setup-overlay" style="display:none;" onclick="if(event.target===this)closeAiGameSetup()">
+  <div class="ai-game-setup-modal">
+    <h3>🤖 Challenge Stockfish AI</h3>
+    <p>Set up your game against Stockfish:</p>
+    <div class="ags-field">
+      <label>AI plays as:</label>
+      <div class="ags-color-options">
+        <button class="ags-color-btn ags-c-white" id="ags-btn-white" onclick="selectAiColor('white')">♔ White</button>
+        <button class="ags-color-btn ags-c-black" id="ags-btn-black" onclick="selectAiColor('black')">♚ Black</button>
+        <button class="ags-color-btn ags-c-random ags-active" id="ags-btn-random" onclick="selectAiColor('random')">🎲
+          Random</button>
+      </div>
+    </div>
+    <div class="ags-field">
+      <label for="ags-skill-level">Skill Level (1–10):</label>
+      <input type="number" id="ags-skill-level" value="5" min="1" max="10">
+    </div>
+    <div class="ags-field">
+      <label id="ags-strategy-label" for="ags-strategy">Preferred Strategy:</label>
+      <select id="ags-strategy">
+        <option value="">No Preference</option>
+        <option value="ruy-lopez">Ruy Lopez (White Opening)</option>
+        <option value="italian">Italian Game (White Opening)</option>
+        <option value="sicilian">Sicilian Defense (Black Defense)</option>
+        <option value="french">French Defense (Black Defense)</option>
+      </select>
+    </div>
+    <div class="ags-actions">
+      <button class="ags-start-btn" onclick="confirmAiGameSetup()">▶ Start Game</button>
+      <button class="ags-cancel-btn" onclick="closeAiGameSetup()">Cancel</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

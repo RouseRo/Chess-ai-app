@@ -6,7 +6,7 @@ This document describes the Docker-based microservices architecture for the Ches
 
 ## Overview
 
-The application consists of **four containerized microservices** plus a CLI application, all sharing a unified SQLite database for user authentication:
+The application consists of **four containerized microservices**, all sharing a unified SQLite database for user authentication:
 
 | Service | Port | Description |
 |---------|------|-------------|
@@ -14,7 +14,6 @@ The application consists of **four containerized microservices** plus a CLI appl
 | **chess-engine** | 8000 | Chess game logic and AI integration |
 | **chess-admin-service** | 8001 | Admin dashboard and user management |
 | **chess-auth-service** | 8002 | Authentication and JWT token management |
-| **CLI App** | - | Command-line interface (`python -m src.main`) |
 
 ---
 
@@ -25,16 +24,15 @@ The application consists of **four containerized microservices** plus a CLI appl
 │                              Clients                                     │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────────────┐   │
-│  │   CLI App    │    │   Web UI     │    │   Admin Dashboard        │   │
-│  │ (python -m   │    │ (Port 8080)  │    │   (Port 8080/admin.html) │   │
-│  │  src.main)   │    │              │    │                          │   │
-│  └──────┬───────┘    └──────┬───────┘    └────────────┬─────────────┘   │
-│         │                   │                         │                  │
-└─────────┼───────────────────┼─────────────────────────┼──────────────────┘
-          │                   │                         │
-          │     HTTP API      │                         │
-          └─────────┬─────────┴─────────────────────────┘
+│  ┌──────────────────────────┐    ┌──────────────────────────┐   │
+│  │         Web UI           │    │   Admin Dashboard        │   │
+│  │       (Port 8080)        │    │   (Port 8080/admin.html) │   │
+│  └──────────────┬───────────┘    └────────────┬─────────────┘   │
+│                 │                             │                  │
+└─────────────────┼─────────────────────────────┼──────────────────┘
+                  │                             │
+                  │     HTTP API               │
+                  └──────────────┬─────────────┘
                     │
 ┌───────────────────┼─────────────────────────────────────────────────────┐
 │                   │           Docker Network                             │
@@ -69,17 +67,17 @@ The application consists of **four containerized microservices** plus a CLI appl
 
 ## Unified Authentication Architecture
 
-All clients (CLI, Web UI, Admin Dashboard) authenticate through the same auth-service API:
+All clients (Web UI, Admin Dashboard) authenticate through the same auth-service API:
 
 ```
-┌─────────────┐   ┌─────────────┐   ┌─────────────┐
-│   CLI App   │   │   Web UI    │   │   Admin UI  │
-│             │   │             │   │             │
-│ AuthClient  │   │  fetch()    │   │  fetch()    │
-└──────┬──────┘   └──────┬──────┘   └──────┬──────┘
-       │                 │                 │
-       │    HTTP POST /auth/login          │
-       └─────────────────┼─────────────────┘
+┌─────────────┐   ┌─────────────┐
+│   Web UI    │   │   Admin UI  │
+│             │   │             │
+│  fetch()    │   │  fetch()    │
+└──────┬──────┘   └──────┬──────┘
+       │                 │
+       │    HTTP POST /auth/login
+       └─────────────────┘
                          │
                          ▼
               ┌─────────────────────┐
@@ -105,13 +103,6 @@ All clients (CLI, Web UI, Admin Dashboard) authenticate through the same auth-se
 ```
 chess-ai-app/
 │
-├── src/                       # CLI Application
-│   ├── main.py               # Main entry point
-│   ├── auth_client.py        # HTTP client for auth-service
-│   ├── user_manager.py       # User management (uses AuthClient)
-│   ├── auth_ui.py            # CLI authentication prompts
-│   └── ...
-│
 ├── engine/                    # Chess engine service
 │   ├── Dockerfile
 │   ├── main.py
@@ -121,8 +112,7 @@ chess-ai-app/
 ├── ui/                        # Frontend web UI
 │   ├── Dockerfile
 │   ├── nginx.conf
-│   ├── index.html             # Login page
-│   ├── chessboard.html        # Game interface
+│   ├── index.html             # Login/Register + game interface (single-page app)
 │   ├── admin.html             # Admin dashboard
 │   ├── chessboard.js
 │   ├── chessboard.css
@@ -149,7 +139,6 @@ chess-ai-app/
 │   └── Docker_Design.md
 │
 ├── docker-compose.yml         # Container orchestration
-├── requirements.txt           # CLI dependencies
 └── .env                       # Environment variables
 ```
 
@@ -157,33 +146,7 @@ chess-ai-app/
 
 ## Services
 
-### 1. CLI Application
-
-**Purpose:** Command-line interface for playing chess, managing games, and user authentication.
-
-**Tech Stack:**
-- Python 3.12
-- requests (for HTTP API calls)
-- python-chess
-
-**Authentication:**
-The CLI uses `AuthClient` to communicate with the auth-service:
-
-```python
-from src.auth_client import AuthClient
-
-client = AuthClient("http://localhost:8002")
-success, message, token = client.login("johndoe", "password123")
-```
-
-**Running the CLI:**
-```bash
-python -m src.main
-```
-
----
-
-### 2. Chess UI (Port 8080)
+### 1. Chess UI (Port 8080)
 
 **Purpose:** Serves the frontend web application with interactive chessboard.
 
@@ -196,8 +159,7 @@ python -m src.main
 **Pages:**
 | Page | Description |
 |------|-------------|
-| `index.html` | Login/Register page |
-| `chessboard.html` | Main game interface |
+| `index.html` | Login/Register + game interface (single-page app) |
 | `admin.html` | Admin dashboard |
 
 **Dockerfile:**
@@ -210,7 +172,7 @@ EXPOSE 80
 
 ---
 
-### 3. Chess Engine (Port 8000)
+### 2. Chess Engine (Port 8000)
 
 **Purpose:** Handles chess game logic, move validation, and AI integration.
 
@@ -243,7 +205,7 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 ---
 
-### 4. Auth Service (Port 8002)
+### 3. Auth Service (Port 8002)
 
 **Purpose:** Manages user authentication, registration, and JWT tokens. **Single source of truth for all user data.**
 
@@ -311,7 +273,7 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8002"]
 
 ---
 
-### 5. Admin Service (Port 8001)
+### 4. Admin Service (Port 8001)
 
 **Purpose:** Provides admin dashboard functionality, user management, and system statistics.
 
@@ -445,7 +407,6 @@ All services and clients share a single SQLite database:
 |-------------|----------|
 | Docker Containers | `/app/data/users.db` (mounted from `./data`) |
 | Local Development | `data/users.db` |
-| CLI Application | Accesses via auth-service API (http://localhost:8002) |
 
 ### Users Table Schema
 
@@ -504,37 +465,6 @@ for row in conn.execute('SELECT username, is_admin, is_verified FROM users'):
 
 ## Authentication Flow
 
-### CLI Login Sequence
-
-```
-┌─────────┐         ┌────────────┐         ┌──────────────┐
-│   CLI   │         │ AuthClient │         │ Auth Service │
-└────┬────┘         └─────┬──────┘         └──────┬───────┘
-     │                    │                       │
-     │  User enters       │                       │
-     │  credentials       │                       │
-     │                    │                       │
-     │  login(user, pass) │                       │
-     │───────────────────▶│                       │
-     │                    │                       │
-     │                    │  POST /auth/login     │
-     │                    │  {username, password} │
-     │                    │──────────────────────▶│
-     │                    │                       │
-     │                    │                       │  Validate with bcrypt
-     │                    │                       │  Generate JWT
-     │                    │                       │
-     │                    │  {success, token}     │
-     │                    │◀──────────────────────│
-     │                    │                       │
-     │  (success, msg,    │                       │
-     │   token)           │                       │
-     │◀───────────────────│                       │
-     │                    │                       │
-     │  Store token       │                       │
-     │  Show menu         │                       │
-```
-
 ### Web Login Sequence
 
 ```
@@ -560,7 +490,7 @@ for row in conn.execute('SELECT username, is_admin, is_verified FROM users'):
      │  localStorage     │                      │
      │                   │                      │
      │  Redirect to      │                      │
-     │  chessboard.html  │                      │
+     │  game interface   │                      │
      │──────────────────▶│                      │
 ```
 
@@ -571,8 +501,6 @@ for row in conn.execute('SELECT username, is_admin, is_verified FROM users'):
 ### Prerequisites
 
 1. Docker and Docker Compose installed
-2. Python 3.12+ (for CLI)
-3. Required Python packages: `pip install -r requirements.txt`
 
 ### Start All Docker Services
 
@@ -585,13 +513,6 @@ docker-compose up --build
 
 ```bash
 docker-compose up -d
-```
-
-### Run CLI Application
-
-```bash
-# Ensure Docker services are running first
-python -m src.main
 ```
 
 ### View Logs
@@ -612,8 +533,7 @@ docker-compose down
 
 | Service | URL |
 |---------|-----|
-| Login Page | http://localhost:8080 |
-| Chessboard | http://localhost:8080/chessboard.html |
+| Login / Play Chess | http://localhost:8080 |
 | Admin Dashboard | http://localhost:8080/admin.html |
 | Engine API | http://localhost:8000 |
 | Admin API | http://localhost:8001 |
@@ -660,26 +580,6 @@ JWT_EXPIRATION_HOURS=24
 
 # Development Mode (auto-verifies new users)
 CHESS_DEV_MODE=false
-
-# Auth Service URL (for CLI)
-AUTH_SERVICE_URL=http://localhost:8002
-```
-
----
-
-## CLI Dependencies
-
-The CLI application requires these Python packages (in `requirements.txt`):
-
-```
-requests>=2.28.0
-python-chess>=1.999
-bcrypt>=4.0.0
-```
-
-Install with:
-```bash
-pip install -r requirements.txt
 ```
 
 ---
@@ -716,24 +616,10 @@ pip install -r requirements.txt
 
 | Issue | Solution |
 |-------|----------|
-| "Invalid username or password" (CLI) | Ensure `requests` is installed: `pip install requests` |
-| CLI can't reach auth service | Ensure Docker services are running: `docker-compose up -d` |
+| "Invalid username or password" | Reset password with `scripts/setup_test_user.py` |
 | Database not syncing | Copy manually: `docker cp data/users.db chess-auth-service:/app/data/` |
 | Port already in use | `docker-compose down` then retry |
 | Token expired | Login again |
-
-### Debug CLI Authentication
-
-```powershell
-# Test AuthClient directly
-python -c "
-from src.auth_client import AuthClient
-client = AuthClient()
-print('Health:', client.health_check())
-success, msg, token = client.login('johndoe', 'password123')
-print('Login:', success, msg)
-"
-```
 
 ### View Container Logs
 
