@@ -2267,6 +2267,15 @@
                                     // Heartbeat: keep the user's online status fresh (every 60 s)
                                     postActivity('online');
                                     setInterval(() => postActivity('online'), 60000);
+        // Ensure Welcome tab is active and in focus on login
+        navigateToTab('welcome-panel');
+        // Show Chess News on first login of the day
+        const _today = new Date().toDateString();
+        const _newsKey = 'chessNewsDailyShown_' + currentUser;
+        if (localStorage.getItem(_newsKey) !== _today) {
+          localStorage.setItem(_newsKey, _today);
+          setTimeout(() => showWelcomeInfo('news'), 150);
+        }
                                   }
 
                                   function postActivity(status) {
@@ -2297,6 +2306,11 @@
                                             // Reset Game Status
                                             const statusDiv = document.getElementById('game-status');
                                             if (statusDiv) statusDiv.innerHTML = '<p>Game Status: <strong>Ready to play</strong></p>';
+                                            // Clear displayed White and Black players
+                                            const whiteDisplay = document.getElementById('white-player-display');
+                                            const blackDisplay = document.getElementById('black-player-display');
+                                            if (whiteDisplay) whiteDisplay.textContent = 'Not configured';
+                                            if (blackDisplay) blackDisplay.textContent = 'Not configured';
                                           }
                                         })
                                         .catch(e => console.error('Clear activity error:', e));
