@@ -612,6 +612,8 @@
           let _pendingInviteId = null;
           let _pendingInviterUsername = null;
             let _aiGameSetupColor = 'random';
+            let setupReviewMoves = [];   // parsed SAN moves for step-through review
+            let setupReviewIndex = -1;   // current position: 0 = start, n = after n moves
 
     function checkAuthentication() {
       const token = localStorage.getItem('authToken');
@@ -2115,6 +2117,54 @@
                     </label>
                   </div>
 
+                  <!-- Position Setup from Moves -->
+                  <div style="border: 1px solid #ddd; padding: 10px; margin: 10px 0; border-radius: 4px;">
+                    <h4 style="margin-top: 0;">Setup Position from Moves</h4>
+                    <label style="display: block; margin-bottom: 8px; font-size: 0.88em; color: #555;">
+                      Preset Openings:
+                      <select id="setup-opening-preset" onchange="applyOpeningPreset()" style="width: 100%; padding: 5px; margin-top: 3px;">
+                        <option value="">-- Select a preset --</option>
+                        <option value="1.e4 e5 2.Nf3 Nc6 3.Bb5">Ruy López (1.e4 e5 2.Nf3 Nc6 3.Bb5)</option>
+                        <option value="1.e4 e5 2.Nf3 Nc6 3.Bc4">Italian Game (1.e4 e5 2.Nf3 Nc6 3.Bc4)</option>
+                        <option value="1.e4 e5 2.Nf3 Nc6 3.d4">Scotch Game (1.e4 e5 2.Nf3 Nc6 3.d4)</option>
+                        <option value="1.e4 e5 2.f4">King's Gambit (1.e4 e5 2.f4)</option>
+                        <option value="1.e4 c5">Sicilian Defense (1.e4 c5)</option>
+                        <option value="1.e4 e6">French Defense (1.e4 e6)</option>
+                        <option value="1.e4 c6">Caro-Kann Defense (1.e4 c6)</option>
+                        <option value="1.d4 d5 2.c4">Queen's Gambit (1.d4 d5 2.c4)</option>
+                        <option value="1.d4 Nf6 2.c4 g6">King's Indian Defense (1.d4 Nf6 2.c4 g6)</option>
+                        <option value="1.d4 Nf6 2.c4 e6 3.Nc3 Bb4">Nimzo-Indian Defense (1.d4 Nf6 2.c4 e6 3.Nc3 Bb4)</option>
+                        <option value="1.d4 d5 2.Nf3 Nf6 3.Bf4">London System (1.d4 d5 2.Nf3 Nf6 3.Bf4)</option>
+                        <option value="1.c4">English Opening (1.c4)</option>
+                      </select>
+                    </label>
+                    <label style="display: block; margin-bottom: 8px; font-size: 0.88em; color: #555;">
+                      Custom Moves (PGN notation):
+                      <textarea id="setup-moves-input" rows="3"
+                        placeholder="e.g. 1.e4 e5 2.Nf3 Nc6 3.Bb5"
+                        style="width: 100%; padding: 5px; box-sizing: border-box; font-family: monospace; font-size: 0.9em; margin-top: 3px; border: 1px solid #ccc; border-radius: 3px; resize: vertical;"></textarea>
+                    </label>
+                    <div style="display: flex; gap: 6px; margin-top: 2px;">
+                      <button onclick="previewSetupPosition()" style="flex:1; padding: 7px; background:#2196F3; color:white; border:none; border-radius:4px; cursor:pointer; font-size:0.88em; font-weight:600;">Preview Position</button>
+                      <button onclick="clearSetupPosition()" style="padding: 7px 12px; background:#f5f5f5; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:0.88em; color:#555;">Clear</button>
+                    </div>
+                    <div id="setup-moves-status" style="margin-top: 6px; font-size: 0.82em; color: #888;"></div>
+                    <div id="setup-nav-controls" style="display:none; margin-top:8px;">
+                      <div style="display:flex; gap:4px; align-items:center; justify-content:center;">
+                        <button id="setup-nav-first" onclick="stepReview(-9999)" title="First move"
+                          style="padding:5px 8px; background:#f5f5f5; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:1em;">&#x23EE;</button>
+                        <button id="setup-nav-prev" onclick="stepReview(-1)" title="Previous move"
+                          style="padding:5px 10px; background:#f5f5f5; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:1em;">&#9664;</button>
+                        <span id="setup-nav-label"
+                          style="flex:1; text-align:center; font-size:0.82em; color:#555; min-width:90px; font-family:monospace;"></span>
+                        <button id="setup-nav-next" onclick="stepReview(1)" title="Next move"
+                          style="padding:5px 10px; background:#f5f5f5; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:1em;">&#9654;</button>
+                        <button id="setup-nav-last" onclick="stepReview(9999)" title="Last move"
+                          style="padding:5px 8px; background:#f5f5f5; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:1em;">&#x23ED;</button>
+                      </div>
+                    </div>
+                  </div>
+
                   <button onclick="startNewGame()" class="btn-primary" style="margin-top: 15px;">Start New Game</button>
                 </div>
 
@@ -2383,6 +2433,153 @@
                             }
                           }
 
+                                // ── Position Setup from Moves ────────────────────────────────────────────
+
+                                function applyOpeningPreset() {
+                                  const preset = document.getElementById('setup-opening-preset');
+                                  const input = document.getElementById('setup-moves-input');
+                                  if (!preset || !input) return;
+                                  input.value = preset.value;
+                                  if (preset.value) {
+                                    previewSetupPosition();
+                                  } else {
+                                    clearSetupPosition();
+                                  }
+                                }
+
+                                function parseMoveNotation(text) {
+                                  // Strip block comments, variations, NAG annotations, and result tokens
+                                  let cleaned = text
+                                    .replace(/\{[^}]*\}/g, '')
+                                    .replace(/\([^)]*\)/g, '')
+                                    .replace(/\$\d+/g, '')
+                                    .replace(/[!?]+/g, '')
+                                    .replace(/1-0|0-1|1\/2-1\/2|\*/g, '');
+                                  // Split into tokens, strip leading move-number prefixes from each token
+                                  // (handles both standalone "1." and combined "1.e4" → "e4")
+                                  return cleaned.trim().split(/\s+/)
+                                    .filter(t => t.length > 0)
+                                    .map(t => t.replace(/^\d+\.{1,3}/, ''))
+                                    .filter(t => t.length > 0);
+                                }
+
+                                function previewSetupPosition() {
+                                  const input = document.getElementById('setup-moves-input');
+                                  const status = document.getElementById('setup-moves-status');
+                                  if (!input || !game) return;
+
+                                  const text = input.value.trim();
+                                  if (!text) {
+                                    if (status) status.textContent = '';
+                                    return;
+                                  }
+
+                                  const moves = parseMoveNotation(text);
+                                  if (moves.length === 0) {
+                                    if (status) { status.textContent = 'No valid moves found.'; status.style.color = '#c62828'; }
+                                    return;
+                                  }
+
+                                  // Validate moves against a temporary game instance
+                                  const tempGame = new Chess();
+                                  let applied = 0;
+                                  for (const san of moves) {
+                                    if (!tempGame.move(san, { sloppy: true })) {
+                                      if (status) {
+                                        status.textContent = 'Invalid move "' + san + '" after ' + applied + ' move' + (applied !== 1 ? 's' : '') + '.';
+                                        status.style.color = '#c62828';
+                                      }
+                                      return;
+                                    }
+                                    applied++;
+                                  }
+
+                                  // Store moves for step-through review
+                                  setupReviewMoves = moves;
+                                  setupReviewIndex = moves.length;
+
+                                  // Apply validated FEN to live board for preview
+                                  const previewFen = tempGame.fen();
+                                  game.load(previewFen);
+                                  if (board) board.position(previewFen);
+                                  updateFenDisplay();
+
+                                  // Show navigation controls
+                                  const navControls = document.getElementById('setup-nav-controls');
+                                  if (navControls) navControls.style.display = 'block';
+                                  updateReviewNavState();
+
+                                  if (status) {
+                                    status.textContent = '\u2713 ' + applied + ' move' + (applied !== 1 ? 's' : '') + ' loaded \u2014 use \u25c4 \u25ba to step through.';
+                                    status.style.color = '#2e7d32';
+                                  }
+                                }
+
+                                function updateReviewNavState() {
+                                  const total = setupReviewMoves.length;
+                                  const idx = setupReviewIndex;
+                                  const firstBtn = document.getElementById('setup-nav-first');
+                                  const prevBtn = document.getElementById('setup-nav-prev');
+                                  const nextBtn = document.getElementById('setup-nav-next');
+                                  const lastBtn = document.getElementById('setup-nav-last');
+                                  const label = document.getElementById('setup-nav-label');
+                                  if (firstBtn) firstBtn.disabled = idx <= 0;
+                                  if (prevBtn) prevBtn.disabled = idx <= 0;
+                                  if (nextBtn) nextBtn.disabled = idx >= total;
+                                  if (lastBtn) lastBtn.disabled = idx >= total;
+                                  if (label) {
+                                    label.textContent = idx === 0
+                                      ? 'Start'
+                                      : idx + '\u00a0/\u00a0' + total + '\u2002' + setupReviewMoves[idx - 1];
+                                  }
+                                }
+
+                                function stepReview(delta) {
+                                  if (setupReviewMoves.length === 0) return;
+                                  setupReviewIndex = Math.max(0, Math.min(setupReviewMoves.length, setupReviewIndex + delta));
+
+                                  const tempGame = new Chess();
+                                  for (let i = 0; i < setupReviewIndex; i++) {
+                                    tempGame.move(setupReviewMoves[i], { sloppy: true });
+                                  }
+                                  const fen = tempGame.fen();
+                                  game.load(fen);
+                                  if (board) board.position(fen);
+                                  updateFenDisplay();
+                                  updateReviewNavState();
+
+                                  const status = document.getElementById('setup-moves-status');
+                                  if (status) {
+                                    const idx = setupReviewIndex;
+                                    const total = setupReviewMoves.length;
+                                    if (idx === 0) {
+                                      status.textContent = 'Start position.';
+                                    } else {
+                                      const side = idx % 2 === 1 ? 'White' : 'Black';
+                                      status.textContent = 'Move ' + idx + ' of ' + total + ' \u2014 ' + side + ': ' + setupReviewMoves[idx - 1];
+                                    }
+                                    status.style.color = '#2e7d32';
+                                  }
+                                }
+
+                                function clearSetupPosition() {
+                                  const input = document.getElementById('setup-moves-input');
+                                  const preset = document.getElementById('setup-opening-preset');
+                                  const status = document.getElementById('setup-moves-status');
+                                  if (input) input.value = '';
+                                  if (preset) preset.value = '';
+                                  if (status) { status.textContent = ''; }
+                                  setupReviewMoves = [];
+                                  setupReviewIndex = -1;
+                                  const navControls = document.getElementById('setup-nav-controls');
+                                  if (navControls) navControls.style.display = 'none';
+                                  if (game) { game.reset(); }
+                                  if (board) board.start();
+                                  updateFenDisplay();
+                                }
+
+                                // ─────────────────────────────────────────────────────────────────────────
+
                           function checkGameStatus() {
                             const statusDiv = document.getElementById('game-status');
                             let status = '';
@@ -2492,6 +2689,19 @@
       if (board) {
         board.start();
       }
+
+                            // Apply setup moves if the user has entered a position
+                            (function () {
+                              const setupInput = document.getElementById('setup-moves-input');
+                              if (!setupInput || !setupInput.value.trim()) return;
+                              const setupMoves = parseMoveNotation(setupInput.value.trim());
+                              if (!setupMoves.length) return;
+                              for (const san of setupMoves) {
+                                if (!game.move(san, { sloppy: true })) break;
+                              }
+                              if (board) board.position(game.fen());
+                              updateStatusBox('Position set from ' + setupMoves.length + ' move' + (setupMoves.length !== 1 ? 's' : ''), 'info');
+                            })();
 
       document.getElementById('move-history').innerHTML = '<p style="color: #999;">No moves yet</p>';
         const expertResp = document.getElementById('expert-response');
