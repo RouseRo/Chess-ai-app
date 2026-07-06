@@ -39,10 +39,12 @@ The application is for people that are new to the game of chess and want to lear
 - **FEN Notation**: View and track game state
 - **Captured Pieces & Material Advantage**: Live display of captured pieces with material score
 - **Opening & Defense Selection**: Configure White opening and Black defense strategy before each game
-- **Endgame Practice Drills**: Guided endgame positions (King & Pawn vs King, King & Rook vs King, Lucena Position, Philidor Position)
+- **Practice Hub**: A single button combining **Openings** (Ruy López, Sicilian, Italian, Queen's Gambit, King's Indian) and **Endgame Drills** (King & Pawn vs King, King & Rook vs King, Lucena Position, Philidor Position) in one place
 - **Classic Games Library**: Step through 6 famous games (The Opera Game, The Immortal Game, The Evergreen Game, Game of the Century, Fischer vs Spassky Game 6, Kasparov's Immortal) with move-by-move commentary explaining why each move matters
+- **Classic Game Board Banner**: The chessboard banner automatically updates to display the name of the game being reviewed (e.g. "🏆 Reviewing: The Opera Game — Morphy vs Duke & Count (Paris, 1858)")
 - **Step-through Position Review**: Navigate any loaded position move-by-move with First / Prev / Next / Last controls
 - **Move Commentary Panel**: Annotated analysis appears automatically at key moments during classic game review, explaining sacrifices, principles, and historical context
+- **Live Captured Pieces During Review**: The captured pieces box updates in real time as you step through a classic game, showing exactly which pieces have been taken at each point with material advantage score
 - **Player Stats**: Win/loss/draw record per opponent, stored locally in the browser
 - **Chess News & Jokes**: Built-in rotating chess news articles and jokes
 - **Comm Log**: Diagnostics panel showing all API requests and responses, including H vs H sync events (purple)
@@ -384,7 +386,7 @@ Invoke-RestMethod -Uri "http://localhost:8000/move" `
 
 | Tab | Description |
 |-----|-------------|
-| **Welcome** | Quick-start buttons: Start New Game, Practice Openings, Practice Endgames, Chess News, Chess Jokes |
+| **Welcome** | Quick-start buttons: Start New Game, My Saves, Practice (Openings & Endgames), Classic Games, Chess News, Chess Joke |
 | **Player Setup** | Configure White/Black as Human or AI; select AI engine, skill level, opening and defense. Includes **Setup Position from Moves** panel (see below) |
 | **Move History** | Full move list for the current game |
 | **Ask Expert** | Chat with the AI chess expert; quick-action buttons for position analysis |
@@ -399,7 +401,7 @@ Invoke-RestMethod -Uri "http://localhost:8000/move" `
 
 The **Player Setup** tab contains a "Setup Position from Moves" panel for loading and reviewing positions:
 
-- **Classic Games** — select one of 6 legendary games from the dropdown. The board immediately loads at the starting position and step-through navigation controls appear.
+- **Classic Games** — select one of 6 legendary games from the dropdown. The board immediately loads at the starting position and step-through navigation controls appear. The **board banner** updates to show the game name (e.g. *🏆 Reviewing: The Immortal Game — Anderssen vs Kieseritzky (London, 1851)*).
 - **Preset Openings** — jump to the end of a named opening line (Ruy López, Sicilian, etc.).
 - **Manual PGN / move input** — paste any move sequence in SAN or PGN format and click **Preview Position**.
 
@@ -412,7 +414,9 @@ Once a position is loaded the navigation bar appears:
 | ▶ | Step forward one move |
 | ⏭ | Jump to final position |
 
-For classic games, a **yellow commentary panel** appears automatically at annotated positions explaining key moves, sacrifices, and strategic ideas.
+For classic games, a **yellow commentary panel** appears automatically at annotated positions explaining key moves, sacrifices, and strategic ideas. The **captured pieces box** below the board updates in real time at every step, showing which pieces have been taken and the current material advantage.
+
+Clicking **Clear** resets the board to the starting position, clears the game name banner, and empties the captured pieces display.
 
 #### Classic Games included
 
