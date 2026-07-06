@@ -40,6 +40,9 @@ The application is for people that are new to the game of chess and want to lear
 - **Captured Pieces & Material Advantage**: Live display of captured pieces with material score
 - **Opening & Defense Selection**: Configure White opening and Black defense strategy before each game
 - **Endgame Practice Drills**: Guided endgame positions (King & Pawn vs King, King & Rook vs King, Lucena Position, Philidor Position)
+- **Classic Games Library**: Step through 6 famous games (The Opera Game, The Immortal Game, The Evergreen Game, Game of the Century, Fischer vs Spassky Game 6, Kasparov's Immortal) with move-by-move commentary explaining why each move matters
+- **Step-through Position Review**: Navigate any loaded position move-by-move with First / Prev / Next / Last controls
+- **Move Commentary Panel**: Annotated analysis appears automatically at key moments during classic game review, explaining sacrifices, principles, and historical context
 - **Player Stats**: Win/loss/draw record per opponent, stored locally in the browser
 - **Chess News & Jokes**: Built-in rotating chess news articles and jokes
 - **Comm Log**: Diagnostics panel showing all API requests and responses, including H vs H sync events (purple)
@@ -382,7 +385,7 @@ Invoke-RestMethod -Uri "http://localhost:8000/move" `
 | Tab | Description |
 |-----|-------------|
 | **Welcome** | Quick-start buttons: Start New Game, Practice Openings, Practice Endgames, Chess News, Chess Jokes |
-| **Player Setup** | Configure White/Black as Human or AI; select AI engine, skill level, opening and defense |
+| **Player Setup** | Configure White/Black as Human or AI; select AI engine, skill level, opening and defense. Includes **Setup Position from Moves** panel (see below) |
 | **Move History** | Full move list for the current game |
 | **Ask Expert** | Chat with the AI chess expert; quick-action buttons for position analysis |
 | **Stats** | Win/loss/draw record per opponent stored in the browser |
@@ -391,6 +394,36 @@ Invoke-RestMethod -Uri "http://localhost:8000/move" `
 
 3. Go to the **Player Setup** tab, configure both players and click **Start New Game**
 4. Drag pieces to make moves; the AI responds automatically
+
+### Setup Position from Moves
+
+The **Player Setup** tab contains a "Setup Position from Moves" panel for loading and reviewing positions:
+
+- **Classic Games** — select one of 6 legendary games from the dropdown. The board immediately loads at the starting position and step-through navigation controls appear.
+- **Preset Openings** — jump to the end of a named opening line (Ruy López, Sicilian, etc.).
+- **Manual PGN / move input** — paste any move sequence in SAN or PGN format and click **Preview Position**.
+
+Once a position is loaded the navigation bar appears:
+
+| Button | Action |
+|--------|--------|
+| ⏮ | Jump to starting position |
+| ◀ | Step back one move |
+| ▶ | Step forward one move |
+| ⏭ | Jump to final position |
+
+For classic games, a **yellow commentary panel** appears automatically at annotated positions explaining key moves, sacrifices, and strategic ideas.
+
+#### Classic Games included
+
+| Game | Players | Year | Opening |
+|------|---------|------|---------|
+| The Opera Game | Morphy vs Duke Karl & Count Isouard | 1858 | Philidor Defence |
+| The Immortal Game | Anderssen vs Kieseritzky | 1851 | King's Gambit |
+| The Evergreen Game | Anderssen vs Dufresne | 1852 | Evans Gambit |
+| Game of the Century | Byrne vs Fischer | 1956 | Grünfeld Defence |
+| Fischer vs Spassky, Game 6 | Fischer vs Spassky | 1972 | QGD Tartakower |
+| Kasparov's Immortal | Kasparov vs Topalov | 1999 | Pirc Defence |
 
 ### Human vs Human (H vs H) Sync
 
@@ -619,7 +652,8 @@ CREATE TABLE users (
 ## Future Enhancements
 
 - [ ] PGN export/import
-- [ ] Game replay/analysis
+- [x] Classic games step-through review with annotated move commentary
+- [ ] Full game replay from saved game history
 - [ ] ELO rating system
 - [x] Human vs Human multiplayer (browser-to-browser sync)
 - [x] Community chat, DMs, and game invitations
