@@ -1521,16 +1521,71 @@
         } else if (type === 'news') {
           const item = CHESS_NEWS_ITEMS[Math.floor(Math.random() * CHESS_NEWS_ITEMS.length)];
           area.innerHTML = `<h4>📰 ${item.title}</h4><p style="margin:0 0 8px;">${item.body}</p><div id="news-details" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid #ddd;color:#444;line-height:1.6;font-size:0.92em;">${item.details}</div><a href="#" id="news-read-more" onclick="toggleNewsDetails(event)" style="font-size:0.85em;color:#1565c0;text-decoration:none;font-weight:500;">Read More →</a>`;
-        } else if (type === 'openings') {
+        } else if (type === 'practice') {
           area.innerHTML = `<h4>📖 Practice Openings</h4>
-              <ul>
+              <ul style="margin:4px 0 8px;">
                 <li><strong>Ruy López</strong> — 1.e4 e5 2.Nf3 Nc6 3.Bb5</li>
                 <li><strong>Sicilian Defence</strong> — 1.e4 c5</li>
                 <li><strong>Italian Game</strong> — 1.e4 e5 2.Nf3 Nc6 3.Bc4</li>
                 <li><strong>Queen's Gambit</strong> — 1.d4 d5 2.c4</li>
                 <li><strong>King's Indian Defence</strong> — 1.d4 Nf6 2.c4 g6</li>
               </ul>
-              <p style="color:#888;margin:4px 0 0;font-size:0.9em;">Set up the position on the board using Player Setup.</p>`;
+              <p style="color:#888;margin:0 0 10px;font-size:0.9em;">Set up an opening using <em>Player Setup → Preset Openings</em>.</p>
+              <hr style="border:none;border-top:1px solid #e0e0e0;margin:0 0 10px;">
+              <h4 style="margin:0 0 6px;">🏁 Practice Endgames — choose a drill:</h4>
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <button class="endgame-drill-btn" onclick="loadEndgamePosition(
+                  '8/8/4k3/4P3/4K3/8/8/8 w - - 0 1',
+                  'King &amp; Pawn vs King',
+                  ['White to move. Can the pawn promote?',
+                   'Tip: Place your king in front of the pawn to escort it.',
+                   'Key concept: Direct opposition — kings facing each other with one square between them.',
+                   'If White king reaches e6 with the pawn on e5, the pawn will promote.']
+                )">
+                  <span style="font-size:1.2em;">♙</span>
+                  <span><strong>King &amp; Pawn vs King</strong><br><small>Opposition &amp; key squares</small></span>
+                </button>
+                <button class="endgame-drill-btn" onclick="loadEndgamePosition(
+                  '4k3/8/8/8/4K3/8/8/R7 w - - 0 1',
+                  'King &amp; Rook vs King',
+                  ['White to move. Drive the black king to the edge and deliver checkmate.',
+                   'Tip: Use your king actively — the rook alone cannot force mate.',
+                   'Key concept: Cut off the black king rank by rank using the rook.',
+                   'Bring your king toward the black king to tighten the net.',
+                   'Final mate typically occurs on the edge or corner of the board.']
+                )">
+                  <span style="font-size:1.2em;">♖</span>
+                  <span><strong>King &amp; Rook vs King</strong><br><small>Basic mating pattern</small></span>
+                </button>
+                <button class="endgame-drill-btn" onclick="loadEndgamePosition(
+                  '1K1k4/1P6/8/8/8/8/r7/2R5 w - - 0 1',
+                  'Lucena Position',
+                  ['White to move and win. The pawn is on the 7th rank — promote it!',
+                   'Key technique: Build a bridge to shelter your king from rook checks.',
+                   'Step 1: Play Rc4 to prepare to block the black rook\'s checks.',
+                   'Step 2: Advance your king from b8 with the rook shielding on c4.',
+                   'Step 3: Once the king is safe, the pawn will queen.']
+                )">
+                  <span style="font-size:1.2em;">♖</span>
+                  <span><strong>Lucena Position</strong><br><small>Build a bridge — winning technique</small></span>
+                </button>
+                <button class="endgame-drill-btn" onclick="loadEndgamePosition(
+                  '4k3/8/r7/4PK2/8/8/8/5R2 b - - 0 1',
+                  'Philidor Position',
+                  ['Black to move and draw! This is the classic Philidor defensive technique.',
+                   'Key concept: Keep your rook on the 6th rank (rank 3) to cut off White\'s king.',
+                   'Do NOT let the white king advance past the 6th rank.',
+                   'When the pawn advances to e6, switch immediately to checking from behind (Ra1, Rb1 etc).',
+                   'Checks from behind force the white king in front of the pawn, blocking its own rook.']
+                )">
+                  <span style="font-size:1.2em;">♖</span>
+                  <span><strong>Philidor Position</strong><br><small>Drawing defence with a rook</small></span>
+                </button>
+                <button class="endgame-drill-btn endgame-drill-locked" disabled title="Coming soon">
+                  <span style="font-size:1.2em;">♕</span>
+                  <span><strong>Queen vs Pawn</strong><br><small>Promotion race — coming soon</small></span>
+                </button>
+              </div>`;
         } else if (type === 'endgames') {
           area.innerHTML = `<h4>🏁 Practice Endgames — choose a drill:</h4>
               <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">
@@ -2013,11 +2068,11 @@
                     <button id="my-saves-btn" class="welcome-tab-btn wb-continue" onclick="showMySaves()">
                       <span class="wb-icon">📂</span> My Saves
                     </button>
-                    <button class="welcome-tab-btn" onclick="showWelcomeInfo('openings')">
-                      <span class="wb-icon">📖</span> Practice Openings
+                    <button class="welcome-tab-btn" onclick="showWelcomeInfo('practice')">
+                      <span class="wb-icon">🎯</span> Practice
                     </button>
-                    <button class="welcome-tab-btn" onclick="showWelcomeInfo('endgames')">
-                      <span class="wb-icon">🏁</span> Practice Endgames
+                    <button class="welcome-tab-btn" onclick="startNewGame(); navigateToTab('player-setup-panel'); setTimeout(()=>{var el=document.getElementById('setup-classic-preset');if(el)el.focus();},200);">
+                      <span class="wb-icon">🏆</span> Classic Games
                     </button>
                     <button class="welcome-tab-btn" onclick="showWelcomeInfo('news')">
                       <span class="wb-icon">📰</span> Chess News
@@ -2566,6 +2621,12 @@
                                       if (input) input.value = data.pgn;
                                       setupReviewComments = data.comments || {};
                                       previewSetupPosition();
+                                      // Update the board banner with the classic game name
+                                      const gameName = select.options[select.selectedIndex].text;
+                                      const bannerDiv = document.getElementById('game-status');
+                                      if (bannerDiv) {
+                                        bannerDiv.innerHTML = `<p style="font-size:0.9em;color:#555;">&#127942; Reviewing: <strong>${gameName}</strong></p>`;
+                                      }
                                       // Start review from the very beginning
                                       if (setupReviewMoves.length > 0) {
                                         stepReview(-9999);
@@ -2681,9 +2742,16 @@
                                   setupReviewIndex = Math.max(0, Math.min(setupReviewMoves.length, setupReviewIndex + delta));
 
                                   const tempGame = new Chess();
+                                  capturedByWhite = [];
+                                  capturedByBlack = [];
                                   for (let i = 0; i < setupReviewIndex; i++) {
-                                    tempGame.move(setupReviewMoves[i], { sloppy: true });
+                                    const mv = tempGame.move(setupReviewMoves[i], { sloppy: true });
+                                    if (mv && mv.captured) {
+                                      if (mv.color === 'w') capturedByWhite.push(mv.captured);
+                                      else capturedByBlack.push(mv.captured);
+                                    }
                                   }
+                                  renderCapturedPieces();
                                   const fen = tempGame.fen();
                                   game.load(fen);
                                   if (board) board.position(fen);
@@ -2731,6 +2799,17 @@
                                   if (commentEl2) { commentEl2.style.display = 'none'; commentEl2.textContent = ''; }
                                   const navControls = document.getElementById('setup-nav-controls');
                                   if (navControls) navControls.style.display = 'none';
+                                  // Reset the board banner
+                                  const clearClassicSel = document.getElementById('setup-classic-preset');
+                                  if (clearClassicSel) clearClassicSel.value = '';
+                                  const clearClassicInfo = document.getElementById('setup-classic-info');
+                                  if (clearClassicInfo) clearClassicInfo.textContent = '';
+                                  const bannerDiv2 = document.getElementById('game-status');
+                                  if (bannerDiv2) bannerDiv2.innerHTML = '<p>Game Status: <strong>Ready to play</strong></p>';
+                                  // Reset captured pieces display
+                                  capturedByWhite = [];
+                                  capturedByBlack = [];
+                                  renderCapturedPieces();
                                   if (game) { game.reset(); }
                                   if (board) board.start();
                                   updateFenDisplay();
