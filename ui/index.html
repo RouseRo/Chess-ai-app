@@ -614,6 +614,7 @@
             let _aiGameSetupColor = 'random';
             let setupReviewMoves = [];   // parsed SAN moves for step-through review
             let setupReviewIndex = -1;   // current position: 0 = start, n = after n moves
+              let setupReviewComments = {}; // ply-index → commentary string (populated for classic games)
 
     function checkAuthentication() {
       const token = localStorage.getItem('authToken');
@@ -2121,6 +2122,26 @@
                   <div style="border: 1px solid #ddd; padding: 10px; margin: 10px 0; border-radius: 4px;">
                     <h4 style="margin-top: 0;">Setup Position from Moves</h4>
                     <label style="display: block; margin-bottom: 8px; font-size: 0.88em; color: #555;">
+                      Classic Games:
+                      <select id="setup-classic-preset" onchange="applyClassicGamePreset()" style="width: 100%; padding: 5px; margin-top: 3px;">
+                        <option value="">-- Select a classic game --</option>
+                        <optgroup label="19th Century">
+                          <option value="opera-game">The Opera Game &mdash; Morphy vs Duke &amp; Count (Paris, 1858)</option>
+                          <option value="immortal-game">The Immortal Game &mdash; Anderssen vs Kieseritzky (London, 1851)</option>
+                          <option value="evergreen-game">The Evergreen Game &mdash; Anderssen vs Dufresne (Berlin, 1852)</option>
+                        </optgroup>
+                        <optgroup label="20th Century">
+                          <option value="game-of-century">Game of the Century &mdash; Byrne vs Fischer (New York, 1956)</option>
+                          <option value="fischer-spassky-g6">Fischer vs Spassky, Game 6 &mdash; World Ch. (Reykjavik, 1972)</option>
+                        </optgroup>
+                        <optgroup label="Modern Era">
+                          <option value="kasparov-topalov">Kasparov&#39;s Immortal &mdash; Kasparov vs Topalov (Wijk aan Zee, 1999)</option>
+                        </optgroup>
+                      </select>
+                    </label>
+                    <div id="setup-classic-info" style="font-size:0.78em; color:#555; font-style:italic; margin-bottom:6px; min-height:1.1em;"></div>
+                    <hr style="border:none; border-top:1px solid #e0e0e0; margin:2px 0 10px;">
+                    <label style="display: block; margin-bottom: 8px; font-size: 0.88em; color: #555;">
                       Preset Openings:
                       <select id="setup-opening-preset" onchange="applyOpeningPreset()" style="width: 100%; padding: 5px; margin-top: 3px;">
                         <option value="">-- Select a preset --</option>
@@ -2162,6 +2183,7 @@
                         <button id="setup-nav-last" onclick="stepReview(9999)" title="Last move"
                           style="padding:5px 8px; background:#f5f5f5; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:1em;">&#x23ED;</button>
                       </div>
+                      <div id="setup-move-comment" style="display:none; margin-top:7px; padding:8px 10px; font-size:0.81em; line-height:1.5; color:#333; background:#fffde7; border-left:3px solid #f9a825; border-radius:0 4px 4px 0;"></div>
                     </div>
                   </div>
 
@@ -2435,10 +2457,130 @@
 
                                 // ── Position Setup from Moves ────────────────────────────────────────────
 
+                                    const classicGamesData = {
+                                      'opera-game': {
+                                        info: "Paul Morphy vs Duke Karl & Count Isouard \u00b7 Paris Opera, 1858 \u00b7 1-0 (17 moves) \u00b7 Philidor Defence",
+                                        pgn: '1.e4 e5 2.Nf3 d6 3.d4 Bg4 4.dxe5 Bxf3 5.Qxf3 dxe5 6.Bc4 Nf6 7.Qb3 Qe7 8.Nc3 c6 9.Bg5 b5 10.Nxb5 cxb5 11.Bxb5+ Nbd7 12.O-O-O Rd8 13.Rxd7 Rxd7 14.Rd1 Qe6 15.Bxd7+ Nxd7 16.Qb8+ Nxb8 17.Rd8#',
+                                        comments: {
+                                          0: "Played during a Paris opera performance in 1858! Duke Karl of Brunswick and Count Isouard played Black together, consulting with each other, while the 21-year-old Paul Morphy played alone. This game is considered a teaching masterpiece: Morphy demolishes an undeveloped army in 17 moves through rapid development, piece activity, and an unstoppable attack.",
+                                          4: "2\u2026d6 \u2014 the Philidor Defence, a solid but passive setup. Black plans ...Nf6 and ...Be7 but will fall behind in development.",
+                                          6: "3\u2026Bg4? \u2014 a premature pin on White\u2019s knight. Rather than developing naturally, Black reaches out with this bishop and loses time. Morphy will simply blow open the center and benefit from it.",
+                                          9: "5.Qxf3 \u2014 White\u2019s queen is powerfully centralized. Black traded a bishop for a knight (even material) but at the cost of White\u2019s queen becoming extremely active. Notice how many of Black\u2019s pieces are still on their starting squares.",
+                                          13: "7.Qb3 \u2014 Morphy simultaneously eyes the f7 pawn (a chronic weakness near the Black king) and threatens the b7 pawn. This multi-purpose move puts Black under immediate pressure \u2014 every Morphy move does double duty.",
+                                          15: "8.Nc3 \u2014 development before greed! Morphy does NOT play 8.Qxb7 (winning a pawn) because 8\u2026Qb4+ would let Black counterattack and equalize. Morphy\u2019s entire army will be fully mobilized before he strikes. \u201cHelp your pieces help each other.\u201d",
+                                          17: "9.Bg5 \u2014 White pins the knight on f6 against the queen. All five White pieces are now developed and pointing at Black\u2019s position. Black\u2019s undeveloped queenside (Ra8, Nb8, Bc8) is a ticking time bomb.",
+                                          18: "9\u2026b5?? \u2014 a blunder! Black tries to gain time by chasing the bishop, but this allows a stunning sacrifice. The correct defensive try was 9\u2026Be7, accepting a cramped but defensible position.",
+                                          19: "10.Nxb5!! \u2014 the sacrificial blow! Morphy tears open the queenside. After 10\u2026cxb5 11.Bxb5+, the Black king is exposed and Black\u2019s undeveloped pieces cannot come back in time to defend.",
+                                          21: "11.Bxb5+ \u2014 check! The bishop arrives on b5 with tempo, forcing the blocking move 11\u2026Nbd7. White has sacrificed a whole knight to destroy Black\u2019s pawn cover.",
+                                          23: "12.O-O-O \u2014 castles long! Morphy\u2019s rook instantly enters the game on the open d-file. Compare the armies: ALL of White\u2019s pieces are developed, active, and coordinated. Black\u2019s queenside is still completely undeveloped.",
+                                          24: "12\u2026Rd8 \u2014 Black tries to contest the d-file. But White has a stunning combination prepared that exploits the overloaded d7 knight.",
+                                          25: "13.Rxd7!! \u2014 a rook sacrifice! Morphy gives up the exchange to shatter Black\u2019s defenses. After 13\u2026Rxd7, White\u2019s remaining rook enters on d1 with unstoppable force.",
+                                          27: "14.Rd1 \u2014 the second rook storms in. White threatens 15.Bxd7+ followed by a queen check. Black\u2019s only move is 14\u2026Qe6, trying to guard d7 but exposing the queen to a final trick.",
+                                          31: "16.Qb8+!! \u2014 the queen sacrifice, the most beautiful move of the game! By giving up the queen, Morphy forces 16\u2026Nxb8, after which 17.Rd8# is an inescapable back-rank checkmate, guarded by the bishop on b5. Black cannot avoid it.",
+                                          33: "17.Rd8# \u2014 checkmate! The rook lands on d8, supported by the bishop on b5. In 17 moves Morphy sacrificed a knight, a rook, and his queen to force a model back-rank mate. He reportedly returned to watching the opera without missing a beat."
+                                        }
+                                      },
+                                      'immortal-game': {
+                                        info: "Adolf Anderssen vs Lionel Kieseritzky \u00b7 London, 1851 \u00b7 1-0 (23 moves) \u00b7 King\u2019s Gambit",
+                                        pgn: '1.e4 e5 2.f4 exf4 3.Bc4 Qh4+ 4.Kf1 b5 5.Bxb5 Nf6 6.Nf3 Qh6 7.d3 Nh5 8.Nh4 Qg5 9.Nf5 c6 10.g4 Nf6 11.Rg1 cxb5 12.h4 Qg6 13.h5 Qg5 14.Qf3 Ng8 15.Bxf4 Qf6 16.Nc3 Bc5 17.Nd5 Qxb2 18.Bd6 Bxg1 19.e5 Qxa1+ 20.Ke2 Na6 21.Nxg7+ Kd8 22.Qf6+ Nxf6 23.Be7#',
+                                        comments: {
+                                          0: "The \u2018Immortal Game\u2019 \u2014 played during a break at the 1851 London international tournament. Anderssen gives up both rooks, a bishop, and his queen for a mating attack! Kieseritzky was so impressed he telegraphed the moves to his chess club in Paris. It became \u2018immortal\u2019 because Anderssen\u2019s sacrifices are recklessly beautiful and purely for checkmate.",
+                                          3: "2.f4 \u2014 the King\u2019s Gambit! White offers a pawn to open the f-file and seize the initiative. A beloved romantic-era opening full of fire and sacrifices.",
+                                          7: "4.Kf1!! \u2014 Anderssen deliberately steps into the check by the queen, sacrificing his right to castle in order to keep a pawn on g2 that holds the attacking structure together. An extraordinary positional decision for 1851.",
+                                          9: "5.Bxb5 \u2014 another piece sacrifice! Anderssen keeps investing material to develop rapidly and attack. Kieseritzky is winning pawns and pieces, but White\u2019s initiative is overwhelming.",
+                                          21: "11.Rg1!! \u2014 the first great sacrifice! Anderssen gives up his g5 bishop deliberately (Black plays 11\u2026cxb5 taking it) to keep the kingside attack alive. He refuses to retreat a single piece.",
+                                          35: "18.Bd6!! \u2014 a stunning bishop sacrifice! The bishop cannot be taken safely. Anderssen now has the rook on g1, the queen on f3, and the knight on d5 all converging on Black\u2019s exposed king.",
+                                          37: "19.e5 \u2014 with the queen on a1 and both rooks gone, Black looks to be winning materially. But Anderssen ignores it! The attack is now unstoppable \u2014 Black\u2019s king will be mated.",
+                                          43: "22.Qf6+!! \u2014 the queen sacrifice, the game\u2019s climax! After 22\u2026Nxf6, the bishop delivers checkmate on e7. Anderssen has sacrificed two rooks, a bishop, and now his queen.",
+                                          45: "23.Be7# \u2014 checkmate! Anderssen has given up two rooks, a bishop, and his queen to deliver this final blow. The game was sent by telegraph across Europe and has been celebrated ever since as chess art at its purest."
+                                        }
+                                      },
+                                      'evergreen-game': {
+                                        info: "Adolf Anderssen vs Jean Dufresne \u00b7 Berlin, 1852 \u00b7 1-0 (24 moves) \u00b7 Evans Gambit",
+                                        pgn: '1.e4 e5 2.Nf3 Nc6 3.Bc4 Bc5 4.b4 Bxb4 5.c3 Ba5 6.d4 exd4 7.O-O d3 8.Qb3 Qf6 9.e5 Qg6 10.Re1 Nge7 11.Ba3 b5 12.Qxb5 Rb8 13.Qa4 Bb6 14.Nbd2 Bb7 15.Ne4 Qf5 16.Bxd3 Qh5 17.Nf6+ gxf6 18.exf6 Rg8 19.Rad1 Qxf3 20.Rxe7+ Nxe7 21.Qxd7+ Kxd7 22.Bf5+ Ke8 23.Bd7+ Kf8 24.Bxe7#',
+                                        comments: {
+                                          0: "The \u2018Evergreen Game\u2019 \u2014 played in Berlin in 1852, also by Adolf Anderssen. The game features a queen sacrifice and three piece sacrifices leading to a beautiful checkmate. Its appeal is so enduring that Wilhelm Steinitz (the first World Champion) called it \u2018the most beautiful game ever played,\u2019 and it has remained \u2018evergreen\u2019 \u2014 always fresh \u2014 for over 170 years.",
+                                          7: "4.b4! \u2014 the Evans Gambit! White sacrifices a second pawn to accelerate development dramatically. A gambit within a gambit. Black accepts (4\u2026Bxb4) but White will gain tremendous piece activity in return.",
+                                          13: "7.O-O \u2014 White castles to safety while the position is still chaotic. White has sacrificed a pawn but has open lines, active pieces, and king safety. This is the spirit of the Evans Gambit.",
+                                          21: "11.Ba3 \u2014 a quiet developing move with a deadly threat! The bishop eyes the b2\u2013e8 diagonal. White is about to win back material while keeping the attack going.",
+                                          33: "17.Nf6+!! \u2014 the combination begins! Anderssen sacrifices the knight to expose Black\u2019s king. After 17\u2026gxf6 18.exf6, the f6 pawn cuts through Black\u2019s position like a sword.",
+                                          39: "20.Rxe7+!! \u2014 a rook sacrifice! The rook is thrown into the position to expose the king. After 20\u2026Nxe7, the queen delivers a devastating check on d7.",
+                                          41: "21.Qxd7+!! \u2014 the queen sacrifice! Black must take: 21\u2026Kxd7. Then follows a series of bishop checks that drive the king to its doom.",
+                                          47: "24.Bxe7# \u2014 checkmate! Anderssen has sacrificed a rook, his queen, and used two bishops to force this final mate. Steinitz later said this was \u2018the most beautiful game ever played.\u2019"
+                                        }
+                                      },
+                                      'game-of-century': {
+                                        info: "Donald Byrne vs Bobby Fischer \u00b7 Rosenwald Trophy, New York, 1956 \u00b7 0-1 (41 moves) \u00b7 Gr\u00fcnfeld Defence",
+                                        pgn: '1.Nf3 Nf6 2.c4 g6 3.Nc3 Bg7 4.d4 O-O 5.Bf4 d5 6.Qb3 dxc4 7.Qxc4 c6 8.e4 Nbd7 9.Rd1 Nb6 10.Qc5 Bg4 11.Bg5 Na4 12.Qa3 Nxc3 13.bxc3 Nxe4 14.Bxe7 Qb6 15.Bc4 Nxc3 16.Bc5 Rfe8+ 17.Kf1 Be6 18.Bxb6 Bxc4+ 19.Kg1 Ne2+ 20.Kf1 Nxd4+ 21.Kg1 Ne2+ 22.Kf1 Nc3+ 23.Kg1 axb6 24.Qb4 Ra4 25.Qxb6 Nxd1 26.h3 Rxa2 27.Kh2 Nxf2 28.Re1 Rxe1 29.Qd8+ Bf8 30.Nxe1 Bd5 31.Nf3 Ne4 32.Qb8 b5 33.h4 h5 34.Ne5 Kg7 35.Kg1 Bc5+ 36.Kf1 Ng3+ 37.Ke1 Bb4+ 38.Kd1 Bb3+ 39.Kc1 Ne2+ 40.Kb1 Nc3+ 41.Kc1 Rc2#',
+                                        comments: {
+                                          0: "The \u2018Game of the Century\u2019 \u2014 named by chess journalist Hans Kmoch at the time. Bobby Fischer was only 13 years old! His opponent Donald Byrne was a strong U.S. Master. On move 17 Fischer makes a breathtaking queen sacrifice that initiates one of the most complex combinations ever seen. It remains the most celebrated junior performance in chess history.",
+                                          26: "13\u2026Nxe4! \u2014 Fischer grabs a pawn and opens the position. Byrne has underestimated what the 13-year-old has prepared.",
+                                          34: "17\u2026Be6!! \u2014 the queen sacrifice! Fischer offers his queen for just a bishop and a rook. After 18.Bxb6 Bxc4+ 19.Kg1 Ne2+, a brilliant series of forcing moves wins back the material with a dominant position. Hans Kmoch wrote: \u2018A boy of 13 sacrifices a queen. A master of 26 years accepts. The boy wins.\u2019",
+                                          36: "18\u2026Bxc4+ \u2014 the combination unfolds. Fischer has calculated a long forcing sequence that regains the queen with a vastly superior position.",
+                                          48: "24\u2026Ra4! \u2014 the complications have resolved and Fischer is materially ahead with two minor pieces and a rook versus Byrne\u2019s queen. More importantly, Fischer\u2019s pieces are far more active.",
+                                          82: "41\u2026Rc2# \u2014 checkmate! Fischer converts with clinical precision. At age 13, he produced the game that journalist Kmoch immediately dubbed \u2018The Game of the Century\u2019 \u2014 a title it has kept for nearly 70 years."
+                                        }
+                                      },
+                                      'fischer-spassky-g6': {
+                                        info: "Bobby Fischer vs Boris Spassky \u00b7 World Championship Game 6, Reykjavik, 1972 \u00b7 1-0 (41 moves) \u00b7 QGD Tartakower",
+                                        pgn: '1.c4 e6 2.Nf3 d5 3.d4 Nf6 4.Nc3 Be7 5.Bg5 O-O 6.e3 h6 7.Bh4 b6 8.cxd5 Nxd5 9.Bxe7 Qxe7 10.Nxd5 exd5 11.Rc1 Be6 12.Qa4 c5 13.Qa3 Rc8 14.Bb5 a6 15.dxc5 bxc5 16.O-O Ra7 17.Be2 Nd7 18.Nd4 Qf8 19.Nxe6 fxe6 20.e4 d4 21.f4 Qe7 22.e5 Rb8 23.Bc4 Kh8 24.Qh3 Nf8 25.b3 a5 26.f5 exf5 27.Rxf5 Nh7 28.Rcf1 Qd8 29.Qg3 Re7 30.h4 Rbb7 31.e6 Rbc7 32.Qe5 Qe8 33.a4 Qd8 34.R1f2 Qe8 35.R2f3 Qd8 36.Bd3 Qe8 37.Qe4 Nf6 38.Rxf6 gxf6 39.Rxf6 Kg8 40.Bc4 Kh8 41.Qf4',
+                                        comments: {
+                                          0: "From the 1972 World Championship \u2014 the \u2018Match of the Century\u2019 between Fischer and Spassky. Game 6 is considered one of the greatest strategic masterpieces ever played. Fischer employs the Queen\u2019s Gambit Declined (a surprise \u2014 he usually avoided it) with profound positional understanding. Spassky was reportedly so impressed that he applauded Fischer when he resigned.",
+                                          37: "19.Nxe6! \u2014 White captures, and after 19\u2026fxe6, Black\u2019s doubled isolated e-pawns become a permanent structural weakness. Fischer will exploit this pawn weakness for the rest of the game with precision.",
+                                          39: "20.e4! \u2014 Fischer seizes the center. The pawn on e5 will become a battering ram. Black is strategically squeezed.",
+                                          51: "26.f5! \u2014 the pawn storm begins. Fischer advances on the kingside to pry open lines against Spassky\u2019s king. Every White move has a clear strategic purpose.",
+                                          75: "38.Rxf6!! \u2014 a rook sacrifice to remove Black\u2019s defensive knight! After 38\u2026gxf6 39.Rxf6, White\u2019s attack is crushing and Fischer has a winning position.",
+                                          81: "41.Qf4 \u2014 Spassky resigns. He can see no defense against Fischer\u2019s coming attack on the f5 pawn and kingside. Spassky stood up and applauded \u2014 one of the most memorable moments in chess history. Fischer later called this his favorite game."
+                                        }
+                                      },
+                                      'kasparov-topalov': {
+                                        info: "Garry Kasparov vs Veselin Topalov \u00b7 Hoogovens, Wijk aan Zee, 1999 \u00b7 1-0 (44 moves) \u00b7 Pirc Defence",
+                                        pgn: '1.e4 d6 2.d4 Nf6 3.Nc3 g6 4.Be3 Bg7 5.Qd2 c6 6.f3 b5 7.Nge2 Nbd7 8.Bh6 Bxh6 9.Qxh6 Bb7 10.a3 e5 11.O-O-O Qe7 12.Kb1 a6 13.Nc1 O-O-O 14.Nb3 exd4 15.Rxd4 c5 16.Rd1 Nb6 17.g3 Kb8 18.Na5 Ba8 19.Bh3 d5 20.Qf4+ Ka7 21.Rhe1 d4 22.Nd5 Nbxd5 23.exd5 Qd6 24.Rxd4 cxd4 25.Re7+ Kb6 26.Qxd4+ Kxa5 27.b4+ Ka4 28.Qc3 Qxd5 29.Ra7 Bb7 30.Rxb7 Qc4 31.Qxf6 Kxa3 32.Qxa6+ Kxb4 33.c3+ Kxc3 34.Qa1+ Kd2 35.Qb2+ Kd1 36.Bf1 Rd2 37.Rd7 Rxd7 38.Bxc4 bxc4 39.Qxh8 Rd3 40.Qa8 c3 41.Qa4+ Ke1 42.f4 f5 43.Kc1 Rd2 44.Qa7',
+                                        comments: {
+                                          0: "Kasparov\u2019s Immortal \u2014 played at the Hoogovens tournament in Wijk aan Zee, 1999. Many consider this the greatest game of the computer era. Kasparov sacrifices a rook on move 24 and hunts Topalov\u2019s king across the entire board \u2014 from b6 all the way to e1 \u2014 over 20 moves. Kasparov himself called it one of his best games.",
+                                          47: "24.Rxd4!! \u2014 the rook sacrifice that starts everything! Kasparov gives up the exchange to open lines and launch an unstoppable king hunt. Topalov\u2019s king will be chased from b8 to its eventual doom.",
+                                          49: "25.Re7+ \u2014 the rook cuts off the king\u2019s retreat as the hunt begins. Kasparov\u2019s pieces coordinate with frightening precision.",
+                                          51: "26.Qxd4+ \u2014 check! The king is forced into the open. From here Kasparov drives Topalov\u2019s king from b6 \u2192 a5 \u2192 a4 \u2192 a3 \u2192 b4 \u2192 c3 \u2192 d2 \u2192 d1 \u2192 e1 across nine squares.",
+                                          87: "44.Qa7 \u2014 Topalov resigns. He cannot stop Kasparov\u2019s queen from coordinating with the f4/f5 pawns for a decisive promotion or checkmate. The Black king has been driven from b8 to e1 \u2014 a 9-square odyssey. One of the most spectacular attacking games of the modern era."
+                                        }
+                                      }
+                                    };
+
+                                    function applyClassicGamePreset() {
+                                      const select = document.getElementById('setup-classic-preset');
+                                      const infoEl = document.getElementById('setup-classic-info');
+                                      const input = document.getElementById('setup-moves-input');
+                                      if (!select) return;
+                                      const key = select.value;
+                                      if (!key) {
+                                        if (infoEl) infoEl.textContent = '';
+                                        clearSetupPosition();
+                                        return;
+                                      }
+                                      const data = classicGamesData[key];
+                                      if (!data) return;
+                                      if (infoEl) infoEl.textContent = data.info;
+                                      // Clear the opening-preset dropdown to avoid confusion
+                                      const presetSel = document.getElementById('setup-opening-preset');
+                                      if (presetSel) presetSel.value = '';
+                                      if (input) input.value = data.pgn;
+                                      setupReviewComments = data.comments || {};
+                                      previewSetupPosition();
+                                      // Start review from the very beginning
+                                      if (setupReviewMoves.length > 0) {
+                                        stepReview(-9999);
+                                      }
+                                    }
+
                                 function applyOpeningPreset() {
                                   const preset = document.getElementById('setup-opening-preset');
                                   const input = document.getElementById('setup-moves-input');
                                   if (!preset || !input) return;
+                                  // Clear classic-game selection to avoid confusion
+                                  const classicSel = document.getElementById('setup-classic-preset');
+                                  const classicInfo = document.getElementById('setup-classic-info');
+                                  if (classicSel) classicSel.value = '';
+                                  if (classicInfo) classicInfo.textContent = '';
                                   input.value = preset.value;
                                   if (preset.value) {
                                     previewSetupPosition();
@@ -2548,6 +2690,19 @@
                                   updateFenDisplay();
                                   updateReviewNavState();
 
+                                  // Update move commentary if available
+                                  const commentEl = document.getElementById('setup-move-comment');
+                                  if (commentEl) {
+                                    const comment = setupReviewComments[setupReviewIndex];
+                                    if (comment) {
+                                      commentEl.textContent = comment;
+                                      commentEl.style.display = 'block';
+                                    } else {
+                                      commentEl.style.display = 'none';
+                                      commentEl.textContent = '';
+                                    }
+                                  }
+
                                   const status = document.getElementById('setup-moves-status');
                                   if (status) {
                                     const idx = setupReviewIndex;
@@ -2571,6 +2726,9 @@
                                   if (status) { status.textContent = ''; }
                                   setupReviewMoves = [];
                                   setupReviewIndex = -1;
+                                  setupReviewComments = {};
+                                  const commentEl2 = document.getElementById('setup-move-comment');
+                                  if (commentEl2) { commentEl2.style.display = 'none'; commentEl2.textContent = ''; }
                                   const navControls = document.getElementById('setup-nav-controls');
                                   if (navControls) navControls.style.display = 'none';
                                   if (game) { game.reset(); }
