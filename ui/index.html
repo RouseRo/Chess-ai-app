@@ -179,6 +179,28 @@
     .expert-quick-btn:hover {
       background-color: #e0e0e0;
     }
+    .expert-quick-btn:active {
+      background-color: #bbdefb;
+      border-color: #2196F3;
+      color: #1565c0;
+    }
+    .expert-loading {
+      cursor: wait !important;
+      opacity: 0.6;
+      animation: expert-pulse 0.9s ease-in-out infinite;
+    }
+    .expert-send-btn.expert-loading {
+      background-color: #90caf9;
+    }
+    .expert-quick-btn.expert-loading {
+      background-color: #e3f2fd;
+      border-color: #90caf9;
+      color: #1565c0;
+    }
+    @keyframes expert-pulse {
+      0%, 100% { opacity: 0.6; }
+      50%       { opacity: 0.25; }
+    }
     .expert-qa-entry {
       border: 1px solid #e0e0e0;
       border-radius: 4px;
@@ -1563,7 +1585,7 @@
                   'Lucena Position',
                   ['White to move and win. The pawn is on the 7th rank — promote it!',
                    'Key technique: Build a bridge to shelter your king from rook checks.',
-                   'Step 1: Play Rc4 to prepare to block the black rook\'s checks.',
+                   'Step 1: Play Rc4 \u2014 use the rook to shield the king from checks.',
                    'Step 2: Advance your king from b8 with the rook shielding on c4.',
                    'Step 3: Once the king is safe, the pawn will queen.']
                 )">
@@ -1574,7 +1596,7 @@
                   '4k3/8/r7/4PK2/8/8/8/5R2 b - - 0 1',
                   'Philidor Position',
                   ['Black to move and draw! This is the classic Philidor defensive technique.',
-                   'Key concept: Keep your rook on the 6th rank (rank 3) to cut off White\'s king.',
+                   'Key concept: Keep your rook on rank 6 to cut off the White king.',
                    'Do NOT let the white king advance past the 6th rank.',
                    'When the pawn advances to e6, switch immediately to checking from behind (Ra1, Rb1 etc).',
                    'Checks from behind force the white king in front of the pawn, blocking its own rook.']
@@ -1618,7 +1640,7 @@
                   'Lucena Position',
                   ['White to move and win. The pawn is on the 7th rank — promote it!',
                    'Key technique: Build a bridge to shelter your king from rook checks.',
-                   'Step 1: Play Rc4 to prepare to block the black rook\'s checks.',
+                   'Step 1: Play Rc4 \u2014 use the rook to shield the king from checks.',
                    'Step 2: Advance your king from b8 with the rook shielding on c4.',
                    'Step 3: Once the king is safe, the pawn will queen.']
                 )">
@@ -1629,7 +1651,7 @@
                   '4k3/8/r7/4PK2/8/8/8/5R2 b - - 0 1',
                   'Philidor Position',
                   ['Black to move and draw! This is the classic Philidor defensive technique.',
-                   'Key concept: Keep your rook on the 6th rank (rank 3) to cut off White\'s king.',
+                   'Key concept: Keep your rook on rank 6 to cut off the White king.',
                    'Do NOT let the white king advance past the 6th rank.',
                    'When the pawn advances to e6, switch immediately to checking from behind (Ra1, Rb1 etc).',
                    'Checks from behind force the white king in front of the pawn, blocking its own rook.']
@@ -3339,6 +3361,20 @@
           return;
         }
 
+        // --- loading state ---
+        document.body.style.cursor = 'wait';
+        document.querySelectorAll('.expert-quick-btn, .expert-send-btn').forEach(btn => {
+          btn.disabled = true;
+          btn.classList.add('expert-loading');
+        });
+        function _clearExpertLoading() {
+          document.body.style.cursor = '';
+          document.querySelectorAll('.expert-quick-btn, .expert-send-btn').forEach(btn => {
+            btn.disabled = false;
+            btn.classList.remove('expert-loading');
+          });
+        }
+
         updateStatusBox(`Asking expert: "${question}"`, 'info');
         document.getElementById('expert-input').value = '';
 
@@ -3367,14 +3403,17 @@
           .then(data => {
             logCommMessage('res', 'ENGINE', '/expert/question', data, _expertStatus);
             if (data.error) {
+              _clearExpertLoading();
               addExpertQA(question, 'Error: ' + data.error, true);
               updateStatusBox(`Expert error: ${data.error}`, 'error');
             } else {
+              _clearExpertLoading();
               addExpertQA(question, data.response || 'No response', false);
               updateStatusBox('Expert response received', 'success');
             }
           })
           .catch(error => {
+            _clearExpertLoading();
             if (error.message !== 'Unauthorized') {
               logCommMessage('err', 'ENGINE', '/expert/question', { message: error.message }, null);
               addExpertQA(question, 'Connection error: ' + error.message, true);
