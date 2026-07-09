@@ -14,6 +14,7 @@ The application is for people that are new to the game of chess and want to lear
 - [Admin Dashboard](#admin-dashboard)
 - [API Services](#api-services)
 - [Playing Chess](#playing-chess)
+- [Classic Game Rewards](#classic-game-rewards)
 - [Configuration](#configuration)
 - [Troubleshooting](#troubleshooting)
 - [Architecture](#architecture)
@@ -45,6 +46,7 @@ The application is for people that are new to the game of chess and want to lear
 - **Step-through Position Review**: Navigate any loaded position move-by-move with First / Prev / Next / Last controls
 - **Move Commentary Panel**: Annotated analysis appears automatically at key moments during classic game review, explaining sacrifices, principles, and historical context
 - **Live Captured Pieces During Review**: The captured pieces box updates in real time as you step through a classic game, showing exactly which pieces have been taken at each point with material advantage score
+- **Classic Game Rewards**: Earn a badge every time you step through an entire classic game review; collect all 6 to unlock the 🎓 Grand Scholar award. Progress is saved server-side and displayed in the new **🏅 Rewards** tab
 - **Player Stats**: Win/loss/draw record per opponent, stored locally in the browser
 - **Chess News & Jokes**: Built-in rotating chess news articles and jokes
 - **Comm Log**: Diagnostics panel showing all API requests and responses, including H vs H sync events (purple)
@@ -260,6 +262,13 @@ All clients (Web UI, Admin Dashboard) authenticate through the same auth-service
 | `/community/game-invite` | POST | Send a game invitation |
 | `/community/clear-activity` | POST | Clear own game activity status |
 
+### Rewards API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/rewards/complete-review` | POST | Record a classic game review completion |
+| `/rewards/my-reviews` | GET | Get review progress and earned badges |
+
 ### Login Example (API)
 
 ```powershell
@@ -391,6 +400,7 @@ Invoke-RestMethod -Uri "http://localhost:8000/move" `
 | **Move History** | Full move list for the current game |
 | **Ask Expert** | Chat with the AI chess expert; quick-action buttons for position analysis |
 | **Stats** | Win/loss/draw record per opponent stored in the browser |
+| **🏅 Rewards** | Badge collection showing which classic games you have reviewed; earn the Grand Scholar award for completing all 6 |
 | **Community** | See online users, send public chat, send DMs, send/accept game invitations |
 | **Comm** | Diagnostics log of all API requests and responses (sync events shown in purple) |
 
@@ -418,6 +428,8 @@ For classic games, a **yellow commentary panel** appears automatically at annota
 
 Clicking **Clear** resets the board to the starting position, clears the game name banner, and empties the captured pieces display.
 
+> **Reward trigger**: reaching the final move of any classic game automatically records a completion and awards a badge (see [Classic Game Rewards](#classic-game-rewards)).
+
 #### Classic Games included
 
 | Game | Players | Year | Opening |
@@ -428,6 +440,66 @@ Clicking **Clear** resets the board to the starting position, clears the game na
 | Game of the Century | Byrne vs Fischer | 1956 | Grünfeld Defence |
 | Fischer vs Spassky, Game 6 | Fischer vs Spassky | 1972 | QGD Tartakower |
 | Kasparov's Immortal | Kasparov vs Topalov | 1999 | Pirc Defence |
+
+## Classic Game Rewards
+
+The app tracks which classic games each logged-in user has stepped through to completion and awards a badge for each one.
+
+### Badges
+
+| Game | Badge | Title |
+|------|-------|-------|
+| The Opera Game | 🎭 | Opera Maestro |
+| The Immortal Game | ♾️ | Immortal Scholar |
+| The Evergreen Game | 🌿 | Evergreen Aficionado |
+| Game of the Century | 🏆 | Century Witness |
+| Fischer vs Spassky, Game 6 | ⚔️ | Cold War Classic |
+| Kasparov's Immortal | 👑 | Kasparov's Devotee |
+| **All 6 completed** | 🎓 | **Grand Scholar** |
+
+### How it works
+
+1. Open **Player Setup → Classic Games** and select a game.
+2. Use ▶ / ⏭ to step through every move until you reach the end.
+3. A **reward toast** slides in from the bottom-right corner confirming the badge earned.
+4. Open the **🏅 Rewards** tab at any time to see your full progress, completion dates, and whether you have unlocked the Grand Scholar badge.
+
+Completions are stored in the database under the logged-in username, so they persist across sessions and devices.
+
+### Reward API Endpoints
+
+Both endpoints require a valid `Authorization: Bearer <token>` header.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/rewards/complete-review` | POST | Record completion of a classic game review |
+| `/rewards/my-reviews` | GET | Fetch all review progress and earned badges |
+
+#### Record a completion
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:8002/rewards/complete-review" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Headers @{Authorization="Bearer $token"} `
+  -Body '{"game_key":"game-of-century"}'
+```
+
+```json
+{
+  "success": true,
+  "newly_completed": true,
+  "game_key": "game-of-century",
+  "game_name": "Game of the Century",
+  "badge": "🏆",
+  "badge_title": "Century Witness",
+  "completed_count": 1,
+  "total_games": 6,
+  "grand_scholar_unlocked": false
+}
+```
+
+Valid `game_key` values: `opera-game`, `immortal-game`, `evergreen-game`, `game-of-century`, `fischer-spassky-g6`, `kasparov-topalov`.
 
 ### Human vs Human (H vs H) Sync
 
@@ -624,7 +696,22 @@ CREATE TABLE users (
     is_verified BOOLEAN DEFAULT 0,
     verification_token TEXT,
     games_count INTEGER DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login TIMESTAMP,
+    last_activity TIMESTAMP,
+    current_activity TEXT DEFAULT 'offline'
+);
+```
+
+### Classic Game Reviews Table Schema
+
+```sql
+CREATE TABLE classic_game_reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    game_key TEXT NOT NULL,
+    completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(username, game_key)
 );
 ```
 
@@ -657,6 +744,7 @@ CREATE TABLE users (
 
 - [ ] PGN export/import
 - [x] Classic games step-through review with annotated move commentary
+- [x] Classic game reward badges and Grand Scholar award
 - [ ] Full game replay from saved game history
 - [ ] ELO rating system
 - [x] Human vs Human multiplayer (browser-to-browser sync)

@@ -99,6 +99,17 @@ def init_db():
     ]:
         if col not in existing_columns:
             cursor.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
+
+    # Classic game reviews tracking
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS classic_game_reviews (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            game_key TEXT NOT NULL,
+            completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(username, game_key)
+        )
+    ''')
     
     # Create default admin if not exists
     cursor.execute("SELECT id FROM users WHERE username = ?", ("admin",))
@@ -744,3 +755,119 @@ async def clear_game_activity(authorization: Optional[str] = Header(None)):
     conn.commit()
     conn.close()
     return {"success": True}
+
+
+# ========== Rewards Endpoints ==========
+
+CLASSIC_GAMES_CATALOG = {
+    'opera-game':         {'name': 'The Opera Game',          'badge': '🎭', 'title': 'Opera Maestro'},
+    'immortal-game':      {'name': 'The Immortal Game',       'badge': '♾️',  'title': 'Immortal Scholar'},
+    'evergreen-game':     {'name': 'The Evergreen Game',      'badge': '🌿', 'title': 'Evergreen Aficionado'},
+    'game-of-century':    {'name': 'Game of the Century',     'badge': '🏆', 'title': 'Century Witness'},
+    'fischer-spassky-g6': {'name': 'Fischer vs Spassky G6',   'badge': '⚔️',  'title': 'Cold War Classic'},
+    'kasparov-topalov':   {'name': "Kasparov's Immortal",     'badge': '👑', 'title': "Kasparov's Devotee"},
+}
+
+GRAND_SCHOLAR_BADGE = {'badge': '🎓', 'title': 'Grand Scholar', 'description': 'Reviewed all 6 classic games'}
+
+
+class CompleteReviewRequest(BaseModel):
+    game_key: str
+
+
+@app.post("/rewards/complete-review")
+async def complete_review(
+    request: CompleteReviewRequest,
+    authorization: Optional[str] = Header(None)
+):
+    """Record that the authenticated user has completed a classic game review."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+
+    game_key = request.game_key.strip()
+    if game_key not in CLASSIC_GAMES_CATALOG:
+        return {"success": False, "message": f"Unknown game key: {game_key}"}
+
+    username = payload.get("username")
+    now = datetime.now(timezone.utc).isoformat()
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Insert if not already recorded (UNIQUE constraint prevents duplicates)
+    cursor.execute(
+        "INSERT OR IGNORE INTO classic_game_reviews (username, game_key, completed_at) VALUES (?, ?, ?)",
+        (username, game_key, now)
+    )
+    newly_completed = cursor.rowcount == 1
+    conn.commit()
+
+    # Fetch all completed game keys for this user
+    cursor.execute(
+        "SELECT game_key FROM classic_game_reviews WHERE username = ?",
+        (username,)
+    )
+    completed_keys = {row["game_key"] for row in cursor.fetchall()}
+    conn.close()
+
+    game_info = CLASSIC_GAMES_CATALOG[game_key]
+    all_complete = completed_keys >= set(CLASSIC_GAMES_CATALOG.keys())
+
+    return {
+        "success": True,
+        "newly_completed": newly_completed,
+        "game_key": game_key,
+        "game_name": game_info["name"],
+        "badge": game_info["badge"],
+        "badge_title": game_info["title"],
+        "completed_count": len(completed_keys),
+        "total_games": len(CLASSIC_GAMES_CATALOG),
+        "grand_scholar_unlocked": all_complete and newly_completed and len(completed_keys) == len(CLASSIC_GAMES_CATALOG),
+    }
+
+
+@app.get("/rewards/my-reviews")
+async def my_reviews(authorization: Optional[str] = Header(None)):
+    """Return the authenticated user's classic game review progress and earned badges."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+
+    username = payload.get("username")
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT game_key, completed_at FROM classic_game_reviews WHERE username = ? ORDER BY completed_at",
+        (username,)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    completed = {row["game_key"]: row["completed_at"] for row in rows}
+
+    games = []
+    for key, info in CLASSIC_GAMES_CATALOG.items():
+        games.append({
+            "game_key": key,
+            "game_name": info["name"],
+            "badge": info["badge"],
+            "badge_title": info["title"],
+            "completed": key in completed,
+            "completed_at": completed.get(key),
+        })
+
+    all_complete = len(completed) == len(CLASSIC_GAMES_CATALOG)
+    return {
+        "success": True,
+        "username": username,
+        "games": games,
+        "completed_count": len(completed),
+        "total_games": len(CLASSIC_GAMES_CATALOG),
+        "grand_scholar": all_complete,
+        "grand_scholar_badge": GRAND_SCHOLAR_BADGE if all_complete else None,
+    }

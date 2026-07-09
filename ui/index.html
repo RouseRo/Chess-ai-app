@@ -601,6 +601,42 @@
     #dm-compose .dm-compose-header { font-size: 0.82em; color: #6a1b9a; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
     #dm-compose .dm-input-row { display: flex; gap: 5px; }
     #dm-compose-input { flex: 1; padding: 5px 8px; border: 1px solid #ce93d8; border-radius: 4px; font-size: 0.9em; }
+    /* ── Rewards system ───────────────────────────────────────────────────── */
+    .rewards-header { margin-bottom: 12px; }
+    .rewards-progress-bar-wrap { height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; }
+    .rewards-progress-bar { height: 100%; background: linear-gradient(90deg, #4CAF50, #81C784); border-radius: 4px; transition: width 0.5s ease; }
+    .rewards-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .reward-card { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 6px; border: 1px solid #e0e0e0; background: #fafafa; }
+    .reward-card-earned { background: #f1f8e9; border-color: #a5d6a7; }
+    .reward-card-locked { opacity: 0.55; filter: grayscale(60%); }
+    .reward-card-badge { font-size: 1.8em; flex-shrink: 0; width: 36px; text-align: center; }
+    .reward-card-info { flex: 1; min-width: 0; }
+    .reward-card-title { font-weight: 700; font-size: 0.9em; color: #2e7d32; }
+    .reward-card-locked .reward-card-title { color: #757575; }
+    .reward-card-game { font-size: 0.82em; color: #555; }
+    .reward-card-date { font-size: 0.78em; color: #888; margin-top: 2px; }
+    .reward-grand-scholar { display: flex; align-items: center; gap: 14px; margin-top: 14px; padding: 12px 16px; background: linear-gradient(135deg, #ede7f6, #f3e5f5); border: 2px solid #9c27b0; border-radius: 8px; }
+    .reward-grand-scholar strong { display: block; font-size: 1em; color: #4a148c; }
+    /* Reward toast notification */
+    .reward-toast {
+      position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+      display: flex; align-items: flex-start; gap: 12px;
+      background: #fff; border: 2px solid #4CAF50; border-radius: 10px;
+      padding: 14px 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+      max-width: 340px; animation: rewardSlideIn 0.35s ease;
+    }
+    @keyframes rewardSlideIn {
+      from { opacity: 0; transform: translateY(30px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .reward-toast-badge { font-size: 2.4em; flex-shrink: 0; }
+    .reward-toast-body { flex: 1; min-width: 0; }
+    .reward-toast-title { font-weight: 700; font-size: 0.95em; color: #2e7d32; margin-bottom: 2px; }
+    .reward-toast-game { font-size: 0.85em; color: #555; margin-bottom: 4px; }
+    .reward-toast-progress { font-size: 0.8em; color: #888; }
+    .reward-toast-grand { font-size: 0.82em; color: #6a1b9a; font-weight: 600; }
+    .reward-toast-close { background: none; border: none; cursor: pointer; font-size: 1.1em; color: #999; padding: 0 2px; align-self: flex-start; margin-left: 4px; }
+    .reward-toast-close:hover { color: #333; }
   </style>
 </head>
 <body>
@@ -637,6 +673,7 @@
             let setupReviewMoves = [];   // parsed SAN moves for step-through review
             let setupReviewIndex = -1;   // current position: 0 = start, n = after n moves
               let setupReviewComments = {}; // ply-index → commentary string (populated for classic games)
+                  let activeClassicGameKey = '';  // key of the classic game currently under review
 
     function checkAuthentication() {
       const token = localStorage.getItem('authToken');
@@ -2075,6 +2112,7 @@
                   <button class="tab-panel-button" onclick="switchTab('community-panel'); openCommunityTab();">Community<span id="community-unread-badge" class="comm-unread-badge" style="display:none;"></span></button>
                   <button class="tab-panel-button" onclick="switchTab('comm-panel')">Comm</button>
                   <button class="tab-panel-button" onclick="switchTab('stats-panel'); renderStatsPanel();">Stats</button>
+                  <button class="tab-panel-button" onclick="switchTab('rewards-panel'); loadMyRewards();">🏅 Rewards</button>
                 </div>
 
                 <!-- Welcome Tab -->
@@ -2328,6 +2366,16 @@
                   <div id="stats-opponent-list"><p class="stats-empty">No games played yet.</p></div>
                 </div>
 
+                <!-- Rewards Tab -->
+                <div id="rewards-panel" class="tab-panel-content" style="display:none; overflow-y:auto; padding:4px 2px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h3 style="margin:0;">🏅 Rewards</h3>
+                  </div>
+                  <div id="rewards-panel-content">
+                    <p style="color:#999; font-size:0.9em;">Loading your rewards…</p>
+                  </div>
+                </div>
+
                 <!-- Community Tab -->
                 <div id="community-panel" class="tab-panel-content">
                   <div style="display:flex; flex-direction:column; height:100%; min-height:0;">
@@ -2425,6 +2473,8 @@
                                     setInterval(() => postActivity('online'), 60000);
         // Ensure Welcome tab is active and in focus on login
         navigateToTab('welcome-panel');
+        // Pre-load rewards in background
+        loadMyRewards();
         // Show Chess News on first login of the day
         const _today = new Date().toDateString();
         const _newsKey = 'chessNewsDailyShown_' + currentUser;
@@ -2650,11 +2700,13 @@
                                       const key = select.value;
                                       if (!key) {
                                         if (infoEl) infoEl.textContent = '';
+                                        activeClassicGameKey = '';
                                         const playerSectionsReset = document.getElementById('player-strategy-sections');
                                         if (playerSectionsReset) playerSectionsReset.style.display = '';
                                         clearSetupPosition();
                                         return;
                                       }
+                                      activeClassicGameKey = key;
                                       const data = classicGamesData[key];
                                       if (!data) return;
                                       if (infoEl) infoEl.textContent = data.info;
@@ -2858,6 +2910,11 @@
                                     }
                                     status.style.color = '#2e7d32';
                                   }
+
+                                  // Reward: record completion when user reaches the final move of a classic game
+                                  if (activeClassicGameKey && setupReviewIndex === setupReviewMoves.length) {
+                                    recordClassicGameReview(activeClassicGameKey);
+                                  }
                                 }
 
                                 function clearSetupPosition() {
@@ -2872,6 +2929,7 @@
                                   setupReviewMoves = [];
                                   setupReviewIndex = -1;
                                   setupReviewComments = {};
+                                  activeClassicGameKey = '';
                                   const commentEl2 = document.getElementById('setup-move-comment');
                                   if (commentEl2) { commentEl2.style.display = 'none'; commentEl2.textContent = ''; }
                                   const navControls = document.getElementById('setup-nav-controls');
@@ -2897,6 +2955,125 @@
                                 }
 
                                 // ─────────────────────────────────────────────────────────────────────────
+
+                                  // ── Classic Game Rewards ─────────────────────────────────────────────────
+
+                                  let _rewardInFlight = new Set(); // prevent duplicate calls per session
+
+                                  function recordClassicGameReview(gameKey) {
+                                    if (!authToken || !gameKey) return;
+                                    if (_rewardInFlight.has(gameKey)) return;
+                                    _rewardInFlight.add(gameKey);
+
+                                    fetch('http://localhost:8002/rewards/complete-review', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                                      body: JSON.stringify({ game_key: gameKey })
+                                    })
+                                      .then(r => r.json())
+                                      .then(data => {
+                                        if (data.success && data.newly_completed) {
+                                          showRewardToast(data.badge, data.badge_title, data.game_name,
+                                            data.completed_count, data.total_games, data.grand_scholar_unlocked);
+                                          // Refresh rewards panel if it's open
+                                          if (document.getElementById('rewards-panel') &&
+                                            document.getElementById('rewards-panel').style.display !== 'none') {
+                                            loadMyRewards();
+                                          }
+                                        }
+                                      })
+                                      .catch(() => { _rewardInFlight.delete(gameKey); });
+                                  }
+
+                                  function showRewardToast(badge, title, gameName, count, total, grandScholar) {
+                                    const existing = document.getElementById('reward-toast');
+                                    if (existing) existing.remove();
+
+                                    const toast = document.createElement('div');
+                                    toast.id = 'reward-toast';
+                                    toast.className = 'reward-toast';
+                                    const grandLine = grandScholar
+                                      ? `<div class="reward-toast-grand">🎓 Grand Scholar badge unlocked — you've reviewed all ${total} classics!</div>`
+                                      : `<div class="reward-toast-progress">${count} of ${total} classic games reviewed</div>`;
+                                    toast.innerHTML = `
+                                    <div class="reward-toast-badge">${badge}</div>
+                                    <div class="reward-toast-body">
+                                      <div class="reward-toast-title">Badge earned: <strong>${title}</strong></div>
+                                      <div class="reward-toast-game">${gameName}</div>
+                                      ${grandLine}
+                                    </div>
+                                    <button class="reward-toast-close" onclick="this.parentElement.remove()">✕</button>
+                                  `;
+                                    document.body.appendChild(toast);
+                                    // Auto-dismiss after 8 seconds
+                                    setTimeout(() => { if (toast.parentElement) toast.remove(); }, 8000);
+                                  }
+
+                                  function loadMyRewards() {
+                                    if (!authToken) return;
+                                    fetch('http://localhost:8002/rewards/my-reviews', {
+                                      headers: { 'Authorization': 'Bearer ' + authToken }
+                                    })
+                                      .then(r => r.json())
+                                      .then(data => {
+                                        if (!data.success) return;
+                                        renderRewardsPanel(data);
+                                      })
+                                      .catch(() => { });
+                                  }
+
+                                  function renderRewardsPanel(data) {
+                                    const panel = document.getElementById('rewards-panel-content');
+                                    if (!panel) return;
+
+                                    const progressPct = Math.round((data.completed_count / data.total_games) * 100);
+                                    let html = `
+                                    <div class="rewards-header">
+                                      <h4 style="margin:0 0 4px;">Classic Game Reviews</h4>
+                                      <p style="margin:0 0 10px;font-size:0.85em;color:#666;">
+                                        Complete a classic game review by stepping through all its moves.
+                                      </p>
+                                      <div class="rewards-progress-bar-wrap">
+                                        <div class="rewards-progress-bar" style="width:${progressPct}%"></div>
+                                      </div>
+                                      <div style="font-size:0.82em;color:#555;text-align:right;margin-top:3px;">
+                                        ${data.completed_count} / ${data.total_games} reviewed
+                                      </div>
+                                    </div>
+                                    <div class="rewards-grid">`;
+
+                                    for (const g of data.games) {
+                                      const cls = g.completed ? 'reward-card reward-card-earned' : 'reward-card reward-card-locked';
+                                      const dateStr = g.completed_at
+                                        ? new Date(g.completed_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+                                        : '';
+                                      html += `
+                                      <div class="${cls}">
+                                        <div class="reward-card-badge">${g.completed ? g.badge : '🔒'}</div>
+                                        <div class="reward-card-info">
+                                          <div class="reward-card-title">${g.completed ? g.badge_title : '???'}</div>
+                                          <div class="reward-card-game">${g.game_name}</div>
+                                          ${g.completed ? `<div class="reward-card-date">Completed ${dateStr}</div>` : '<div class="reward-card-date">Not yet reviewed</div>'}
+                                        </div>
+                                      </div>`;
+                                    }
+                                    html += '</div>';
+
+                                    if (data.grand_scholar) {
+                                      html += `
+                                      <div class="reward-grand-scholar">
+                                        <span style="font-size:2em;">🎓</span>
+                                        <div>
+                                          <strong>Grand Scholar</strong>
+                                          <div style="font-size:0.85em;color:#4a148c;">You've reviewed all ${data.total_games} classic games!</div>
+                                        </div>
+                                      </div>`;
+                                    }
+
+                                    panel.innerHTML = html;
+                                  }
+
+                                  // ─────────────────────────────────────────────────────────────────────────
 
                           function checkGameStatus() {
                             const statusDiv = document.getElementById('game-status');
