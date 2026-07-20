@@ -131,9 +131,7 @@ chess-ai-app/
 ├── data/                      # Shared database directory
 │   └── users.db              # SQLite database (shared volume)
 │
-├── scripts/                   # Utility scripts
-│   ├── setup_test_user.py    # Create/reset test users
-│   └── migrate_json_to_sqlite.py
+├── scripts/                   # Utility scripts (currently empty)
 │
 ├── docs/                      # Documentation
 │   └── Docker_Design.md
@@ -151,7 +149,8 @@ chess-ai-app/
 **Purpose:** Serves the frontend web application with interactive chessboard.
 
 **Tech Stack:**
-- nginx (Alpine-based)
+- Node.js 20 / TypeScript (build stage)
+- nginx (Alpine-based, serve stage)
 - HTML/CSS/JavaScript
 - chessboard.js library
 - chess.js for move validation
@@ -162,10 +161,22 @@ chess-ai-app/
 | `index.html` | Login/Register + game interface (single-page app) |
 | `admin.html` | Admin dashboard |
 
-**Dockerfile:**
+**Dockerfile** (multi-stage build — TypeScript compiled before serving):
 ```dockerfile
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY . .
+RUN npm install && chmod +x node_modules/.bin/tsc
+RUN npm run build
+RUN cp index.html dist/ || true
+RUN cp admin.html dist/ || true
+RUN [ -d "assets" ] && cp -r assets dist/ || true
+RUN cp chessboard.js dist/ || true
+RUN cp chessboard.css dist/ || true
+RUN [ -d "img" ] && cp -r img dist/ || true
+
 FROM nginx:alpine
-COPY . /usr/share/nginx/html
+COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 ```
@@ -196,11 +207,18 @@ EXPOSE 80
 ```dockerfile
 FROM python:3.12-slim
 WORKDIR /app
-COPY requirements.txt .
+RUN apt-get update && apt-get install -y \
+    curl \
+    stockfish \
+    && rm -rf /var/lib/apt/lists/*
+COPY engine/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
+COPY engine/ ./engine/
+COPY src/ ./src/
+COPY user_data/ ./user_data/
+ENV STOCKFISH_PATH=/usr/games/stockfish
 EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "engine.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 ---
@@ -264,11 +282,16 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```dockerfile
 FROM python:3.12-slim
 WORKDIR /app
-COPY requirements.txt .
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+COPY auth-service/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
+COPY auth-service ./auth-service
+COPY engine ./engine
+COPY user_data ./user_data
 EXPOSE 8002
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8002"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8002/health || exit 1
+CMD ["uvicorn", "auth-service.main:app", "--host", "0.0.0.0", "--port", "8002"]
 ```
 
 ---
@@ -308,11 +331,16 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8002"]
 ```dockerfile
 FROM python:3.12-slim
 WORKDIR /app
-COPY requirements.txt .
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+COPY admin-service/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
+COPY admin-service ./admin-service
+COPY engine ./engine
+COPY user_data ./user_data
 EXPOSE 8001
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:8001/health')"
+CMD ["uvicorn", "admin-service.main:app", "--host", "0.0.0.0", "--port", "8001"]
 ```
 
 ---
@@ -321,17 +349,22 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
 
 **docker-compose.yml:**
 ```yaml
-version: '3.8'
-
 services:
   chess-engine:
-    build: ./engine
+    build:
+      context: .
+      dockerfile: engine/Dockerfile
     container_name: chess-engine
     ports:
       - "8000:8000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-chess-ai-secret-key-change-in-production}
+      - AUTH_SERVICE_URL=http://auth-service:8002
+    volumes:
+      - ./engine:/app/engine
+      - ./src:/app/src
+      - ./user_data:/app/user_data
     networks:
       - chess-network
     healthcheck:
@@ -339,27 +372,18 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
-  chess-ui:
-    build: ./ui
-    container_name: chess-ui
-    ports:
-      - "8080:80"
-    depends_on:
-      - chess-engine
-      - auth-service
-    networks:
-      - chess-network
+      start_period: 10s
 
   auth-service:
-    build: ./auth-service
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
     container_name: chess-auth-service
     ports:
       - "8002:8002"
     environment:
       - DATABASE_PATH=/app/data/users.db
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-chess-app-secret-key}
-      - JWT_EXPIRATION_HOURS=${JWT_EXPIRATION_HOURS:-24}
       - CHESS_DEV_MODE=${CHESS_DEV_MODE:-false}
     volumes:
       - ./data:/app/data
@@ -370,9 +394,12 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
 
   admin-service:
-    build: ./admin-service
+    build:
+      context: .
+      dockerfile: admin-service/Dockerfile
     container_name: chess-admin-service
     ports:
       - "8001:8001"
@@ -380,8 +407,7 @@ services:
       - DATABASE_PATH=/app/data/users.db
     volumes:
       - ./data:/app/data
-    depends_on:
-      - auth-service
+      - ./user_data:/app/user_data
     networks:
       - chess-network
     healthcheck:
@@ -389,6 +415,21 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
+
+  chess-ui:
+    build: ./ui
+    container_name: chess-ui
+    ports:
+      - "8080:80"
+    volumes:
+      - ./ui:/usr/share/nginx/html
+    depends_on:
+      - chess-engine
+      - auth-service
+      - admin-service
+    networks:
+      - chess-network
 
 networks:
   chess-network:
@@ -435,11 +476,10 @@ Created automatically on first startup or via setup script:
 
 ### Setup Test Users
 
-```powershell
-# Run the setup script
-python scripts/setup_test_user.py
+Default users are created automatically by the auth service on first startup. To reset or inspect user data, connect to the running container:
 
-# Copy database to container (if needed)
+```powershell
+# Copy an existing database into the container (if needed)
 docker cp data/users.db chess-auth-service:/app/data/users.db
 
 # Restart auth service
@@ -572,11 +612,9 @@ Create a `.env` file in the project root:
 ```env
 # AI API Keys
 OPENAI_API_KEY=your_openai_key
-DEEPSEEK_API_KEY=your_deepseek_key
 
 # JWT Configuration
 JWT_SECRET_KEY=your-secure-secret-key-change-in-production
-JWT_EXPIRATION_HOURS=24
 
 # Development Mode (auto-verifies new users)
 CHESS_DEV_MODE=false
@@ -639,13 +677,7 @@ docker exec -it chess-admin-service /bin/bash
 
 ## Migration from JSON to SQLite
 
-If you have existing users in JSON files (`user_data/users/profiles/*.json`), run the migration script:
-
-```powershell
-python scripts/migrate_json_to_sqlite.py
-docker cp data/users.db chess-auth-service:/app/data/users.db
-docker-compose restart auth-service
-```
+If you have existing users in JSON files (`user_data/users/profiles/*.json`), import them manually into the SQLite database (`data/users.db`) before starting the services.
 
 ---
 

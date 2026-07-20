@@ -10,6 +10,7 @@ The application is for people that are new to the game of chess and want to lear
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
 - [Running the Application](#running-the-application)
+- [Azure Deployment](#azure-deployment)
 - [User Authentication](#user-authentication)
 - [Admin Dashboard](#admin-dashboard)
 - [API Services](#api-services)
@@ -89,6 +90,8 @@ The application is for people that are new to the game of chess and want to lear
 Chess-ai-app/
 ├── engine/                     # Chess engine service (Port 8000)
 │   ├── main.py                # API endpoints & Stockfish integration
+│   ├── game_service.py        # Game helper utilities
+│   ├── user_manager.py        # User/model management for engine
 │   ├── Dockerfile             # Engine container config
 │   └── requirements.txt       # Python dependencies
 │
@@ -116,9 +119,24 @@ Chess-ai-app/
 ├── data/                      # Shared database directory
 │   └── users.db             # SQLite database (shared volume)
 │
-├── scripts/                   # Utility scripts
-│   ├── setup_test_user.py   # Create/reset test users
-│   └── migrate_json_to_sqlite.py
+├── scripts/                   # Utility scripts (reserved for future use)
+│
+├── src/                       # Shared Python modules (used by engine)
+│   ├── ai_player.py          # AI model integration via OpenRouter
+│   ├── chess_game.py         # Core game logic
+│   ├── stockfish_player.py   # Stockfish integration
+│   ├── stockfish_utils.py    # Stockfish config helpers
+│   ├── data_models.py        # Shared data models
+│   ├── constants.py          # Shared constants
+│   ├── config.json           # AI model & opening configuration
+│   └── utils/
+│       └── input_handler.py
+│
+├── user_data/                 # AI model registry (engine volume)
+│   └── ai_models.json        # Registered AI models
+│
+├── data/                      # Shared database directory
+│   └── users.db              # SQLite database (shared volume)
 │
 ├── docs/                      # Documentation
 │   └── Docker_Design.md     # Architecture documentation
@@ -145,9 +163,8 @@ Chess-ai-app/
 
 2. **Create environment file** (optional, for AI features)
    ```powershell
-   # Create .env file in project root
-   echo "OPENAI_API_KEY=your_key_here" > .env
-   echo "DEEPSEEK_API_KEY=your_key_here" >> .env
+   # Create .env file in project root — one key covers all AI providers via OpenRouter
+   echo "OPENAI_API_KEY=your_openrouter_key" > .env
    ```
 
 3. **Build and run**
@@ -192,6 +209,93 @@ docker-compose down
 | **Auth API** | http://localhost:8002 | Authentication service |
 | **Admin API** | http://localhost:8001 | Admin service |
 | **Engine API** | http://localhost:8000 | Chess engine |
+
+## Azure Deployment
+
+The application can be deployed to **Azure Container Apps** using the provided PowerShell script. All four services (engine, auth, admin, UI) are built and pushed to Azure Container Registry, then deployed as Container Apps backed by Azure Files for persistent storage.
+
+### Prerequisites
+
+- [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) installed and logged in (`az login`)
+- Docker running locally
+- An active Azure subscription
+
+### First-time Deployment
+
+Run the full deployment script from the repo root:
+
+```powershell
+.\deploy-azure.ps1
+```
+
+This script performs the following steps:
+
+| Step | What it does |
+|------|--------------|
+| 0 | Registers required Azure resource providers |
+| 1 | Creates resource group `chess-ai-rg` (East US) |
+| 2 | Creates Azure Container Registry (`chessairegistry7646`) |
+| 3 | Creates storage account and two Azure Files shares (`chessdata`, `chessuserdata`) |
+| 4 | Creates the Container Apps Environment (`chess-ai-env`) |
+| 5 | Links the Azure Files shares to the environment as volumes |
+| 6 | Builds and pushes Docker images for all four services to ACR |
+| 7 | Fetches ACR credentials |
+| 8 | Deploys all four Container Apps via YAML |
+
+At the end the script prints the public HTTPS URL for the Chess UI.
+
+### Redeployment (infra already exists)
+
+When the Azure infrastructure is already provisioned and you only need to rebuild and redeploy the container images, use:
+
+```powershell
+.\redeploy-azure.ps1
+```
+
+### Deployed Services
+
+| Container App | Visibility | Port | Description |
+|---------------|-----------|------|-------------|
+| `chess-ui` | Public (external) | 80 | Nginx-served web frontend |
+| `chess-engine` | Internal | 8000 | Chess engine & game logic |
+| `chess-auth` | Internal | 8002 | JWT authentication service |
+| `chess-admin` | Internal | 8001 | Admin dashboard backend |
+
+### Live Deployment URLs
+
+| Service | FQDN |
+|---------|------|
+| **Chess UI (public)** | `chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
+| chess-auth (internal) | `chess-auth.internal.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
+| chess-admin (internal) | `chess-admin.internal.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
+| chess-engine (internal) | `chess-engine.internal.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
+
+### Accessing the Deployed App
+
+Open the app in a browser:
+
+```
+https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io
+```
+
+| Page | URL |
+|------|-----|
+| Login / Play Chess | `https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
+| Admin Dashboard | `https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io/admin.html` |
+
+The three backend services (`chess-engine`, `chess-auth`, `chess-admin`) are internal-only and not reachable from the public internet — they communicate with each other over the private Container Apps Environment network.
+
+### Resource Configuration
+
+| Resource | Name |
+|----------|------|
+| Resource Group | `chess-ai-rg` |
+| Location | `eastus` |
+| Container Registry | `chessairegistry7646` |
+| Storage Account | `chessaistorage4996` |
+| Container Apps Environment | `chess-ai-env` |
+
+> **Note:** The `JWT_SECRET` in the script (`chess-ai-jwt-secret-change-me-in-prod`) must be changed to a strong random value before deploying to production.
 
 ## User Authentication
 
@@ -325,10 +429,12 @@ The **&#8635; Refresh Status** button refreshes the user list and online statuse
 | `/health` | GET | Health check |
 | `/admin/stats` | GET | System statistics |
 | `/admin/users` | GET | List all users |
+| `/admin/users/{username}` | GET | Get detailed user info |
 | `/admin/users/{username}/promote` | POST | Promote to admin |
 | `/admin/users/{username}/demote` | POST | Demote from admin |
 | `/admin/users/{username}/verify` | POST | Manually verify user |
 | `/admin/users/{username}` | DELETE | Delete user |
+| `/admin/models` | GET | List configured AI models |
 
 ### Stats Response
 
@@ -348,12 +454,13 @@ The **&#8635; Refresh Status** button refreshes the user list and online statuse
 
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
-| `/` | GET | No | Health check |
+| `/` | GET | No | Health check with component status |
+| `/health` | GET | No | Simple health check |
 | `/move` | POST | Yes | Submit move & get AI response |
+| `/game/sync` | POST | Yes | Push board state for H vs H sync |
+| `/game/sync/{game_id}` | GET | Yes | Poll board state for H vs H sync |
 | `/ai/suggest` | GET | Yes | Get AI move suggestion |
 | `/expert/question` | POST | Yes | Ask chess expert |
-| `/expert/joke` | GET | Yes | Get chess joke |
-| `/expert/fact` | GET | Yes | Get chess fact |
 
 #### Submit Move
 
@@ -543,9 +650,8 @@ Two players can play against each other from different browser tabs or computers
 Create a `.env` file in the project root:
 
 ```env
-# AI API Keys (optional)
-OPENAI_API_KEY=your_openai_key
-DEEPSEEK_API_KEY=your_deepseek_key
+# OpenRouter API key — used for ALL AI models (GPT, Claude, DeepSeek, Gemini, Llama, etc.)
+OPENAI_API_KEY=your_openrouter_key
 
 # JWT Configuration (optional, has defaults)
 JWT_SECRET_KEY=your_secret_key
@@ -554,6 +660,8 @@ JWT_EXPIRATION_HOURS=24
 # Development Mode (auto-verifies new users)
 CHESS_DEV_MODE=false
 ```
+
+> **AI model selection**: The active AI model for the chess expert and AI opponents is configured in `src/config.json` under `chess_expert_model` and `ai_models`. All models are accessed through [OpenRouter](https://openrouter.ai) using the `OPENAI_API_KEY`.
 
 ### Docker Compose Services
 
@@ -572,7 +680,7 @@ services:
 | Issue | Solution |
 |-------|----------|
 | Can't login | Check credentials, verify auth service is running |
-| "Invalid username or password" | Reset password with `scripts/setup_test_user.py` |
+| "Invalid username or password" | Reset the database and restart auth-service |
 | Token expired | Logout and login again |
 | AI not responding | Check engine logs: `docker logs chess-engine` |
 | Port in use | `docker-compose down` then restart |
@@ -590,16 +698,13 @@ curl http://localhost:8001/admin/stats  # Stats
 ```
 
 
-### Reset Test Users
+### Reset Database
 
 ```powershell
-# Run setup script to reset passwords
-python scripts/setup_test_user.py
-
-# Copy database to container
+# Copy a fresh database to the auth container
 docker cp data/users.db chess-auth-service:/app/data/users.db
 
-# Restart auth service
+# Restart auth service to pick up changes
 docker-compose restart auth-service
 ```
 
@@ -792,8 +897,8 @@ docker-compose down
 # View logs
 docker-compose logs -f
 
-# Reset test users
-python scripts/setup_test_user.py
+# Reset auth database
+docker cp data/users.db chess-auth-service:/app/data/users.db
 docker-compose restart auth-service
 
 # Rebuild
