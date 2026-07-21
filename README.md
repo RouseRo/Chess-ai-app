@@ -11,6 +11,7 @@ The application is for people that are new to the game of chess and want to lear
 - [Getting Started](#getting-started)
 - [Running the Application](#running-the-application)
 - [Azure Deployment](#azure-deployment)
+- [Distributing to Testers](#distributing-to-testers)
 - [User Authentication](#user-authentication)
 - [Admin Dashboard](#admin-dashboard)
 - [API Services](#api-services)
@@ -180,7 +181,7 @@ Chess-ai-app/
    | Username | Password |
    |----------|----------|
    | admin | admin123 |
-   | johndoe | password123 |
+   | testuser | Chess123 |
 
 ## Running the Application
 
@@ -258,7 +259,7 @@ When the Azure infrastructure is already provisioned and you only need to rebuil
 |---------------|-----------|------|-------------|
 | `chess-ui` | Public (external) | 80 | Nginx-served web frontend |
 | `chess-engine` | Internal | 8000 | Chess engine & game logic |
-| `chess-auth` | Internal | 8002 | JWT authentication service |
+| `chess-auth` | Public (external) | 8002 | JWT authentication service |
 | `chess-admin` | Internal | 8001 | Admin dashboard backend |
 
 ### Live Deployment URLs
@@ -297,6 +298,74 @@ The three backend services (`chess-engine`, `chess-auth`, `chess-admin`) are int
 
 > **Note:** The `JWT_SECRET` in the script (`chess-ai-jwt-secret-change-me-in-prod`) must be changed to a strong random value before deploying to production.
 
+---
+
+## Distributing to Testers
+
+The app is live on Azure. Testers need only a browser — no installation required.
+
+### Active Tester Accounts
+
+The following accounts have been created and verified on the live deployment:
+
+| Username | Password | URL |
+|----------|----------|-----|
+| `tester1` | `Chess2026!` | https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io |
+| `tester2` | `Chess2026!` | https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io |
+| `tester3` | `Chess2026!` | https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io |
+
+> Send the URL and credentials to each tester. Recommend they change their password after first login.
+
+### Adding More Tester Accounts
+
+```powershell
+# Register and immediately verify a new tester
+$name = "tester4"
+Invoke-RestMethod `
+  -Uri "https://chess-auth.calmdesert-0b7461a5.eastus.azurecontainerapps.io/auth/register" `
+  -Method POST -ContentType "application/json" `
+  -Body "{`"username`":`"$name`",`"password`":`"Chess2026!`",`"email`":`"$name@chess.local`"}"
+
+Invoke-RestMethod `
+  -Uri "https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io/admin/users/$name/verify" `
+  -Method POST
+```
+
+Or use the **Admin Dashboard → User Management** panel to verify accounts that testers registered themselves.
+
+### Monitoring Testers
+
+Open the **Admin Dashboard** to watch tester activity in real time:
+
+```
+https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io/admin.html
+```
+
+The **User Management** tab shows each tester's online status, current game activity, and last seen time. Use the **⟳ Refresh Status** button to update.
+
+### Notes
+- Stockfish AI is always available (no API key needed).
+- LLM opponents (GPT, Claude, DeepSeek) require the `OPENAI_API_KEY` environment variable to be set in the Azure deployment.
+- All testers share the same database — usernames must be unique.
+
+---
+
+### Tester Feedback Checklist
+
+Things to ask testers to verify:
+
+- [ ] Can log in with provided credentials
+- [ ] Chessboard loads and pieces are draggable
+- [ ] Can start a game against Stockfish (any skill level)
+- [ ] Move history and captured pieces update correctly
+- [ ] Classic Games step-through works and badges are awarded
+- [ ] Community panel shows online users
+- [ ] H vs H sync works between two browser tabs
+- [ ] Admin can see tester activity in the User Management panel
+- [ ] App works on mobile browser (responsive layout)
+
+---
+
 ## User Authentication
 
 ### Unified Authentication
@@ -328,7 +397,7 @@ All clients (Web UI, Admin Dashboard) authenticate through the same auth-service
 | Username | Password | Email | Admin |
 |----------|----------|-------|-------|
 | `admin` | `admin123` | admin@chess.local | Yes |
-| `johndoe` | `password123` | john@example.com | No |
+| `testuser` | `Chess123` | testuser@chess.local | No |
 
 **Important**: Change the default passwords after first login.
 
@@ -831,7 +900,7 @@ CREATE TABLE classic_game_reviews (
 | Unified User Storage | ✅ Single SQLite database |
 | Login by Username/Email | ✅ Supported |
 | CORS | ⚠️ Open (for development) |
-| HTTPS | ❌ Not configured |
+| HTTPS | ✅ Enabled on Azure (Container Apps TLS) |
 | Rate Limiting | ❌ Not implemented |
 
 ### Production Recommendations
@@ -880,7 +949,7 @@ CREATE TABLE classic_game_reviews (
 | Username | Password | Admin |
 |----------|----------|-------|
 | admin | admin123 | Yes |
-| johndoe | password123 | No |
+| testuser | Chess123 | No |
 
 ### Commands
 

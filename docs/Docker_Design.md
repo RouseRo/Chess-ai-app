@@ -246,8 +246,15 @@ CMD ["uvicorn", "engine.main:app", "--host", "0.0.0.0", "--port", "8000"]
 | `/auth/verify-email` | POST | Verify email with token |
 | `/auth/refresh` | POST | Refresh JWT token |
 | `/auth/logout` | POST | Logout (client-side) |
-| `/auth/change-password` | POST | Update password |
-
+| `/auth/change-password` | POST | Update password || `/auth/activity` | POST | Update online/playing status |
+| `/community/online-users` | GET | List currently online users |
+| `/community/messages` | GET | Get recent chat and DMs |
+| `/community/messages` | POST | Post a public chat message |
+| `/community/dm` | POST | Send a direct message |
+| `/community/game-invite` | POST | Send a game invitation |
+| `/community/clear-activity` | POST | Clear own game activity status |
+| `/rewards/complete-review` | POST | Record a classic game review completion |
+| `/rewards/my-reviews` | GET | Fetch review progress and earned badges |
 **Login Request (supports username OR email):**
 ```json
 {
@@ -310,11 +317,13 @@ CMD ["uvicorn", "auth-service.main:app", "--host", "0.0.0.0", "--port", "8002"]
 |----------|--------|------|-------------|
 | `/health` | GET | No | Health check |
 | `/admin/stats` | GET | No | System statistics |
-| `/admin/users` | GET | No | List all users |
-| `/admin/users/{username}/promote` | POST | Yes | Promote user to admin |
-| `/admin/users/{username}/demote` | POST | Yes | Demote admin to user |
-| `/admin/users/{username}/verify` | POST | Yes | Manually verify user |
-| `/admin/users/{username}` | DELETE | Yes | Delete user |
+| `/admin/users` | GET | No | List all users with online status |
+| `/admin/users/{username}` | GET | No | Get detailed user info |
+| `/admin/users/{username}/promote` | POST | No | Promote user to admin |
+| `/admin/users/{username}/demote` | POST | No | Demote admin to user |
+| `/admin/users/{username}/verify` | POST | No | Manually verify user |
+| `/admin/users/{username}` | DELETE | No | Delete user |
+| `/admin/models` | GET | Yes | List configured AI models |
 
 **Stats Response Example:**
 ```json
@@ -461,7 +470,22 @@ CREATE TABLE IF NOT EXISTS users (
     is_verified BOOLEAN DEFAULT 0,
     verification_token TEXT,
     games_count INTEGER DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login TIMESTAMP,
+    last_activity TIMESTAMP,
+    current_activity TEXT DEFAULT 'offline'
+);
+```
+
+### Classic Game Reviews Table Schema
+
+```sql
+CREATE TABLE classic_game_reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    game_key TEXT NOT NULL,
+    completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(username, game_key)
 );
 ```
 
@@ -472,6 +496,7 @@ Created automatically on first startup or via setup script:
 | Username | Email | Password | Admin | Verified |
 |----------|-------|----------|-------|----------|
 | `admin` | `admin@chess.local` | `admin123` | Yes | Yes |
+| `testuser` | `testuser@chess.local` | `Chess123` | No | Yes |
 | `johndoe` | `john@example.com` | `password123` | No | Yes |
 
 ### Setup Test Users
@@ -632,7 +657,7 @@ CHESS_DEV_MODE=false
 | JWT Authentication | ✅ Implemented |
 | Unified User Storage | ✅ Single SQLite database |
 | CORS | ⚠️ Open (restrict in prod) |
-| HTTPS | ❌ Not configured |
+| HTTPS | ✅ Enabled on Azure (Container Apps TLS) / ❌ Local Docker only |
 | Rate Limiting | ❌ Not implemented |
 | Input Validation | ✅ Basic |
 
@@ -643,7 +668,7 @@ CHESS_DEV_MODE=false
 3. **Add Rate Limiting** - Prevent brute force attacks
 4. **Use Strong JWT Secret** - Generate secure random key
 5. **Database Backup** - Regular SQLite backups
-6. **Change Default Passwords** - Update admin/johndoe on first use
+6. **Change Default Passwords** - Update admin/testuser/johndoe on first use
 7. **Environment Variables** - Never commit secrets to git
 
 ---
@@ -675,6 +700,61 @@ docker exec -it chess-admin-service /bin/bash
 
 ---
 
+## Azure Deployment
+
+The application is deployed to **Azure Container Apps** (ACA) with all four services running as separate container apps in a shared environment.
+
+### Deployed Services
+
+| Container App | Ingress | Port | Description |
+|---------------|---------|------|-------------|
+| `chess-ui` | External (public) | 80 | Nginx frontend — the only public entry point |
+| `chess-engine` | Internal | 8000 | Chess engine & game logic |
+| `chess-auth` | External (public) | 8002 | JWT authentication service |
+| `chess-admin` | Internal | 8001 | Admin dashboard backend |
+
+### Public URLs
+
+| Service | URL |
+|---------|-----|
+| Chess UI | `https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
+| Chess Auth | `https://chess-auth.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
+
+### nginx Proxy Routing (chess-ui)
+
+All browser requests go to `chess-ui`. nginx routes them to the appropriate backend:
+
+| Path prefix | Proxy target | Transport |
+|-------------|-------------|----------|
+| `/auth/`, `/community/`, `/rewards/` | `chess-auth` external HTTPS URL | HTTPS (external ACA URL) |
+| `/admin/` | `chess-admin` internal ACA FQDN | HTTPS (internal ACA FQDN) |
+| `/move`, `/game/`, `/expert/` | `chess-engine` K8s ClusterIP | HTTP (internal) |
+
+> **Note:** `chess-auth` uses its public HTTPS URL rather than the K8s ClusterIP because ACA's internal Envoy routing can become corrupted after a container app is deleted and recreated. Using the external URL bypasses this. `chess-admin` uses the internal ACA FQDN (`chess-admin.internal.calmdesert-0b7461a5.eastus.azurecontainerapps.io`) for the same reason, while keeping the service private.
+
+### Persistent Storage
+
+Both `chess-auth` and `chess-admin` mount the same Azure Files share (`chessdata`) for the SQLite database:
+
+| Share | Mount path | Used by |
+|-------|-----------|--------|
+| `chessdata` | `/app/data` | chess-auth, chess-admin |
+| `chessuserdata` | `/app/user_data` | chess-engine |
+
+> **SQLite on Azure Files:** Azure Files (SMB) does not support POSIX `fcntl()` advisory locks. All `sqlite3.connect()` calls use the `unix-dotfile` VFS with a 30-second timeout: `sqlite3.connect("file:path?vfs=unix-dotfile", uri=True, timeout=30)`.
+
+### Azure Resources
+
+| Resource | Name |
+|----------|------|
+| Resource Group | `chess-ai-rg` |
+| Location | `eastus` |
+| Container Registry | `chessairegistry7646` |
+| Storage Account | `chessaistorage4996` |
+| Container Apps Environment | `chess-ai-env` |
+
+---
+
 ## Migration from JSON to SQLite
 
 If you have existing users in JSON files (`user_data/users/profiles/*.json`), import them manually into the SQLite database (`data/users.db`) before starting the services.
@@ -683,17 +763,22 @@ If you have existing users in JSON files (`user_data/users/profiles/*.json`), im
 
 ## Future Enhancements
 
-- [ ] WebSocket support for real-time games
+- [ ] WebSocket support for real-time games (currently 2-second polling)
 - [ ] Redis for session management
 - [ ] PostgreSQL for production database
 - [ ] Kubernetes deployment
 - [ ] CI/CD pipeline
-- [ ] Game history and replay
-- [ ] Multiplayer support
+- [ ] Full game history and replay from saved games
+- [x] Human vs Human multiplayer (browser-to-browser sync via `/game/sync`)
+- [x] Community chat, DMs, and game invitations
+- [x] Classic game review with step-through and move commentary
+- [x] Classic game reward badges and Grand Scholar award
 - [ ] ELO rating system
 - [ ] Email verification with real SMTP
 - [ ] Password reset functionality
 - [ ] OAuth2 social login
+- [ ] Mobile responsive design
+- [ ] Tournament mode
 
 ---
 
