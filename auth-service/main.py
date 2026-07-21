@@ -58,9 +58,15 @@ class VerifyEmailRequest(BaseModel):
 
 
 # Database functions
+def _sqlite_connect(path: str) -> sqlite3.Connection:
+    """Open a SQLite connection using unix-dotfile VFS for Azure Files SMB compatibility."""
+    uri = f"file:{path}?vfs=unix-dotfile"
+    return sqlite3.connect(uri, uri=True, timeout=30, check_same_thread=False)
+
+
 def get_db():
     """Get database connection."""
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = _sqlite_connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -69,7 +75,7 @@ def init_db():
     """Initialize the database."""
     os.makedirs(os.path.dirname(DATABASE_PATH), exist_ok=True)
     
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = _sqlite_connect(DATABASE_PATH)
     cursor = conn.cursor()
     
     cursor.execute('''
