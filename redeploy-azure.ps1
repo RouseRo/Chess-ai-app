@@ -17,26 +17,31 @@ Write-Host "=== Chess AI Redeploy (UI + Container Apps) ===" -ForegroundColor Cy
 $ACR_USER = az acr credential show --name $ACR --query username --output tsv
 $ACR_PASS = az acr credential show --name $ACR --query "passwords[0].value" --output tsv
 
-# Rebuild and push chess-ui (Dockerfile was fixed for tsc permissions)
-Write-Host "[1/2] Rebuilding chess-ui image..." -ForegroundColor Yellow
+# Rebuild and push chess-auth (feedback endpoints added)
+Write-Host "[1/3] Rebuilding chess-auth image..." -ForegroundColor Yellow
 az acr login --name $ACR
+az acr build --registry $ACR --image chess-auth:latest --file auth-service/Dockerfile .
+Write-Host "chess-auth image pushed." -ForegroundColor Green
+
+# Rebuild and push chess-ui (nginx.conf + UI changes)
+Write-Host "[2/3] Rebuilding chess-ui image..." -ForegroundColor Yellow
 az acr build --registry $ACR --image chess-ui:latest --file ui/Dockerfile ui/
 Write-Host "chess-ui image pushed." -ForegroundColor Green
 
 # Helper: write YAML (no BOM) to temp file and deploy / update
 function Deploy-App($name, $yaml) {
-    $file = "$env:TEMP\$name.yaml"
-    [System.IO.File]::WriteAllText($file, $yaml, (New-Object System.Text.UTF8Encoding $false))
-    # Try create first, fall back to update if already exists
-    Write-Host "  Deploying $name..." -ForegroundColor White
-    $result = az containerapp create --name $name --resource-group $RG --yaml $file --output table 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "  Create failed, trying update..." -ForegroundColor DarkYellow
-        az containerapp update --name $name --resource-group $RG --yaml $file --output table
-    }
+  $file = "$env:TEMP\$name.yaml"
+  [System.IO.File]::WriteAllText($file, $yaml, (New-Object System.Text.UTF8Encoding $false))
+  # Try create first, fall back to update if already exists
+  Write-Host "  Deploying $name..." -ForegroundColor White
+  $result = az containerapp create --name $name --resource-group $RG --yaml $file --output table 2>&1
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "  Create failed, trying update..." -ForegroundColor DarkYellow
+    az containerapp update --name $name --resource-group $RG --yaml $file --output table
+  }
 }
 
-Write-Host "[2/2] Deploying all 4 Container Apps..." -ForegroundColor Yellow
+Write-Host "[3/3] Deploying all 4 Container Apps..." -ForegroundColor Yellow
 
 Deploy-App "chess-auth" @"
 location: $LOCATION
@@ -53,7 +58,7 @@ properties:
       - name: regpassword
         value: $ACR_PASS
     ingress:
-      external: false
+      external: true
       targetPort: 8002
       transport: http
   template:
