@@ -7,6 +7,7 @@ The application is for people that are new to the game of chess and want to lear
 ## Table of Contents
 
 - [Features](#features)
+- [Requirements](#requirements)
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
 - [Running the Application](#running-the-application)
@@ -22,6 +23,7 @@ The application is for people that are new to the game of chess and want to lear
 - [Architecture](#architecture)
 - [Security](#security)
 - [Future Enhancements](#future-enhancements)
+- [Quick Reference](#quick-reference)
 
 ## Features
 

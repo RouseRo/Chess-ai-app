@@ -816,6 +816,40 @@
         });
     }
 
+        function showAlreadyLoggedIn(username, isAdmin) {
+          const role = isAdmin ? 'Admin' : 'User';
+          const loginHTML = `
+          <div id="auth-container" style="text-align:center;">
+            <h2>Chess AI App</h2>
+            <p>You are already logged in as <strong>${username}</strong> (${role}).</p>
+            ${isAdmin ? '<button onclick="window.location.href=\'admin.html\'" style="width:100%;padding:10px;margin:5px 0;background-color:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer;">Go to Admin Panel</button>' : '<button onclick="loadChessboardInterface()" style="width:100%;padding:10px;margin:5px 0;background-color:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer;">Go to Game</button>'}
+            <button onclick="handleSwitchUser()" style="width:100%;padding:10px;margin:5px 0;background-color:#f44336;color:white;border:none;border-radius:4px;cursor:pointer;">Logout / Switch User</button>
+          </div>
+        `;
+          document.getElementById('app').innerHTML = loginHTML;
+        }
+
+        function handleSwitchUser() {
+          const token = localStorage.getItem('authToken');
+          if (token) {
+            fetch('/auth/logout', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token })
+            }).catch(() => { }).finally(() => {
+              localStorage.removeItem('authToken');
+              localStorage.removeItem('currentUser');
+              localStorage.removeItem('isAdmin');
+              showLoginInterface();
+            });
+          } else {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('currentUser');
+            localStorage.removeItem('isAdmin');
+            showLoginInterface();
+          }
+        }
+
       function verifyToken(token) {
         logCommMessage('req', 'AUTH', '/auth/verify', { token: '(stored token)' }, null);
         let _verifyStatus = null;
@@ -829,12 +863,7 @@
           if (data.success) {
             currentUser = data.username;
             localStorage.setItem('isAdmin', data.is_admin ? 'true' : 'false');
-
-            if (data.is_admin) {
-              window.location.href = 'admin.html';
-            } else {
-              loadChessboardInterface();
-            }
+            showAlreadyLoggedIn(data.username, data.is_admin);
           } else {
             localStorage.removeItem('authToken');
             localStorage.removeItem('currentUser');
