@@ -117,6 +117,18 @@ def init_db():
         )
     ''')
     
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS feedback (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            category TEXT NOT NULL,
+            message TEXT NOT NULL,
+            status TEXT DEFAULT 'open',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            resolved_at TIMESTAMP
+        )
+    ''')
+
     # Create default admin if not exists
     cursor.execute("SELECT id FROM users WHERE username = ?", ("admin",))
     if not cursor.fetchone():
@@ -877,3 +889,160 @@ async def my_reviews(authorization: Optional[str] = Header(None)):
         "grand_scholar": all_complete,
         "grand_scholar_badge": GRAND_SCHOLAR_BADGE if all_complete else None,
     }
+
+
+# ========== Feedback Endpoints ==========
+
+FEEDBACK_CATEGORIES = ('bug', 'suggestion', 'feature')
+FEEDBACK_CATEGORY_LABELS = {
+    'bug': 'Bug Report',
+    'suggestion': 'Suggestion',
+    'feature': 'Feature Request',
+}
+
+
+class FeedbackRequest(BaseModel):
+    category: str
+    message: str
+
+
+@app.post("/feedback/submit")
+async def submit_feedback(
+    request: FeedbackRequest,
+    authorization: Optional[str] = Header(None)
+):
+    """Submit a feedback message. Requires authentication."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+
+    category = request.category.strip().lower()
+    if category not in FEEDBACK_CATEGORIES:
+        return {"success": False, "message": f"Invalid category. Must be one of: {', '.join(FEEDBACK_CATEGORIES)}"}
+
+    message = request.message.strip()
+    if not message:
+        return {"success": False, "message": "Message cannot be empty."}
+    if len(message) > 2000:
+        return {"success": False, "message": "Message too long (max 2000 characters)."}
+
+    username = payload.get("username")
+    now = datetime.now(timezone.utc).isoformat()
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO feedback (username, category, message, created_at) VALUES (?, ?, ?, ?)",
+        (username, category, message, now)
+    )
+    conn.commit()
+    feedback_id = cursor.lastrowid
+    conn.close()
+
+    return {"success": True, "id": feedback_id, "message": "Feedback submitted. Thank you!"}
+
+
+@app.get("/feedback/list")
+async def list_feedback(
+    status: Optional[str] = None,
+    authorization: Optional[str] = Header(None)
+):
+    """Return all feedback. Admin only."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+    if not payload.get("is_admin"):
+        return {"success": False, "message": "Admin privileges required."}
+
+    conn = get_db()
+    cursor = conn.cursor()
+    if status in ('open', 'resolved'):
+        cursor.execute(
+            "SELECT id, username, category, message, status, created_at, resolved_at FROM feedback WHERE status = ? ORDER BY created_at DESC",
+            (status,)
+        )
+    else:
+        cursor.execute(
+            "SELECT id, username, category, message, status, created_at, resolved_at FROM feedback ORDER BY created_at DESC"
+        )
+    rows = cursor.fetchall()
+    conn.close()
+
+    return {
+        "success": True,
+        "feedback": [
+            {
+                "id": row["id"],
+                "username": row["username"],
+                "category": row["category"],
+                "category_label": FEEDBACK_CATEGORY_LABELS.get(row["category"], row["category"]),
+                "message": row["message"],
+                "status": row["status"],
+                "created_at": row["created_at"],
+                "resolved_at": row["resolved_at"],
+            }
+            for row in rows
+        ]
+    }
+
+
+@app.post("/feedback/{feedback_id}/resolve")
+async def resolve_feedback(
+    feedback_id: int,
+    authorization: Optional[str] = Header(None)
+):
+    """Mark a feedback item as resolved (or re-open if already resolved). Admin only."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+    if not payload.get("is_admin"):
+        return {"success": False, "message": "Admin privileges required."}
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, status FROM feedback WHERE id = ?", (feedback_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return {"success": False, "message": "Feedback not found."}
+
+    new_status = 'open' if row["status"] == 'resolved' else 'resolved'
+    resolved_at = datetime.now(timezone.utc).isoformat() if new_status == 'resolved' else None
+    cursor.execute(
+        "UPDATE feedback SET status = ?, resolved_at = ? WHERE id = ?",
+        (new_status, resolved_at, feedback_id)
+    )
+    conn.commit()
+    conn.close()
+    return {"success": True, "status": new_status}
+
+
+@app.delete("/feedback/{feedback_id}")
+async def delete_feedback(
+    feedback_id: int,
+    authorization: Optional[str] = Header(None)
+):
+    """Delete a feedback item. Admin only."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+    if not payload.get("is_admin"):
+        return {"success": False, "message": "Admin privileges required."}
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM feedback WHERE id = ?", (feedback_id,))
+    deleted = cursor.rowcount
+    conn.commit()
+    conn.close()
+    if not deleted:
+        return {"success": False, "message": "Feedback not found."}
+    return {"success": True}

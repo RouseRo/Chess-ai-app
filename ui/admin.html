@@ -99,6 +99,9 @@
         <li><a class="nav-link active" onclick="switchTab('dashboard')">Dashboard</a></li>
         <li><a class="nav-link" onclick="switchTab('users')">User Management</a></li>
         <li><a class="nav-link" onclick="switchTab('announcements'); loadAnnouncementsSection();">Announcements</a></li>
+        <li><a class="nav-link" onclick="switchTab('feedback'); loadFeedback();">Feedback <span id="feedback-badge"
+              style="display:none; background:#f44336; color:white; font-size:0.75em; padding:1px 6px; border-radius:10px; margin-left:4px;"></span></a>
+        </li>
         <li><a class="nav-link" onclick="switchTab('models')">AI Models</a></li>
         <li><a class="nav-link" onclick="switchTab('settings')">Settings</a></li>
       </ul>
@@ -216,6 +219,42 @@
             </div>
           </div>
           <button class="btn btn-secondary" style="margin-top:10px;" onclick="loadAnnouncementHistory()">Refresh</button>
+        </div>
+      </section>
+
+      <section id="feedback" class="content-section">
+        <h2 class="page-title">User Feedback</h2>
+        <p class="page-subtitle">Bug reports, suggestions, and feature requests from users</p>
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-secondary" id="fb-filter-all" onclick="loadFeedback('all')"
+                style="font-weight:bold;">All</button>
+              <button class="btn btn-secondary" id="fb-filter-open" onclick="loadFeedback('open')">Open</button>
+              <button class="btn btn-secondary" id="fb-filter-resolved" onclick="loadFeedback('resolved')">Resolved</button>
+            </div>
+            <button class="btn btn-secondary" onclick="loadFeedback(currentFeedbackFilter)">⟳ Refresh</button>
+          </div>
+          <div class="table-responsive">
+            <table id="feedback-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>User</th>
+                  <th>Category</th>
+                  <th>Message</th>
+                  <th>Status</th>
+                  <th>Submitted</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="feedback-tbody">
+                <tr>
+                  <td colspan="7" class="loading">Loading feedback…</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -808,6 +847,109 @@
             })
             .catch(function () { histEl.innerHTML = '<p style="color:#999;">Error loading history.</p>'; });
         }
+
+      var currentFeedbackFilter = 'all';
+
+      function loadFeedback(filter) {
+        filter = filter || 'all';
+        currentFeedbackFilter = filter;
+
+        // Highlight active filter button
+        ['all', 'open', 'resolved'].forEach(function (f) {
+          var btn = document.getElementById('fb-filter-' + f);
+          if (btn) btn.style.fontWeight = (f === filter) ? 'bold' : 'normal';
+        });
+
+        var tbody = document.getElementById('feedback-tbody');
+        tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading feedback\u2026</td></tr>';
+
+        var url = '/feedback/list' + (filter !== 'all' ? '?status=' + filter : '');
+        fetch(url, { headers: { 'Authorization': 'Bearer ' + adminToken } })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (!data.success) {
+              tbody.innerHTML = '<tr><td colspan="7" style="color:#999;">Error: ' + (data.message || 'Failed to load.') + '</td></tr>';
+              return;
+            }
+            var items = data.feedback;
+            if (!items.length) {
+              tbody.innerHTML = '<tr><td colspan="7" style="color:#999; text-align:center;">No feedback found.</td></tr>';
+              // Hide badge
+              var badge = document.getElementById('feedback-badge');
+              if (badge) badge.style.display = 'none';
+              return;
+            }
+
+            // Update badge with count of open items
+            var openCount = items.filter(function (i) { return i.status === 'open'; }).length;
+            var badge = document.getElementById('feedback-badge');
+            if (badge) {
+              if (openCount > 0) { badge.textContent = openCount; badge.style.display = 'inline'; }
+              else { badge.style.display = 'none'; }
+            }
+
+            var catIcons = { bug: '\ud83d\udc1b', suggestion: '\ud83d\udca1', feature: '\u2728' };
+            var html = '';
+            items.forEach(function (item) {
+              var icon = catIcons[item.category] || '';
+              var dateStr = new Date(item.created_at).toLocaleString();
+              var statusBadge = item.status === 'resolved'
+                ? '<span style="background:#4CAF50; color:white; padding:2px 8px; border-radius:10px; font-size:0.82em;">Resolved</span>'
+                : '<span style="background:#f44336; color:white; padding:2px 8px; border-radius:10px; font-size:0.82em;">Open</span>';
+              var resolveLabel = item.status === 'resolved' ? 'Re-open' : 'Resolve';
+              html += '<tr>' +
+                '<td>' + item.id + '</td>' +
+                '<td><strong>' + escapeHtml(item.username) + '</strong></td>' +
+                '<td>' + icon + ' ' + escapeHtml(item.category_label) + '</td>' +
+                '<td style="max-width:320px; white-space:pre-wrap; word-break:break-word;">' + escapeHtml(item.message) + '</td>' +
+                '<td>' + statusBadge + '</td>' +
+                '<td style="white-space:nowrap;">' + dateStr + '</td>' +
+                '<td style="white-space:nowrap;">' +
+                '<button class="btn btn-secondary" style="font-size:0.82em; padding:3px 8px; margin-right:4px;" onclick="toggleFeedbackResolve(' + item.id + ')">' + resolveLabel + '</button>' +
+                '<button class="btn btn-danger" style="font-size:0.82em; padding:3px 8px;" onclick="deleteFeedback(' + item.id + ')">Delete</button>' +
+                '</td>' +
+                '</tr>';
+            });
+            tbody.innerHTML = html;
+          })
+          .catch(function () {
+            tbody.innerHTML = '<tr><td colspan="7" style="color:#999;">Network error loading feedback.</td></tr>';
+          });
+      }
+
+      function toggleFeedbackResolve(id) {
+        fetch('/feedback/' + id + '/resolve', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + adminToken }
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.success) loadFeedback(currentFeedbackFilter);
+          })
+          .catch(function () { alert('Error updating feedback status.'); });
+      }
+
+      function deleteFeedback(id) {
+        if (!confirm('Delete this feedback item?')) return;
+        fetch('/feedback/' + id, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + adminToken }
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.success) loadFeedback(currentFeedbackFilter);
+            else alert('Error: ' + (data.message || 'Delete failed.'));
+          })
+          .catch(function () { alert('Network error deleting feedback.'); });
+      }
+
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
 
     function handleLogout() {
       if (!confirm('Are you sure you want to logout?')) return;

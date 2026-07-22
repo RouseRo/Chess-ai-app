@@ -116,7 +116,8 @@ Chess-ai-app/
 │   ├── chessboard.js        # Chessboard library
 │   ├── chessboard.css       # Styling
 │   ├── img/                 # Chess piece images
-│   ├── nginx.conf           # Nginx configuration
+│   ├── nginx.conf           # Nginx config used in Azure (baked into Docker image)
+│   ├── nginx.local.conf     # Nginx config for local Docker Compose (mounted at runtime)
 │   └── Dockerfile           # UI container config
 │
 ├── data/                      # Shared database directory
@@ -273,6 +274,8 @@ When the Azure infrastructure is already provisioned and you only need to rebuil
 | chess-admin (internal) | `chess-admin.internal.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
 | chess-engine (internal) | `chess-engine.internal.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
 
+> **nginx routing**: `/auth/`, `/community/`, `/rewards/`, and `/feedback/` all proxy to `chess-auth`. Local Docker Compose uses `nginx.local.conf` (routes to `auth-service:8002`); the Azure image bakes `nginx.conf` (routes to the public ACA FQDN).
+
 ### Accessing the Deployed App
 
 Open the app in a browser:
@@ -411,6 +414,16 @@ All clients (Web UI, Admin Dashboard) authenticate through the same auth-service
 4. All API requests include token in Authorization header
 5. Token expires after 24 hours
 
+### Already Logged In Behavior
+
+If a user navigates to `http://localhost:8080` while already holding a valid session token, the page detects the token, verifies it with the auth service, and displays an **"Already Logged In"** screen showing:
+
+- The current username and role
+- **[Go to Admin Panel]** (admins) or **[Go to Game]** (regular users)
+- **[Logout / Switch User]** — calls `/auth/logout`, clears localStorage, and returns to the login form
+
+This allows switching accounts without having to first navigate to the admin panel to click Logout.
+
 ### Auth API Endpoints
 
 | Endpoint | Method | Description |
@@ -444,6 +457,15 @@ All clients (Web UI, Admin Dashboard) authenticate through the same auth-service
 | `/rewards/complete-review` | POST | Record a classic game review completion |
 | `/rewards/my-reviews` | GET | Get review progress and earned badges |
 
+### Feedback API Endpoints
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/feedback/submit` | POST | Any user | Submit a bug report, suggestion, or feature request |
+| `/feedback/list` | GET | Admin only | List all feedback (optional `?status=open\|resolved`) |
+| `/feedback/{id}/resolve` | POST | Admin only | Toggle feedback status between open and resolved |
+| `/feedback/{id}` | DELETE | Admin only | Delete a feedback item |
+
 ### Login Example (API)
 
 ```powershell
@@ -476,6 +498,8 @@ Access at **http://localhost:8080/admin.html**
 |-----|-------------|
 | **Dashboard** | System statistics (users, games, models) |
 | **User Management** | Create, delete, promote/demote users; view online status and game activity |
+| **Announcements** | Send messages to all online players or selected users |
+| **Feedback** | View, resolve, and delete user-submitted bug reports, suggestions, and feature requests |
 | **AI Models** | Configure AI model settings |
 | **Settings** | Change admin password |
 
@@ -579,6 +603,7 @@ Invoke-RestMethod -Uri "http://localhost:8000/move" `
 | **Ask Expert** | Chat with the AI chess expert; quick-action buttons for position analysis |
 | **Stats** | Win/loss/draw record per opponent stored in the browser |
 | **🏅 Rewards** | Badge collection showing which classic games you have reviewed; earn the Grand Scholar award for completing all 6 |
+| **💬 Feedback** | Submit a bug report, suggestion, or feature request to the admin |
 | **Community** | See online users, send public chat, send DMs, send/accept game invitations |
 | **Comm** | Diagnostics log of all API requests and responses (sync events shown in purple) |
 
@@ -750,13 +775,15 @@ services:
 
 | Issue | Solution |
 |-------|----------|
-| Can't login | Check credentials, verify auth service is running |
+| Can't login locally | Ensure `nginx.local.conf` is mounted (recreate with `docker compose up -d --force-recreate chess-ui`) |
+| Login works on Azure but not localhost | nginx.local.conf routes to local services; nginx.conf routes to Azure — confirm the right config is active |
 | "Invalid username or password" | Reset the database and restart auth-service |
 | Token expired | Logout and login again |
 | AI not responding | Check engine logs: `docker logs chess-engine` |
 | Port in use | `docker-compose down` then restart |
 | CORS errors | Ensure all services are running |
 | Database not syncing | Copy manually: `docker cp data/users.db chess-auth-service:/app/data/` |
+| Stuck on admin redirect at localhost:8080 | Click **Logout / Switch User** on the "Already Logged In" screen |
 
 ### Health Checks
 
@@ -925,6 +952,7 @@ CREATE TABLE classic_game_reviews (
 - [ ] ELO rating system
 - [x] Human vs Human multiplayer (browser-to-browser sync)
 - [x] Community chat, DMs, and game invitations
+- [x] User feedback system (bug reports, suggestions, feature requests) with admin review panel
 - [ ] PostgreSQL database
 - [ ] WebSocket for real-time updates (currently uses 2-second polling)
 - [ ] Mobile responsive design
@@ -934,6 +962,7 @@ CREATE TABLE classic_game_reviews (
 - [ ] Email verification with SMTP
 - [ ] Password reset functionality
 - [ ] OAuth2 social login
+- [ ] Make the Admin Login process more secure
 
 ---
 
