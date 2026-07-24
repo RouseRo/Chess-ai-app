@@ -20,12 +20,15 @@ COPY engine ./engine
 # Copy user_data directory for data persistence
 COPY user_data ./user_data
 
-# Expose port
+# Expose ports
 EXPOSE 8002
+EXPOSE 8003
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8002/health || exit 1
 
-# Run the auth service
-CMD ["uvicorn", "auth-service.main:app", "--host", "0.0.0.0", "--port", "8002"]
+# Copy startup script and run both uvicorn processes
+COPY auth-service/start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+CMD ["/bin/sh", "/app/start.sh"]

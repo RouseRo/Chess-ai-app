@@ -13,6 +13,8 @@ import secrets
 import bcrypt
 import jwt
 from datetime import datetime, timezone, timedelta
+from collections import defaultdict
+from threading import Lock
 
 app = FastAPI(title="Chess Auth Service", version="1.0.0")
 
@@ -30,6 +32,34 @@ JWT_SECRET = os.environ.get("JWT_SECRET_KEY", "chess-app-secret-key-change-in-pr
 JWT_EXPIRATION_HOURS = int(os.environ.get("JWT_EXPIRATION_HOURS", "24"))
 DATABASE_PATH = os.environ.get("DATABASE_PATH", "/app/data/users.db")
 DEV_MODE = os.environ.get("CHESS_DEV_MODE", "").lower() == "true"
+
+# Admin login rate limiting (3 failed attempts → 15-min lockout)
+_ADMIN_MAX_ATTEMPTS = 3
+_ADMIN_LOCKOUT_MINUTES = 15
+_admin_failed: dict = defaultdict(list)
+_admin_lock = Lock()
+
+
+def _admin_check_rate(key: str) -> tuple:
+    """Returns (is_locked, remaining_seconds)."""
+    with _admin_lock:
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(minutes=_ADMIN_LOCKOUT_MINUTES)
+        _admin_failed[key] = [t for t in _admin_failed[key] if t > cutoff]
+        if len(_admin_failed[key]) >= _ADMIN_MAX_ATTEMPTS:
+            unlock_at = _admin_failed[key][0] + timedelta(minutes=_ADMIN_LOCKOUT_MINUTES)
+            return True, max(0, int((unlock_at - now).total_seconds()))
+        return False, 0
+
+
+def _admin_record_failure(key: str):
+    with _admin_lock:
+        _admin_failed[key].append(datetime.now(timezone.utc))
+
+
+def _admin_clear(key: str):
+    with _admin_lock:
+        _admin_failed.pop(key, None)
 
 
 # Pydantic models
@@ -176,6 +206,74 @@ def verify_jwt_token(token: str) -> Optional[dict]:
         return None
 
 
+# ── Admin auth app (port 8003 — Docker-internal only, not published to host) ──
+admin_app = FastAPI(title="Chess Admin Auth", version="1.0.0")
+admin_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@admin_app.post("/admin-auth/login")
+async def admin_login(request: LoginRequest):
+    """Admin-only login. Rate limited: 3 failed attempts triggers a 15-min lockout."""
+    username_key = request.username.strip().lower()
+
+    locked, remaining = _admin_check_rate(username_key)
+    if locked:
+        mins, secs = divmod(remaining, 60)
+        return {"success": False, "message": f"Too many failed attempts. Try again in {mins}m {secs}s."}
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT id, username, email, password_hash, is_admin, is_verified
+        FROM users
+        WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)
+    ''', (request.username, request.username))
+    user = cursor.fetchone()
+    conn.close()
+
+    if not user or not bool(user["is_admin"]):
+        _admin_record_failure(username_key)
+        return {"success": False, "message": "Invalid credentials."}
+
+    try:
+        if not bcrypt.checkpw(request.password.encode(), user["password_hash"].encode()):
+            _admin_record_failure(username_key)
+            return {"success": False, "message": "Invalid credentials."}
+    except Exception:
+        _admin_record_failure(username_key)
+        return {"success": False, "message": "Invalid credentials."}
+
+    if not user["is_verified"]:
+        return {"success": False, "message": "Account not verified."}
+
+    _admin_clear(username_key)
+    token = create_token(user["username"], True, user["email"])
+
+    conn2 = get_db()
+    cur2 = conn2.cursor()
+    now = datetime.now(timezone.utc).isoformat()
+    cur2.execute(
+        "UPDATE users SET last_login = ?, last_activity = ?, current_activity = 'online' WHERE username = ?",
+        (now, now, user["username"])
+    )
+    conn2.commit()
+    conn2.close()
+
+    return {
+        "success": True,
+        "message": f"Welcome back, {user['username']}!",
+        "token": token,
+        "username": user["username"],
+        "is_admin": True
+    }
+
+
 # Startup
 @app.on_event("startup")
 async def startup():
@@ -216,7 +314,11 @@ async def login(request: LoginRequest):
     
     if not user:
         return {"success": False, "message": "Invalid username or password."}
-    
+
+    # Admin accounts must use the dedicated secure endpoint (port 8003, Docker-internal only)
+    if bool(user["is_admin"]):
+        return {"success": False, "message": "Please use the admin login.", "use_admin_login": True}
+
     # Verify password
     try:
         if not bcrypt.checkpw(request.password.encode(), user["password_hash"].encode()):

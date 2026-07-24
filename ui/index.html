@@ -709,7 +709,7 @@
             <input id="login-password" type="password" placeholder="Password" style="width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box;">
             <div id="login-error" style="color: red; margin: 10px 0; display: none;"></div>
             <button onclick="handleLogin()" style="width: 100%; padding: 10px; margin: 10px 0; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Login</button>
-            <button onclick="switchToRegister()" style="width: 100%; padding: 10px; background-color: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">Register</button>
+            <button disabled title="Registration is temporarily unavailable" style="width: 100%; padding: 10px; background-color: #b0bec5; color: white; border: none; border-radius: 4px; cursor: not-allowed;">Register (Unavailable)</button>
           </div>
         </div>
       `;
@@ -767,6 +767,35 @@
             } else {
               loadChessboardInterface();
             }
+          } else if (data.use_admin_login) {
+            // Admin accounts are served by the secure internal endpoint (port 8003)
+            logCommMessage('req', 'AUTH', '/admin-auth/login', { username }, null);
+            let _adminStatus = null;
+            fetch('/admin-auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username, password })
+            })
+              .then(r => { _adminStatus = r.status; return r.json(); })
+              .then(adminData => {
+                logCommMessage('res', 'AUTH', '/admin-auth/login', adminData, _adminStatus);
+                if (adminData.success && adminData.token) {
+                  authToken = adminData.token;
+                  currentUser = username;
+                  localStorage.setItem('authToken', authToken);
+                  localStorage.setItem('currentUser', currentUser);
+                  localStorage.setItem('isAdmin', 'true');
+                  window.location.href = 'admin.html';
+                } else {
+                  errorDiv.textContent = adminData.message || 'Admin login failed';
+                  errorDiv.style.display = 'block';
+                }
+              })
+              .catch(err => {
+                logCommMessage('err', 'AUTH', '/admin-auth/login', { message: err.message }, null);
+                errorDiv.textContent = 'Error: ' + err.message;
+                errorDiv.style.display = 'block';
+              });
           } else {
             errorDiv.textContent = data.detail || data.message || 'Login failed';
             errorDiv.style.display = 'block';

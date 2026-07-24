@@ -30,6 +30,8 @@ services:
     container_name: chess-auth-service
     ports:
       - "8002:8002"
+    expose:
+      - "8003"
     environment:
       - DATABASE_PATH=/app/data/users.db
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-chess-app-secret-key}

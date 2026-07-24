@@ -186,6 +186,8 @@ Chess-ai-app/
    | admin | admin123 |
    | testuser | Chess123 |
 
+   > **Note:** Self-registration is currently disabled in the UI pending email verification setup. New user accounts must be created by the admin via the Admin Dashboard.
+
 ## Running the Application
 
 ### Docker Compose (Web Services)
@@ -208,9 +210,10 @@ docker-compose down
 
 | Service | URL | Description |
 |---------|-----|-------------|
-| **Chess UI** | http://localhost:8080 | Login, registration & game interface |
+| **Chess UI** | http://localhost:8080 | Login & game interface |
 | **Admin Dashboard** | http://localhost:8080/admin.html | User management |
-| **Auth API** | http://localhost:8002 | Authentication service |
+| **Auth API** | http://localhost:8002 | Authentication service (regular users) |
+| **Admin Auth API** | port 8003 (Docker-internal only) | Admin login — not published to host |
 | **Admin API** | http://localhost:8001 | Admin service |
 | **Engine API** | http://localhost:8000 | Chess engine |
 
@@ -406,13 +409,17 @@ All clients (Web UI, Admin Dashboard) authenticate through the same auth-service
 
 **Important**: Change the default passwords after first login.
 
-### Authentication Flow
+### Admin Login Flow
 
-1. User enters credentials (login page)
-2. Auth service validates with bcrypt and returns JWT token
-3. Token stored in browser localStorage
-4. All API requests include token in Authorization header
-5. Token expires after 24 hours
+Admin login uses a two-step process that is **transparent to the user** — just enter your credentials in the normal login form:
+
+1. Browser POSTs to `/auth/login` (port 8002)
+2. Auth service detects an admin account and returns a redirect signal (no credentials are validated on port 8002)
+3. Browser automatically retries at `/admin-auth/login`, which nginx proxies to **port 8003** (Docker-internal only — not published to the host)
+4. Port 8003 applies **rate limiting**: 3 failed attempts triggers a 15-minute lockout
+5. On success, the browser is redirected to `admin.html`
+
+Port 8003 has no `ports:` binding in `docker-compose.yml`, so it cannot be reached from outside the Docker network. Only nginx (inside Docker) can proxy to it.
 
 ### Already Logged In Behavior
 
@@ -429,14 +436,15 @@ This allows switching accounts without having to first navigate to the admin pan
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check |
-| `/auth/login` | POST | User login (username OR email) |
-| `/auth/register` | POST | Create account |
+| `/auth/login` | POST | User login — regular accounts only (username OR email) |
+| `/auth/register` | POST | Create account (disabled in UI pending email verification) |
 | `/auth/verify` | POST | Validate token |
 | `/auth/verify-email` | POST | Verify email with token |
 | `/auth/logout` | POST | End session |
 | `/auth/change-password` | POST | Update password |
 | `/auth/refresh` | POST | Refresh JWT token |
 | `/auth/activity` | POST | Update online/playing status |
+| `/admin-auth/login` | POST | **Admin-only login** — served on port 8003 (Docker-internal); rate limited to 3 attempts |
 
 ### Community API Endpoints
 
@@ -928,20 +936,23 @@ CREATE TABLE classic_game_reviews (
 | JWT Authentication | ✅ 24-hour expiry |
 | Unified User Storage | ✅ Single SQLite database |
 | Login by Username/Email | ✅ Supported |
+| Admin Login Rate Limiting | ✅ 3 failed attempts → 15-min lockout |
+| Admin Login Port Isolation | ✅ Separate Docker-internal port 8003 (not published to host) |
 | CORS | ⚠️ Open (for development) |
 | HTTPS | ✅ Enabled on Azure (Container Apps TLS) |
-| Rate Limiting | ❌ Not implemented |
+| User Self-Registration | ⚠️ Disabled in UI (no email verification service configured) |
 
 ### Production Recommendations
 
-1. Change default admin password
-2. Set strong `JWT_SECRET_KEY`
+1. Change the default admin password (`admin123`)
+2. Set a strong `JWT_SECRET_KEY`
 3. Enable HTTPS/TLS
 4. Restrict CORS origins
-5. Add rate limiting
+5. Add rate limiting for regular user login
 6. Use PostgreSQL instead of SQLite
 7. Implement proper logging
 8. Add monitoring/alerting
+9. Implement email sending (SMTP/SendGrid) to re-enable user registration with email verification
 
 ## Future Enhancements
 
@@ -960,9 +971,10 @@ CREATE TABLE classic_game_reviews (
 - [ ] Tournament mode
 - [ ] Game history storage
 - [ ] Email verification with SMTP
+- [x] Make the Admin Login process more secure (rate limiting + Docker-internal port isolation)
 - [ ] Password reset functionality
 - [ ] OAuth2 social login
-- [ ] Make the Admin Login process more secure
+- [ ] User self-registration with email verification (currently disabled)
 
 ---
 
