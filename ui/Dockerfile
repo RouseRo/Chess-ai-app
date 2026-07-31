@@ -6,6 +6,7 @@ RUN npm run build
 # Copy static assets to dist if not handled by build
 RUN cp index.html dist/ || true
 RUN cp admin.html dist/ || true
+RUN cp mobile.html dist/ || true
 RUN [ -d "assets" ] && cp -r assets dist/ || true
 RUN cp chessboard.js dist/ || true
 RUN cp chessboard.css dist/ || true

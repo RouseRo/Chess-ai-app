@@ -59,6 +59,7 @@ The application is for people that are new to the game of chess and want to lear
 - **Unified User Storage**: Single SQLite database shared across all clients
 - **Admin Dashboard**: Manage users and system settings; User Management shows real-time online status, game activity, and a Refresh Status button
 - **Microservices Architecture**: Scalable, modular design with separate services
+- **Mobile Interface**: A dedicated mobile-optimized chess interface (`/mobile.html`) designed for smartphones (Samsung Galaxy S23 and similar); supports touch drag-and-drop, tabbed layout (Game / Setup / History / Expert), JWT auth, and 3-slot local save system
 - **Docker Support**: Complete containerization with docker-compose
 
 ## Requirements
@@ -111,6 +112,7 @@ Chess-ai-app/
 ├── ui/                        # Web interface (Port 8080)
 │   ├── index.html           # Login/Register + game interface (single-page app)
 │   ├── admin.html           # Admin dashboard
+│   ├── mobile.html          # Mobile-optimized chess interface (smartphones)
 │   ├── game-play.ts         # Chessboard drag-and-drop logic (TypeScript)
 │   ├── player-selection.ts  # Player/opening/defense selection logic (TypeScript)
 │   ├── chessboard.js        # Chessboard library
@@ -290,6 +292,7 @@ https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io
 | Page | URL |
 |------|-----|
 | Login / Play Chess | `https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
+| Mobile Interface | `https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io/mobile.html` |
 | Admin Dashboard | `https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io/admin.html` |
 
 The three backend services (`chess-engine`, `chess-auth`, `chess-admin`) are internal-only and not reachable from the public internet — they communicate with each other over the private Container Apps Environment network.
@@ -370,7 +373,7 @@ Things to ask testers to verify:
 - [ ] Community panel shows online users
 - [ ] H vs H sync works between two browser tabs
 - [ ] Admin can see tester activity in the User Management panel
-- [ ] App works on mobile browser (responsive layout)
+- [ ] Mobile interface (`/mobile.html`) loads and plays correctly on smartphone
 
 ---
 
@@ -966,7 +969,7 @@ CREATE TABLE classic_game_reviews (
 - [x] User feedback system (bug reports, suggestions, feature requests) with admin review panel
 - [ ] PostgreSQL database
 - [ ] WebSocket for real-time updates (currently uses 2-second polling)
-- [ ] Mobile responsive design
+- [x] Mobile interface — dedicated mobile-optimized page (`mobile.html`) with touch drag-and-drop, tabbed UI, and 3-slot saves
 - [ ] Opening book integration
 - [ ] Tournament mode
 - [ ] Game history storage

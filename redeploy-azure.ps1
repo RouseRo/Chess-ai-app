@@ -13,6 +13,9 @@ $ACR_SERVER = "$ACR.azurecr.io"
 
 Write-Host "=== Chess AI Redeploy (UI + Container Apps) ===" -ForegroundColor Cyan
 
+# Timestamp tag — forces a new ACA revision on every deploy
+$TAG = Get-Date -Format "yyyyMMdd-HHmm"
+
 # Get ACR credentials
 $ACR_USER = az acr credential show --name $ACR --query username --output tsv
 $ACR_PASS = az acr credential show --name $ACR --query "passwords[0].value" --output tsv
@@ -80,6 +83,7 @@ properties:
       - name: $DATA_SHARE
         storageType: AzureFile
         storageName: $DATA_SHARE
+    revisionSuffix: $TAG
     scale:
       minReplicas: 1
       maxReplicas: 1
@@ -122,6 +126,7 @@ properties:
       - name: $USER_SHARE
         storageType: AzureFile
         storageName: $USER_SHARE
+    revisionSuffix: $TAG
     scale:
       minReplicas: 1
       maxReplicas: 1
@@ -164,6 +169,7 @@ properties:
       - name: $USER_SHARE
         storageType: AzureFile
         storageName: $USER_SHARE
+    revisionSuffix: $TAG
     scale:
       minReplicas: 1
       maxReplicas: 1
@@ -194,6 +200,7 @@ properties:
         resources:
           cpu: 0.25
           memory: 0.5Gi
+    revisionSuffix: $TAG
     scale:
       minReplicas: 1
       maxReplicas: 2
