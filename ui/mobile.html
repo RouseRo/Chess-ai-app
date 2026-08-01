@@ -451,30 +451,111 @@
 
     /* ── Game tab welcome quick-buttons ────────────────────────────────────── */
     .m-quick-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+      display: flex;
+      flex-wrap: wrap;
       gap: 8px;
       margin-bottom: 12px;
     }
     .m-quick-btn {
       display: flex;
-      flex-direction: column;
       align-items: center;
-      gap: 4px;
-      padding: 12px 8px;
+      justify-content: center;
+      width: 50px;
+      height: 50px;
       border: 2px solid #e0e0e0;
-      border-radius: 10px;
+      border-radius: 12px;
       background: white;
       cursor: pointer;
-      font-size: 0.8em;
-      font-weight: 600;
-      color: #333;
+      flex-shrink: 0;
       transition: all 0.15s;
     }
     .m-quick-btn:active { background: #e3f2fd; border-color: #1565c0; }
-    .m-quick-btn .qb-icon { font-size: 1.8em; }
-    .m-quick-btn.qb-primary  { border-color: #2e7d32; background: #f1f8f1; color: #2e7d32; }
-    .m-quick-btn.qb-continue { border-color: #e65100; background: #fff8f0; color: #e65100; }
+    .m-quick-btn .qb-icon { font-size: 1.5em; }
+    .m-quick-btn.qb-primary  { border-color: #2e7d32; background: #f1f8f1; }
+    .m-quick-btn.qb-continue { border-color: #e65100; background: #fff8f0; }
+
+    /* ── Icon-button tooltip ───────────────────────────────────────── */
+    .m-quick-btn {
+      position: relative; /* needed for the ::after tooltip */
+    }
+    /* Tooltip label — appears BELOW the button to avoid being clipped by the
+       scrollable tab panel above */
+    .m-quick-btn::after {
+      content: attr(data-tip);
+      position: absolute;
+      top: calc(100% + 7px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(30,30,30,0.88);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 500;
+      white-space: nowrap;
+      padding: 4px 9px;
+      border-radius: 6px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.18s;
+      z-index: 9999;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    }
+    /* small upward-pointing triangle connecting tooltip to button */
+    .m-quick-btn::before {
+      content: '';
+      position: absolute;
+      top: calc(100% + 1px);
+      left: 50%;
+      transform: translateX(-50%);
+      border: 5px solid transparent;
+      border-bottom-color: rgba(30,30,30,0.88);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.18s;
+      z-index: 9999;
+    }
+    .m-quick-btn:hover::after,
+    .m-quick-btn:hover::before,
+    .m-quick-btn.tip-show::after,
+    .m-quick-btn.tip-show::before {
+      opacity: 1;
+    }
+
+    /* ── Classic game navigation strip ─────────────────────────────────────── */
+    .m-classic-nav-row {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      margin-bottom: 8px;
+    }
+    .m-classic-step {
+      flex: 1;
+      padding: 8px 4px;
+      border: 1.5px solid #c5cae9;
+      border-radius: 8px;
+      background: #e8eaf6;
+      color: #283593;
+      font-size: 1em;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: center;
+    }
+    .m-classic-step:active { background: #c5cae9; }
+    .m-classic-comment {
+      background: #fffde7;
+      border: 1px solid #f9a825;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 0.8em;
+      line-height: 1.55;
+      margin-bottom: 8px;
+      display: none;
+    }
+    .m-classic-progress {
+      text-align: center;
+      font-size: 0.75em;
+      color: #888;
+      margin-bottom: 6px;
+    }
 
     /* ── Board orientation button ───────────────────────────────────────────── */
     .m-board-controls {
@@ -533,6 +614,72 @@
       border: 1px solid #a5d6a7;
       margin-left: 6px;
       vertical-align: middle;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════════════
+       LANDSCAPE MODE  (device held horizontally)
+       Board is placed on the left; tabs fill the right column.
+    ══════════════════════════════════════════════════════════════════════════ */
+    @media (orientation: landscape) {
+
+      /* Auth screen: compress vertically so the card fits without scrolling */
+      .auth-screen {
+        padding: 8px 16px;
+        gap: 0;
+        justify-content: center;
+      }
+      .auth-logo       { font-size: 2em;  margin-bottom: 2px; }
+      .auth-title      { font-size: 1.1em; }
+      .auth-subtitle   { font-size: 0.78em; margin-bottom: 12px; }
+      .auth-card       { padding: 12px 16px; max-width: 320px; }
+      .auth-card h3    { margin-bottom: 10px; font-size: 1em; }
+      .auth-field      { padding: 8px 12px; margin-bottom: 7px; font-size: 0.9em; }
+      .auth-btn        { padding: 10px; font-size: 0.9em; margin-bottom: 6px; }
+
+      /* ── Game body: CSS Grid — board left, tab-nav+content right ── */
+      .m-body {
+        display: grid;
+        grid-template-columns: auto 1fr; /* board col auto-sizes; rest fills right */
+        grid-template-rows: auto 1fr;    /* tab-nav height on top, content below */
+        overflow: hidden;
+        flex: 1; /* still fills space inside #app flex column */
+      }
+
+      /* Board section spans both grid rows on the left column */
+      .m-board-section {
+        grid-column: 1;
+        grid-row: 1 / 3;
+        border-bottom: none;
+        border-right: 1px solid #e0e0e0;
+        padding: 4px 6px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        justify-content: flex-start;
+        align-items: center;
+      }
+
+      /* Compact info strip to save vertical space in the left column */
+      .m-info-strip    { padding: 2px 4px 4px; gap: 2px; max-width: none; }
+      .m-game-status   { font-size: 0.76em; }
+      .m-players-row   { font-size: 0.7em; }
+      .m-captured-row  { font-size: 0.7em; }
+      .m-board-controls { max-width: none; }
+
+      /* Tab nav goes to right column, first row */
+      .m-tab-nav {
+        grid-column: 2;
+        grid-row: 1;
+      }
+
+      /* Tab area goes to right column, second row */
+      .m-tab-area {
+        grid-column: 2;
+        grid-row: 2;
+        overflow: hidden;
+      }
+
+      /* Toast: keep above bottom edge in landscape (no bottom nav bar) */
+      .m-toast { bottom: 12px; }
     }
   </style>
 </head>
@@ -831,17 +978,23 @@
             <!-- ── GAME tab ─────────────────────────────────────────── -->
             <div id="m-panel-game" class="m-tab-panel">
               <div class="m-quick-grid">
-                <button class="m-quick-btn qb-primary" onclick="startNewGameM()">
-                  <span class="qb-icon">♙</span>New Game
+                <button class="m-quick-btn qb-primary" onclick="startNewGameM()" data-tip="New Game" title="New Game">
+                  <span class="qb-icon">♙</span>
                 </button>
-                <button class="m-quick-btn qb-continue" onclick="loadSavedGameM()">
-                  <span class="qb-icon">📂</span>Load Save
+                <button class="m-quick-btn qb-continue" onclick="loadSavedGameM()" data-tip="Load Save" title="Load Save">
+                  <span class="qb-icon">📂</span>
                 </button>
-                <button class="m-quick-btn" onclick="saveGameM()">
-                  <span class="qb-icon">💾</span>Save Game
+                <button class="m-quick-btn" onclick="saveGameM()" data-tip="Save Game" title="Save Game">
+                  <span class="qb-icon">💾</span>
                 </button>
-                <button class="m-quick-btn" onclick="switchMobileTab('setup')">
-                  <span class="qb-icon">⚙</span>Player Setup
+                <button class="m-quick-btn" onclick="switchMobileTab('setup')" data-tip="Player Setup" title="Player Setup">
+                  <span class="qb-icon">⚙️</span>
+                </button>
+                <button class="m-quick-btn" onclick="openClassicGamesM()" data-tip="Classic Games" title="Classic Games">
+                  <span class="qb-icon">🏛️</span>
+                </button>
+                <button class="m-quick-btn" onclick="openPracticeM()" data-tip="Practice Openings" title="Practice Openings">
+                  <span class="qb-icon">🎯</span>
                 </button>
               </div>
               <!-- Live status log -->
@@ -907,6 +1060,47 @@
               <button class="m-btn m-btn-success" onclick="startNewGameM()">♙ Start New Game</button>
             </div>
 
+            <!-- ── CLASSIC GAMES section ────────────────────────── -->
+            <div class="m-setup-section" id="m-classic-section">
+              <h4>🏛️ Classic Games</h4>
+              <label class="m-field-label">Select a Game</label>
+              <select id="m-classic-select" class="m-field-select" onchange="loadClassicGameM()">
+                <option value="">— choose a game —</option>
+                <option value="opera-game">The Opera Game — Morphy, 1858</option>
+                <option value="immortal-game">The Immortal Game — Anderssen, 1851</option>
+                <option value="evergreen-game">The Evergreen Game — Anderssen, 1852</option>
+                <option value="game-of-century">Game of the Century — Fischer, 1956</option>
+                <option value="fischer-spassky-g6">Fischer vs Spassky Game 6, 1972</option>
+                <option value="kasparov-topalov">Kasparov's Immortal, 1999</option>
+              </select>
+              <div id="m-classic-nav" style="display:none;">
+                <div class="m-classic-progress" id="m-classic-progress">Move 0</div>
+                <div class="m-classic-nav-row">
+                  <button class="m-classic-step" onclick="stepClassicM(-9999)">⏮</button>
+                  <button class="m-classic-step" onclick="stepClassicM(-1)">◀</button>
+                  <button class="m-classic-step" onclick="stepClassicM(1)">▶</button>
+                  <button class="m-classic-step" onclick="stepClassicM(9999)">⏭</button>
+                </div>
+                <div class="m-classic-comment" id="m-classic-comment"></div>
+              </div>
+            </div>
+
+            <!-- ── PRACTICE section ────────────────────────────── -->
+            <div class="m-setup-section" id="m-practice-section">
+              <h4>🎯 Practice Openings</h4>
+              <div class="m-expert-quick-btns">
+                <button class="m-expert-quick" onclick="loadPracticeM('ruy-lopez')">Ruy López</button>
+                <button class="m-expert-quick" onclick="loadPracticeM('sicilian')">Sicilian</button>
+                <button class="m-expert-quick" onclick="loadPracticeM('italian')">Italian Game</button>
+                <button class="m-expert-quick" onclick="loadPracticeM('queens-gambit')">Queen's Gambit</button>
+                <button class="m-expert-quick" onclick="loadPracticeM('kings-indian')">King's Indian</button>
+                <button class="m-expert-quick" onclick="loadPracticeM('french')">French Defense</button>
+                <button class="m-expert-quick" onclick="loadPracticeM('caro-kann')">Caro-Kann</button>
+                <button class="m-expert-quick" onclick="loadPracticeM('kings-gambit')">King's Gambit</button>
+              </div>
+              <div id="m-practice-info" style="font-size:0.8em;color:#555;margin-top:8px;line-height:1.5;"></div>
+            </div>
+
             <!-- ── HISTORY tab ──────────────────────────────────────── -->
             <div id="m-panel-history" class="m-tab-panel">
               <div id="m-move-history-content">
@@ -939,7 +1133,15 @@
     // Board Initialization & Handlers
     // ────────────────────────────────────────────────────────────────────────
     function calcBoardSize() {
-      // Use 4px margin each side; cap at 404px (S23 Ultra max physical width in CSS px)
+      const isLandscape = window.innerWidth > window.innerHeight;
+      if (isLandscape) {
+        // Height-constrained: reserve header (48px) + info strip (~80px) + padding (12px)
+        const maxByHeight = window.innerHeight - 48 - 80 - 12;
+        // Don't use more than 48% of screen width (leaves room for tab panel)
+        const maxByWidth = Math.floor(window.innerWidth * 0.48) - 12;
+        return Math.max(120, Math.min(maxByHeight, maxByWidth));
+      }
+      // Portrait: width-constrained; cap at 404px (S23 Ultra max physical width in CSS px)
       return Math.min(window.innerWidth - 8, 404);
     }
 
@@ -1494,6 +1696,245 @@
       commMessages.push({ ts: new Date().toLocaleTimeString(), direction, service, endpoint, data: sanitized, statusCode });
       if (commMessages.length > 100) commMessages.shift();
     }
+
+          // ────────────────────────────────────────────────────────────────────────
+          // Classic Games — data & navigation
+          // ────────────────────────────────────────────────────────────────────────
+          let classicMoveIndex = -1;   // -1 = start position
+          let classicMoves = [];   // parsed SAN move array
+          let classicChess = null; // chess.js replay instance
+          let classicComments = {};   // {moveIndex: comment}
+
+          const MOBILE_CLASSIC_GAMES = {
+            'opera-game': {
+              name: 'The Opera Game',
+              sub: 'Morphy vs Duke Karl & Count · Paris, 1858',
+              key: 'opera-game',
+              pgn: '1.e4 e5 2.Nf3 d6 3.d4 Bg4 4.dxe5 Bxf3 5.Qxf3 dxe5 6.Bc4 Nf6 7.Qb3 Qe7 8.Nc3 c6 9.Bg5 b5 10.Nxb5 cxb5 11.Bxb5+ Nbd7 12.O-O-O Rd8 13.Rxd7 Rxd7 14.Rd1 Qe6 15.Bxd7+ Nxd7 16.Qb8+ Nxb8 17.Rd8#',
+              comments: {
+                0: 'Morphy demolishes an undeveloped army in 17 moves. A masterpiece of rapid development, piece activity, and attack.',
+                19: '10.Nxb5!! — the sacrificial blow! Morphy tears open the queenside to expose the Black king.',
+                25: '13.Rxd7!! — a rook sacrifice! White gives the exchange to destroy Black\'s defensive structure.',
+                31: '16.Qb8+!! — the queen sacrifice! Forces 16…Nxb8, after which Rd8# is unstoppable.',
+                33: '17.Rd8# — checkmate! Morphy sacrificed a knight, rook, and queen in 17 moves.'
+              }
+            },
+            'immortal-game': {
+              name: 'The Immortal Game',
+              sub: 'Anderssen vs Kieseritzky · London, 1851',
+              key: 'immortal-game',
+              pgn: '1.e4 e5 2.f4 exf4 3.Bc4 Qh4+ 4.Kf1 b5 5.Bxb5 Nf6 6.Nf3 Qh6 7.d3 Nh5 8.Nh4 Qg5 9.Nf5 c6 10.g4 Nf6 11.Rg1 cxb5 12.h4 Qg6 13.h5 Qg5 14.Qf3 Ng8 15.Bxf4 Qf6 16.Nc3 Bc5 17.Nd5 Qxb2 18.Bd6 Bxg1 19.e5 Qxa1+ 20.Ke2 Na6 21.Nxg7+ Kd8 22.Qf6+ Nxf6 23.Be7#',
+              comments: {
+                0: 'Anderssen gives up both rooks, a bishop, and his queen for a mating attack. Kieseritzky telegraphed the moves to Paris immediately.',
+                7: '4.Kf1!! — deliberately steps into check, sacrificing the right to castle to keep the attack alive.',
+                21: '11.Rg1!! — the first rook sacrifice! Anderssen refuses to retreat a single piece.',
+                35: '18.Bd6!! — a stunning bishop sacrifice to keep the mating net intact.',
+                43: '22.Qf6+!! — the queen sacrifice! After 22…Nxf6, Be7# ends the game.',
+                45: '23.Be7# — checkmate! Two rooks, a bishop, and a queen sacrificed for this finale.'
+              }
+            },
+            'evergreen-game': {
+              name: 'The Evergreen Game',
+              sub: 'Anderssen vs Dufresne · Berlin, 1852',
+              key: 'evergreen-game',
+              pgn: '1.e4 e5 2.Nf3 Nc6 3.Bc4 Bc5 4.b4 Bxb4 5.c3 Ba5 6.d4 exd4 7.O-O d3 8.Qb3 Qf6 9.e5 Qg6 10.Re1 Nge7 11.Ba3 b5 12.Qxb5 Rb8 13.Qa4 Bb6 14.Nbd2 Bb7 15.Ne4 Qf5 16.Bxd3 Qh5 17.Nf6+ gxf6 18.exf6 Rg8 19.Rad1 Qxf3 20.Rxe7+ Nxe7 21.Qxd7+ Kxd7 22.Bf5+ Ke8 23.Bd7+ Kf8 24.Bxe7#',
+              comments: {
+                0: 'The Evergreen Game — 170+ years later still celebrated as one of the most beautiful games ever played.',
+                7: '4.b4! — the Evans Gambit! A pawn sacrificed for explosive development.',
+                33: '17.Nf6+!! — the combination begins! The knight tears open Black\'s king cover.',
+                39: '20.Rxe7+!! — rook sacrifice to expose the king.',
+                41: '21.Qxd7+!! — the queen sacrifice! Leads to a forced mate.',
+                47: '24.Bxe7# — checkmate! Steinitz called this "the most beautiful game ever played."'
+              }
+            },
+            'game-of-century': {
+              name: 'Game of the Century',
+              sub: 'Byrne vs Fischer · New York, 1956',
+              key: 'game-of-century',
+              pgn: '1.Nf3 Nf6 2.c4 g6 3.Nc3 Bg7 4.d4 O-O 5.Bf4 d5 6.Qb3 dxc4 7.Qxc4 c6 8.e4 Nbd7 9.Rd1 Nb6 10.Qc5 Bg4 11.Bg5 Na4 12.Qa3 Nxc3 13.bxc3 Nxe4 14.Bxe7 Qb6 15.Bc4 Nxc3 16.Bc5 Rfe8+ 17.Kf1 Be6 18.Bxb6 Bxc4+ 19.Kg1 Ne2+ 20.Kf1 Nxd4+ 21.Kg1 Ne2+ 22.Kf1 Nc3+ 23.Kg1 axb6 24.Qb4 Ra4 25.Qxb6 Nxd1 26.h3 Rxa2 27.Kh2 Nxf2 28.Re1 Rxe1 29.Qd8+ Bf8 30.Nxe1 Bd5 31.Nf3 Ne4 32.Qb8 b5 33.h4 h5 34.Ne5 Kg7 35.Kg1 Bc5+ 36.Kf1 Ng3+ 37.Ke1 Bb4+ 38.Kd1 Bb3+ 39.Kc1 Ne2+ 40.Kb1 Nc3+ 41.Kc1 Rc2#',
+              comments: {
+                0: 'Bobby Fischer was only 13 years old! His queen sacrifice on move 17 is one of the most celebrated combinations in history.',
+                34: '17…Be6!! — the queen sacrifice! Fischer offers his queen for a bishop and rook, then unleashes a brilliant combination.',
+                82: '41…Rc2# — checkmate! Hans Kmoch immediately dubbed it "The Game of the Century."'
+              }
+            },
+            'fischer-spassky-g6': {
+              name: 'Fischer vs Spassky, Game 6',
+              sub: 'World Championship · Reykjavik, 1972',
+              key: 'fischer-spassky-g6',
+              pgn: '1.c4 e6 2.Nf3 d5 3.d4 Nf6 4.Nc3 Be7 5.Bg5 O-O 6.e3 h6 7.Bh4 b6 8.cxd5 Nxd5 9.Bxe7 Qxe7 10.Nxd5 exd5 11.Rc1 Be6 12.Qa4 c5 13.Qa3 Rc8 14.Bb5 a6 15.dxc5 bxc5 16.O-O Ra7 17.Be2 Nd7 18.Nd4 Qf8 19.Nxe6 fxe6 20.e4 d4 21.f4 Qe7 22.e5 Rb8 23.Bc4 Kh8 24.Qh3 Nf8 25.b3 a5 26.f5 exf5 27.Rxf5 Nh7 28.Rcf1 Qd8 29.Qg3 Re7 30.h4 Rbb7 31.e6 Rbc7 32.Qe5 Qe8 33.a4 Qd8 34.R1f2 Qe8 35.R2f3 Qd8 36.Bd3 Qe8 37.Qe4 Nf6 38.Rxf6 gxf6 39.Rxf6 Kg8 40.Bc4 Kh8 41.Qf4',
+              comments: {
+                0: 'From the 1972 World Championship. A positional masterpiece — Spassky reportedly stood and applauded when he resigned.',
+                37: '19.Nxe6! — captures, leaving Black with doubled isolated e-pawns as a permanent weakness.',
+                51: '26.f5! — the kingside pawn storm begins. Every White move has a clear strategic purpose.',
+                75: '38.Rxf6!! — rook sacrifice to remove Black\'s defensive knight.',
+                81: '41.Qf4 — Spassky resigns and stands to applaud. Fischer called this his favourite game.'
+              }
+            },
+            'kasparov-topalov': {
+              name: "Kasparov's Immortal",
+              sub: 'Kasparov vs Topalov · Wijk aan Zee, 1999',
+              key: 'kasparov-topalov',
+              pgn: '1.e4 d6 2.d4 Nf6 3.Nc3 g6 4.Be3 Bg7 5.Qd2 c6 6.f3 b5 7.Nge2 Nbd7 8.Bh6 Bxh6 9.Qxh6 Bb7 10.a3 e5 11.O-O-O Qe7 12.Kb1 a6 13.Nc1 O-O-O 14.Nb3 exd4 15.Rxd4 c5 16.Rd1 Nb6 17.g3 Kb8 18.Na5 Ba8 19.Bh3 d5 20.Qf4+ Ka7 21.Rhe1 d4 22.Nd5 Nbxd5 23.exd5 Qd6 24.Rxd4 cxd4 25.Re7+ Kb6 26.Qxd4+ Kxa5 27.b4+ Ka4 28.Qc3 Qxd5 29.Ra7 Bb7 30.Rxb7 Qc4 31.Qxf6 Kxa3 32.Qxa6+ Kxb4 33.c3+ Kxc3 34.Qa1+ Kd2 35.Qb2+ Kd1 36.Bf1 Rd2 37.Rd7 Rxd7 38.Bxc4 bxc4 39.Qxh8 Rd3 40.Qa8 c3 41.Qa4+ Ke1 42.f4 f5 43.Kc1 Rd2 44.Qa7',
+              comments: {
+                0: 'Many consider this the greatest game of the computer era. Kasparov hunts Topalov\'s king across the entire board over 20 moves.',
+                47: '24.Rxd4!! — the rook sacrifice that starts the king hunt! Topalov\'s king will be chased from b8 to e1.',
+                51: '26.Qxd4+ — the king hunt begins: b6 → a5 → a4 → a3 → b4 → c3 → d2 → d1 → e1.',
+                87: '44.Qa7 — Topalov resigns. The king\'s 9-square odyssey ends in defeat.'
+              }
+            }
+          };
+
+          function parsePgn(pgn) {
+            // Strip move numbers (e.g. "1." "12.") and return SAN move array
+            return pgn.replace(/\d+\./g, ' ').trim().split(/\s+/).filter(Boolean);
+          }
+
+          function openClassicGamesM() {
+            switchMobileTab('setup');
+            setTimeout(() => {
+              const el = document.getElementById('m-classic-section');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }, 80);
+          }
+
+          function loadClassicGameM() {
+            const sel = document.getElementById('m-classic-select');
+            if (!sel) return;
+            const key = sel.value;
+            const nav = document.getElementById('m-classic-nav');
+            if (!key) { if (nav) nav.style.display = 'none'; return; }
+
+            const data = MOBILE_CLASSIC_GAMES[key];
+            if (!data) return;
+
+            classicMoves = parsePgn(data.pgn);
+            classicComments = data.comments || {};
+            classicChess = new Chess();
+            classicMoveIndex = -1;
+
+            if (nav) nav.style.display = '';
+            renderClassicStep();
+            showToast(data.name + ' loaded');
+          }
+
+          function stepClassicM(dir) {
+            if (!classicMoves.length || !classicChess) return;
+
+            if (dir <= -9999) {
+              // Jump to start
+              classicChess = new Chess();
+              classicMoveIndex = -1;
+            } else if (dir >= 9999) {
+              // Jump to end
+              classicChess = new Chess();
+              classicMoveIndex = -1;
+              for (let i = 0; i < classicMoves.length; i++) {
+                const result = classicChess.move(classicMoves[i], { sloppy: true });
+                if (result) classicMoveIndex = i;
+                else break;
+              }
+            } else if (dir === 1 && classicMoveIndex < classicMoves.length - 1) {
+              const next = classicMoves[classicMoveIndex + 1];
+              const result = classicChess.move(next, { sloppy: true });
+              if (result) classicMoveIndex++;
+            } else if (dir === -1 && classicMoveIndex >= 0) {
+              // Step back: rebuild from scratch
+              const target = classicMoveIndex - 1;
+              classicChess = new Chess();
+              classicMoveIndex = -1;
+              for (let i = 0; i <= target; i++) {
+                const result = classicChess.move(classicMoves[i], { sloppy: true });
+                if (result) classicMoveIndex = i;
+                else break;
+              }
+            }
+
+            renderClassicStep();
+          }
+
+          function renderClassicStep() {
+            if (!board || !classicChess) return;
+            board.position(classicChess.fen());
+
+            // Progress label
+            const prog = document.getElementById('m-classic-progress');
+            if (prog) {
+              const total = classicMoves.length;
+              const cur = classicMoveIndex + 1;
+              const moveSan = classicMoveIndex >= 0 ? classicMoves[classicMoveIndex] : 'Start';
+              prog.textContent = classicMoveIndex < 0
+                ? `Start position · ${total} moves`
+                : `Move ${cur}/${total} — ${moveSan}`;
+            }
+
+            // Commentary
+            const commentEl = document.getElementById('m-classic-comment');
+            if (commentEl) {
+              // Check for comment at this move index (0-based, matching desktop)
+              const idx = classicMoveIndex < 0 ? 0 : classicMoveIndex + 1;
+              const comment = classicComments[classicMoveIndex < 0 ? 0 : classicMoveIndex];
+              if (comment) {
+                commentEl.textContent = comment;
+                commentEl.style.display = '';
+              } else {
+                commentEl.style.display = 'none';
+              }
+            }
+          }
+
+          // ────────────────────────────────────────────────────────────────────────
+          // Practice Openings
+          // ────────────────────────────────────────────────────────────────────────
+          const PRACTICE_OPENINGS = {
+            'ruy-lopez': { name: 'Ruy López', moves: ['e4', 'e5', 'Nf3', 'Nc6', 'Bb5'], info: 'One of the most classical openings. White pins Black\'s knight to pressure the e5 pawn.' },
+            'italian': { name: 'Italian Game', moves: ['e4', 'e5', 'Nf3', 'Nc6', 'Bc4'], info: 'Rapid development and kingside pressure. Rich strategic middlegames.' },
+            'sicilian': { name: 'Sicilian Defense', moves: ['e4', 'c5'], info: 'The most popular reply to 1.e4 — asymmetric fight for the centre.' },
+            'queens-gambit': { name: "Queen's Gambit", moves: ['d4', 'd5', 'c4'], info: 'White offers a queenside pawn for central control. One of chess\'s most respected openings.' },
+            'kings-indian': { name: "King's Indian", moves: ['d4', 'Nf6', 'c4', 'g6', 'Nc3', 'Bg7', 'e4', 'd6', 'Nf3', 'O-O'], info: 'Black allows a broad White centre, then strikes back dynamically.' },
+            'french': { name: 'French Defense', moves: ['e4', 'e6', 'd4', 'd5'], info: 'Solid pawn chain. Rich strategic battles with clear pawn structures.' },
+            'caro-kann': { name: 'Caro-Kann', moves: ['e4', 'c6', 'd4', 'd5'], info: 'Solid and resilient. Black prepares …d5 keeping the dark-squared bishop free.' },
+            'kings-gambit': { name: "King's Gambit", moves: ['e4', 'e5', 'f4'], info: 'A bold romantic-era gambit. White offers the f-pawn for rapid development and attack.' }
+          };
+
+          function loadPracticeM(key) {
+            const data = PRACTICE_OPENINGS[key];
+            if (!data || !board) return;
+
+            const g = new Chess();
+            for (const m of data.moves) {
+              const result = g.move(m, { sloppy: true });
+              if (!result) break;
+            }
+            board.position(g.fen());
+            game.load(g.fen());
+
+            const infoEl = document.getElementById('m-practice-info');
+            if (infoEl) infoEl.innerHTML = `<strong>${data.name}</strong> — ${escapeHtml(data.info)}`;
+
+            logStatus(`Practice: ${data.name}`, 'info');
+            showToast(data.name);
+          }
+
+          // ────────────────────────────────────────────────────────────────────────
+          // Icon-button tooltips — show on hover (CSS) and on tap (JS)
+          // ────────────────────────────────────────────────────────────────────────
+          (function () {
+            let _tipTimer = null;
+            document.addEventListener('touchstart', function (e) {
+              // Clear any previously visible tooltip
+              document.querySelectorAll('.m-quick-btn.tip-show').forEach(b => b.classList.remove('tip-show'));
+              clearTimeout(_tipTimer);
+
+              const btn = e.target.closest('.m-quick-btn[data-tip]');
+              if (!btn) return;
+
+              // Show tooltip immediately on touch
+              btn.classList.add('tip-show');
+              // Auto-hide after 1.4 s (action fires on touchend, so tooltip acts as label feedback)
+              _tipTimer = setTimeout(() => btn.classList.remove('tip-show'), 1400);
+            }, { passive: true });
+          }());
 
     // ────────────────────────────────────────────────────────────────────────
     // Bootstrap
