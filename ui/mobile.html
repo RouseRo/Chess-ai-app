@@ -968,6 +968,7 @@
           <nav class="m-tab-nav">
             <button class="m-tab-btn" id="m-tab-btn-game"    onclick="switchMobileTab('game')">♟ Game</button>
             <button class="m-tab-btn" id="m-tab-btn-setup"   onclick="switchMobileTab('setup')">⚙ Setup</button>
+            <button class="m-tab-btn" id="m-tab-btn-learn"   onclick="switchMobileTab('learn')">📚 Learn</button>
             <button class="m-tab-btn" id="m-tab-btn-history" onclick="switchMobileTab('history')">📋 History</button>
             <button class="m-tab-btn" id="m-tab-btn-expert"  onclick="switchMobileTab('expert')">🧠 Expert</button>
           </nav>
@@ -1060,45 +1061,46 @@
               <button class="m-btn m-btn-success" onclick="startNewGameM()">♙ Start New Game</button>
             </div>
 
-            <!-- ── CLASSIC GAMES section ────────────────────────── -->
-            <div class="m-setup-section" id="m-classic-section">
-              <h4>🏛️ Classic Games</h4>
-              <label class="m-field-label">Select a Game</label>
-              <select id="m-classic-select" class="m-field-select" onchange="loadClassicGameM()">
-                <option value="">— choose a game —</option>
-                <option value="opera-game">The Opera Game — Morphy, 1858</option>
-                <option value="immortal-game">The Immortal Game — Anderssen, 1851</option>
-                <option value="evergreen-game">The Evergreen Game — Anderssen, 1852</option>
-                <option value="game-of-century">Game of the Century — Fischer, 1956</option>
-                <option value="fischer-spassky-g6">Fischer vs Spassky Game 6, 1972</option>
-                <option value="kasparov-topalov">Kasparov's Immortal, 1999</option>
-              </select>
-              <div id="m-classic-nav" style="display:none;">
-                <div class="m-classic-progress" id="m-classic-progress">Move 0</div>
-                <div class="m-classic-nav-row">
-                  <button class="m-classic-step" onclick="stepClassicM(-9999)">⏮</button>
-                  <button class="m-classic-step" onclick="stepClassicM(-1)">◀</button>
-                  <button class="m-classic-step" onclick="stepClassicM(1)">▶</button>
-                  <button class="m-classic-step" onclick="stepClassicM(9999)">⏭</button>
+            <!-- ── LEARN tab (Classic Games + Practice Openings) ───── -->
+            <div id="m-panel-learn" class="m-tab-panel">
+              <div class="m-setup-section" id="m-classic-section">
+                <h4>🏛️ Classic Games</h4>
+                <label class="m-field-label">Select a Game</label>
+                <select id="m-classic-select" class="m-field-select" onchange="loadClassicGameM()">
+                  <option value="">— choose a game —</option>
+                  <option value="opera-game">The Opera Game — Morphy, 1858</option>
+                  <option value="immortal-game">The Immortal Game — Anderssen, 1851</option>
+                  <option value="evergreen-game">The Evergreen Game — Anderssen, 1852</option>
+                  <option value="game-of-century">Game of the Century — Fischer, 1956</option>
+                  <option value="fischer-spassky-g6">Fischer vs Spassky Game 6, 1972</option>
+                  <option value="kasparov-topalov">Kasparov's Immortal, 1999</option>
+                </select>
+                <div id="m-classic-nav" style="display:none;">
+                  <div class="m-classic-progress" id="m-classic-progress">Move 0</div>
+                  <div class="m-classic-nav-row">
+                    <button class="m-classic-step" onclick="stepClassicM(-9999)">⏮</button>
+                    <button class="m-classic-step" onclick="stepClassicM(-1)">◀</button>
+                    <button class="m-classic-step" onclick="stepClassicM(1)">▶</button>
+                    <button class="m-classic-step" onclick="stepClassicM(9999)">⏭</button>
+                  </div>
+                  <div class="m-classic-comment" id="m-classic-comment"></div>
                 </div>
-                <div class="m-classic-comment" id="m-classic-comment"></div>
               </div>
-            </div>
 
-            <!-- ── PRACTICE section ────────────────────────────── -->
-            <div class="m-setup-section" id="m-practice-section">
-              <h4>🎯 Practice Openings</h4>
-              <div class="m-expert-quick-btns">
-                <button class="m-expert-quick" onclick="loadPracticeM('ruy-lopez')">Ruy López</button>
-                <button class="m-expert-quick" onclick="loadPracticeM('sicilian')">Sicilian</button>
-                <button class="m-expert-quick" onclick="loadPracticeM('italian')">Italian Game</button>
-                <button class="m-expert-quick" onclick="loadPracticeM('queens-gambit')">Queen's Gambit</button>
-                <button class="m-expert-quick" onclick="loadPracticeM('kings-indian')">King's Indian</button>
-                <button class="m-expert-quick" onclick="loadPracticeM('french')">French Defense</button>
-                <button class="m-expert-quick" onclick="loadPracticeM('caro-kann')">Caro-Kann</button>
-                <button class="m-expert-quick" onclick="loadPracticeM('kings-gambit')">King's Gambit</button>
+              <div class="m-setup-section" id="m-practice-section">
+                <h4>🎯 Practice Openings</h4>
+                <div class="m-expert-quick-btns">
+                  <button class="m-expert-quick" onclick="loadPracticeM('ruy-lopez')">Ruy López</button>
+                  <button class="m-expert-quick" onclick="loadPracticeM('sicilian')">Sicilian</button>
+                  <button class="m-expert-quick" onclick="loadPracticeM('italian')">Italian Game</button>
+                  <button class="m-expert-quick" onclick="loadPracticeM('queens-gambit')">Queen's Gambit</button>
+                  <button class="m-expert-quick" onclick="loadPracticeM('kings-indian')">King's Indian</button>
+                  <button class="m-expert-quick" onclick="loadPracticeM('french')">French Defense</button>
+                  <button class="m-expert-quick" onclick="loadPracticeM('caro-kann')">Caro-Kann</button>
+                  <button class="m-expert-quick" onclick="loadPracticeM('kings-gambit')">King's Gambit</button>
+                </div>
+                <div id="m-practice-info" style="font-size:0.8em;color:#555;margin-top:8px;line-height:1.5;"></div>
               </div>
-              <div id="m-practice-info" style="font-size:0.8em;color:#555;margin-top:8px;line-height:1.5;"></div>
             </div>
 
             <!-- ── HISTORY tab ──────────────────────────────────────── -->
@@ -1791,11 +1793,7 @@
           }
 
           function openClassicGamesM() {
-            switchMobileTab('setup');
-            setTimeout(() => {
-              const el = document.getElementById('m-classic-section');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
-            }, 80);
+            switchMobileTab('learn');
           }
 
           function loadClassicGameM() {
@@ -1803,7 +1801,12 @@
             if (!sel) return;
             const key = sel.value;
             const nav = document.getElementById('m-classic-nav');
-            if (!key) { if (nav) nav.style.display = 'none'; return; }
+            const practice = document.getElementById('m-practice-section');
+            if (!key) {
+              if (nav) nav.style.display = 'none';
+              if (practice) practice.style.display = '';
+              return;
+            }
 
             const data = MOBILE_CLASSIC_GAMES[key];
             if (!data) return;
@@ -1814,6 +1817,7 @@
             classicMoveIndex = -1;
 
             if (nav) nav.style.display = '';
+            if (practice) practice.style.display = 'none';
             renderClassicStep();
             showToast(data.name + ' loaded');
           }
@@ -1871,12 +1875,11 @@
             // Commentary
             const commentEl = document.getElementById('m-classic-comment');
             if (commentEl) {
-              // Check for comment at this move index (0-based, matching desktop)
-              const idx = classicMoveIndex < 0 ? 0 : classicMoveIndex + 1;
-              const comment = classicComments[classicMoveIndex < 0 ? 0 : classicMoveIndex];
+              // Keys are 1-based steps: 0 = intro, N = after the Nth halfmove
+              const comment = classicComments[classicMoveIndex + 1];
               if (comment) {
                 commentEl.textContent = comment;
-                commentEl.style.display = '';
+                commentEl.style.display = 'block';
               } else {
                 commentEl.style.display = 'none';
               }
@@ -1886,6 +1889,15 @@
           // ────────────────────────────────────────────────────────────────────────
           // Practice Openings
           // ────────────────────────────────────────────────────────────────────────
+                    function openPracticeM() {
+                      switchMobileTab('learn');
+                      requestAnimationFrame(() => {
+                        const panel = document.getElementById('m-panel-learn');
+                        const el = document.getElementById('m-practice-section');
+                        if (panel && el) panel.scrollTop = el.offsetTop;
+                      });
+                    }
+
           const PRACTICE_OPENINGS = {
             'ruy-lopez': { name: 'Ruy López', moves: ['e4', 'e5', 'Nf3', 'Nc6', 'Bb5'], info: 'One of the most classical openings. White pins Black\'s knight to pressure the e5 pawn.' },
             'italian': { name: 'Italian Game', moves: ['e4', 'e5', 'Nf3', 'Nc6', 'Bc4'], info: 'Rapid development and kingside pressure. Rich strategic middlegames.' },
