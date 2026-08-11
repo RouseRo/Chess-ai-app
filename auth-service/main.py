@@ -12,6 +12,9 @@ import os
 import secrets
 import bcrypt
 import jwt
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 from threading import Lock
@@ -32,6 +35,38 @@ JWT_SECRET = os.environ.get("JWT_SECRET_KEY", "chess-app-secret-key-change-in-pr
 JWT_EXPIRATION_HOURS = int(os.environ.get("JWT_EXPIRATION_HOURS", "24"))
 DATABASE_PATH = os.environ.get("DATABASE_PATH", "/app/data/users.db")
 DEV_MODE = os.environ.get("CHESS_DEV_MODE", "").lower() == "true"
+SMTP_HOST = os.environ.get("SMTP_HOST", "")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER", "")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+SMTP_FROM_EMAIL = os.environ.get("SMTP_FROM_EMAIL", SMTP_USER)
+APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:8080")
+
+def send_verification_email(to_email: str, username: str, token: str) -> None:
+    """Send email verification link via SMTP. Logs on failure without raising."""
+    if not SMTP_HOST or not SMTP_USER or not SMTP_PASSWORD:
+        print(f"[EMAIL] SMTP not configured — verification token for {username}: {token}")
+        return
+    verify_url = f"{APP_BASE_URL}/?verify_token={token}"
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "Verify your Chess AI account"
+    msg["From"] = SMTP_FROM_EMAIL or SMTP_USER
+    msg["To"] = to_email
+    html = (
+        f"<p>Hi {username},</p>"
+        f"<p>Click the link below to verify your email address:</p>"
+        f"<p><a href='{verify_url}'>Verify my account</a></p>"
+        f"<p>If you did not register, you can ignore this email.</p>"
+    )
+    msg.attach(MIMEText(html, "html"))
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(SMTP_USER, to_email, msg.as_string())
+    except Exception as e:
+        print(f"[EMAIL] Failed to send verification email to {to_email}: {e}")
+
 
 # Admin login rate limiting (3 failed attempts → 15-min lockout)
 _ADMIN_MAX_ATTEMPTS = 3
@@ -392,10 +427,11 @@ async def register(request: RegisterRequest):
                 "message": "Registration successful! (Dev mode: auto-verified)",
                 "verification_token": verification_token
             }
-        
+
+        send_verification_email(request.email, request.username, verification_token)
         return {
             "success": True,
-            "message": "Registration successful! Please check your email for verification."
+            "message": "Registration successful! Please check your email for a verification link."
         }
         
     except sqlite3.IntegrityError as e:

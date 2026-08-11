@@ -686,6 +686,13 @@
                   let activeClassicGameKey = '';  // key of the classic game currently under review
 
     function checkAuthentication() {
+      const params = new URLSearchParams(window.location.search);
+      const emailVerifyToken = params.get('verify_token');
+      if (emailVerifyToken) {
+        handleEmailVerification(emailVerifyToken);
+        return;
+      }
+
       const token = localStorage.getItem('authToken');
       const user = localStorage.getItem('currentUser');
 
@@ -699,6 +706,38 @@
       verifyToken(token);
     }
 
+        function handleEmailVerification(token) {
+          document.getElementById('app').innerHTML = `
+        <div id="auth-container" style="text-align:center;">
+          <h2>Chess AI App</h2>
+          <p>Verifying your email address&#8230;</p>
+        </div>`;
+          fetch('/auth/verify-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token })
+          })
+            .then(r => r.json())
+            .then(data => {
+              document.getElementById('app').innerHTML = `
+            <div id="auth-container" style="text-align:center;">
+              <h2>Chess AI App</h2>
+              <p style="color:${data.success ? '#4CAF50' : 'red'}">${data.message}</p>
+              <button onclick="history.replaceState(null,'',location.pathname);showLoginInterface()"
+                style="padding:10px 24px;background:#4CAF50;color:#fff;border:none;border-radius:4px;cursor:pointer;">Go to Login</button>
+            </div>`;
+            })
+            .catch(() => {
+              document.getElementById('app').innerHTML = `
+            <div id="auth-container" style="text-align:center;">
+              <h2>Chess AI App</h2>
+              <p style="color:red">Verification failed. Please try again or contact support.</p>
+              <button onclick="history.replaceState(null,'',location.pathname);showLoginInterface()"
+                style="padding:10px 24px;background:#4CAF50;color:#fff;border:none;border-radius:4px;cursor:pointer;">Go to Login</button>
+            </div>`;
+            });
+        }
+
     function showLoginInterface() {
       const loginHTML = `
         <div id="auth-container">
@@ -709,7 +748,7 @@
             <input id="login-password" type="password" placeholder="Password" style="width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box;">
             <div id="login-error" style="color: red; margin: 10px 0; display: none;"></div>
             <button onclick="handleLogin()" style="width: 100%; padding: 10px; margin: 10px 0; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Login</button>
-            <button disabled title="Registration is temporarily unavailable" style="width: 100%; padding: 10px; background-color: #b0bec5; color: white; border: none; border-radius: 4px; cursor: not-allowed;">Register (Unavailable)</button>
+            <button onclick="switchToRegister()" style="width: 100%; padding: 10px; background-color: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">Register</button>
           </div>
         </div>
       `;
@@ -831,8 +870,10 @@
         .then(data => {
           logCommMessage('res', 'AUTH', '/auth/register', data, _registerStatus);
           if (data.success) {
-            alert('Registration successful! Please login.');
-            showLoginInterface();
+            document.getElementById('register-error').style.display = 'none';
+            document.getElementById('auth-form').innerHTML = `
+              <p style="color:#4CAF50;text-align:center;">Registration successful!<br>Please check your email for a verification link.</p>
+              <button onclick="showLoginInterface()" style="width:100%;padding:10px;background-color:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer;">Go to Login</button>`;
           } else {
             errorDiv.textContent = data.detail || data.message || 'Registration failed';
             errorDiv.style.display = 'block';

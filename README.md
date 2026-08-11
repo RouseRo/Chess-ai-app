@@ -56,6 +56,7 @@ The application is for people that are new to the game of chess and want to lear
 - **Comm Log**: Diagnostics panel showing all API requests and responses, including H vs H sync events (purple)
 - **Clear Activity**: Button in the header lets a player reset their game activity status visible to admins
 - **User Authentication**: Secure JWT-based authentication with bcrypt hashing
+- **User Self-Registration**: New users can register at the login screen; a verification link is sent via Brevo SMTP; accounts are auto-verified in dev mode or can be manually verified by an admin
 - **Unified User Storage**: Single SQLite database shared across all clients
 - **Admin Dashboard**: Manage users and system settings; User Management shows real-time online status, game activity, and a Refresh Status button
 - **Microservices Architecture**: Scalable, modular design with separate services
@@ -188,7 +189,7 @@ Chess-ai-app/
    | admin | admin123 |
    | testuser | Chess123 |
 
-   > **Note:** Self-registration is currently disabled in the UI pending email verification setup. New user accounts must be created by the admin via the Admin Dashboard.
+   > **Note:** Self-registration is available. New users register at the login screen and receive an email verification link. In dev mode (`CHESS_DEV_MODE=true`) accounts are auto-verified. Accounts can also be created and verified manually via the Admin Dashboard.
 
 ## Running the Application
 
@@ -366,6 +367,7 @@ The **User Management** tab shows each tester's online status, current game acti
 Things to ask testers to verify:
 
 - [ ] Can log in with provided credentials
+- [ ] Can self-register a new account and receive a verification email
 - [ ] Chessboard loads and pieces are draggable
 - [ ] Can start a game against Stockfish (any skill level)
 - [ ] Move history and captured pieces update correctly
@@ -434,13 +436,32 @@ If a user navigates to `http://localhost:8080` while already holding a valid ses
 
 This allows switching accounts without having to first navigate to the admin panel to click Logout.
 
+### New User Registration Flow
+
+1. **User clicks Register** on the login screen and fills in username, email, and password
+2. **Frontend POSTs to `/auth/register`** — fields are validated before sending
+3. **auth-service creates the account**:
+   - Checks username and email are not already taken (case-insensitive)
+   - Bcrypt-hashes the password
+   - Generates a `verification_token` (`secrets.token_hex(32)`)
+   - Inserts the user with `is_verified = False` (or `True` in dev mode)
+4. **Verification email is sent** (production only) via SMTP with a link:
+   `https://chess-ui.../?verify_token=<token>`
+   > If SMTP is not configured, the token is printed to the auth-service logs instead
+5. **User clicks the link** — the browser loads `index.html?verify_token=...`; `checkAuthentication()` detects the param, calls `POST /auth/verify-email`, and shows a success/fail screen
+6. **User logs in** — login is blocked until `is_verified = 1`
+
+**Shortcuts:**
+- **Dev mode** (`CHESS_DEV_MODE=true`): accounts are auto-verified on registration; no email is sent
+- **Admin bypass**: an admin can manually verify any account via Admin Dashboard → User Management → Verify
+
 ### Auth API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check |
 | `/auth/login` | POST | User login — regular accounts only (username OR email) |
-| `/auth/register` | POST | Create account (disabled in UI pending email verification) |
+| `/auth/register` | POST | Create account — sends verification email (auto-verified in dev mode) |
 | `/auth/verify` | POST | Validate token |
 | `/auth/verify-email` | POST | Verify email with token |
 | `/auth/logout` | POST | End session |
@@ -764,8 +785,17 @@ OPENAI_API_KEY=your_openrouter_key
 JWT_SECRET_KEY=your_secret_key
 JWT_EXPIRATION_HOURS=24
 
-# Development Mode (auto-verifies new users)
+# Development Mode (auto-verifies new users, skips email)
 CHESS_DEV_MODE=false
+
+# Email verification via Brevo SMTP (required for production registration)
+# Sign up at brevo.com, then generate an SMTP key under SMTP & API → SMTP Keys
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_USER=your_brevo_login@smtp-brevo.com
+SMTP_PASSWORD=your_brevo_smtp_key
+SMTP_FROM_EMAIL=your_verified_sender@example.com
+APP_BASE_URL=https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io
 ```
 
 > **AI model selection**: The active AI model for the chess expert and AI opponents is configured in `src/config.json` under `chess_expert_model` and `ai_models`. All models are accessed through [OpenRouter](https://openrouter.ai) using the `OPENAI_API_KEY`.
@@ -943,7 +973,7 @@ CREATE TABLE classic_game_reviews (
 | Admin Login Port Isolation | ✅ Separate Docker-internal port 8003 (not published to host) |
 | CORS | ⚠️ Open (for development) |
 | HTTPS | ✅ Enabled on Azure (Container Apps TLS) |
-| User Self-Registration | ⚠️ Disabled in UI (no email verification service configured) |
+| User Self-Registration | ✅ Enabled — email verification via Brevo SMTP |
 
 ### Production Recommendations
 
@@ -955,7 +985,7 @@ CREATE TABLE classic_game_reviews (
 6. Use PostgreSQL instead of SQLite
 7. Implement proper logging
 8. Add monitoring/alerting
-9. Implement email sending (SMTP/SendGrid) to re-enable user registration with email verification
+9. Set `SMTP_HOST`, `SMTP_USER`, and `SMTP_PASSWORD` env vars on the `chess-auth` container app
 
 ## Future Enhancements
 
@@ -973,11 +1003,11 @@ CREATE TABLE classic_game_reviews (
 - [ ] Opening book integration
 - [ ] Tournament mode
 - [ ] Game history storage
-- [ ] Email verification with SMTP
+- [x] Email verification via Brevo SMTP
 - [x] Make the Admin Login process more secure (rate limiting + Docker-internal port isolation)
 - [ ] Password reset functionality
 - [ ] OAuth2 social login
-- [ ] User self-registration with email verification (currently disabled)
+- [x] User self-registration with email verification
 
 ---
 

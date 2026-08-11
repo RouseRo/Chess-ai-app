@@ -731,6 +731,13 @@
     // Auth helpers
     // ────────────────────────────────────────────────────────────────────────
     function checkAuthentication() {
+      const params = new URLSearchParams(window.location.search);
+      const emailVerifyToken = params.get('verify_token');
+      if (emailVerifyToken) {
+        handleEmailVerification(emailVerifyToken);
+        return;
+      }
+
       const token = localStorage.getItem('authToken');
       const user  = localStorage.getItem('currentUser');
       if (!token) { showLoginScreen(); return; }
@@ -738,6 +745,47 @@
       currentUser = user;
       verifyToken(token);
     }
+
+        function handleEmailVerification(token) {
+          document.getElementById('app').innerHTML = `
+        <div class="auth-screen">
+          <div class="auth-logo">&#9823;</div>
+          <h1 class="auth-title">Chess AI</h1>
+          <div class="auth-card">
+            <p style="text-align:center">Verifying your email&#8230;</p>
+          </div>
+        </div>`;
+          fetch('/auth/verify-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token })
+          })
+            .then(r => r.json())
+            .then(data => {
+              document.getElementById('app').innerHTML = `
+            <div class="auth-screen">
+              <div class="auth-logo">&#9823;</div>
+              <h1 class="auth-title">Chess AI</h1>
+              <div class="auth-card">
+                <p style="text-align:center;color:${data.success ? '#4CAF50' : '#e53935'}">${data.message}</p>
+                <button class="auth-btn auth-btn-primary"
+                  onclick="history.replaceState(null,'',location.pathname);showLoginScreen()">Go to Login</button>
+              </div>
+            </div>`;
+            })
+            .catch(() => {
+              document.getElementById('app').innerHTML = `
+            <div class="auth-screen">
+              <div class="auth-logo">&#9823;</div>
+              <h1 class="auth-title">Chess AI</h1>
+              <div class="auth-card">
+                <p style="text-align:center;color:#e53935">Verification failed. Please try again.</p>
+                <button class="auth-btn auth-btn-primary"
+                  onclick="history.replaceState(null,'',location.pathname);showLoginScreen()">Go to Login</button>
+              </div>
+            </div>`;
+            });
+        }
 
     function showLoginScreen() {
       document.getElementById('app').innerHTML = `
@@ -755,11 +803,65 @@
               onkeydown="if(event.key==='Enter')handleLogin()">
             <div id="login-error" class="auth-error"></div>
             <button class="auth-btn auth-btn-primary" onclick="handleLogin()">Login</button>
-            <button class="auth-btn auth-btn-disabled" disabled
-              title="Registration is temporarily unavailable">Register (Unavailable)</button>
+            <button class="auth-btn" onclick="switchToRegister()">Register</button>
+          </div>
+        </div>`;
+              }
+
+              function switchToRegister() {
+                document.getElementById('app').innerHTML = `
+        <div class="auth-screen">
+          <div class="auth-logo">&#9823;</div>
+          <h1 class="auth-title">Chess AI</h1>
+          <p class="auth-subtitle">Create your account</p>
+          <div class="auth-card">
+            <h3>Register</h3>
+            <input id="register-username" class="auth-field" type="text"
+              placeholder="Username" autocapitalize="none" autocomplete="username">
+            <input id="register-email" class="auth-field" type="email"
+              placeholder="Email" autocomplete="email">
+            <input id="register-password" class="auth-field" type="password"
+              placeholder="Password" autocomplete="new-password">
+            <div id="register-error" class="auth-error"></div>
+            <button class="auth-btn auth-btn-primary" onclick="handleRegister()">Register</button>
+            <button class="auth-btn" onclick="showLoginScreen()">Back to Login</button>
           </div>
         </div>`;
     }
+
+        function handleRegister() {
+          const username = document.getElementById('register-username').value.trim();
+          const email = document.getElementById('register-email').value.trim();
+          const password = document.getElementById('register-password').value;
+          const errEl = document.getElementById('register-error');
+          if (!username || !email || !password) {
+            errEl.textContent = 'Please fill in all fields.';
+            errEl.style.display = 'block';
+            return;
+          }
+          errEl.style.display = 'none';
+          logComm('req', 'AUTH', '/auth/register', { username, email });
+          let _st = null;
+          fetch('/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, email, password })
+          })
+            .then(r => { _st = r.status; return r.json(); })
+            .then(data => {
+              logComm('res', 'AUTH', '/auth/register', data, _st);
+              if (data.success) {
+                document.querySelector('.auth-card').innerHTML = `
+              <p style="text-align:center;color:#4CAF50">Registration successful!<br>
+              Please check your email for a verification link.</p>
+              <button class="auth-btn auth-btn-primary" onclick="showLoginScreen()">Go to Login</button>`;
+              } else {
+                errEl.textContent = data.detail || data.message || 'Registration failed.';
+                errEl.style.display = 'block';
+              }
+            })
+            .catch(e => { errEl.textContent = 'Error: ' + e.message; errEl.style.display = 'block'; });
+        }
 
     function showAlreadyLoggedIn(username, isAdmin) {
       const role = isAdmin ? 'Admin' : 'Player';
