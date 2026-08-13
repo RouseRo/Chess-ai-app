@@ -252,6 +252,7 @@ admin_app.add_middleware(
 )
 
 
+@app.post("/admin-auth/login")
 @admin_app.post("/admin-auth/login")
 async def admin_login(request: LoginRequest):
     """Admin-only login. Rate limited: 3 failed attempts triggers a 15-min lockout."""
