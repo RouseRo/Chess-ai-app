@@ -122,6 +122,10 @@ class VerifyEmailRequest(BaseModel):
     token: str
 
 
+class ResendVerificationRequest(BaseModel):
+    username: str
+
+
 # Database functions
 def _sqlite_connect(path: str) -> sqlite3.Connection:
     """Open a SQLite connection using unix-dotfile VFS for Azure Files SMB compatibility."""
@@ -487,6 +491,34 @@ async def verify_email(request: VerifyEmailRequest):
         "success": True,
         "message": f"Email verified successfully! You can now login, {user['username']}."
     }
+
+
+@app.post("/auth/resend-verification")
+async def resend_verification(request: ResendVerificationRequest):
+    """Resend the email verification link for an unverified user."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, username, email, is_verified FROM users WHERE LOWER(username) = LOWER(?)",
+        (request.username,)
+    )
+    user = cursor.fetchone()
+
+    if not user:
+        conn.close()
+        return {"success": False, "message": "User not found."}
+
+    if user["is_verified"]:
+        conn.close()
+        return {"success": False, "message": "User email is already verified."}
+
+    token = secrets.token_hex(32)
+    cursor.execute("UPDATE users SET verification_token = ? WHERE id = ?", (token, user["id"]))
+    conn.commit()
+    conn.close()
+
+    send_verification_email(user["email"], user["username"], token)
+    return {"success": True, "message": f"Verification email resent to {user['email']}."}
 
 
 @app.post("/auth/logout")

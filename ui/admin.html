@@ -56,6 +56,9 @@
     .badge-online { background-color: #4CAF50; color: white; }
     .badge-playing { background-color: #ff9800; color: white; }
     .badge-offline { background-color: #9e9e9e; color: white; }
+    .badge-verified { background-color: #4CAF50; color: white; }
+    .badge-unverified { background-color: #ff9800; color: white; }
+    .email-verified-wrap { display: flex; flex-direction: column; gap: 3px; }
     .action-buttons { display: flex; gap: 8px; }
     .form-group { margin-bottom: 20px; }
     .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #333; }
@@ -352,9 +355,10 @@
   <script>
     var adminToken = null;
     var currentAdminUser = null;
-      var API_ADMIN = '';
-      var API_AUTH = '';
-            var usersRefreshTimer = null;
+    var API_ADMIN = '';
+    var API_AUTH = '';
+    var usersRefreshTimer = null;
+    var dashboardController = null;
 
     window.onload = function() {
       var token = localStorage.getItem('authToken');
@@ -408,8 +412,11 @@
     }
 
     function loadDashboard() {
-      fetch(API_ADMIN + '/admin/stats')
+      dashboardController = new AbortController();
+      var timer = setTimeout(function() { dashboardController.abort(); }, 10000);
+      fetch(API_ADMIN + '/admin/stats', { signal: dashboardController.signal })
         .then(function(response) {
+          clearTimeout(timer);
           if (!response.ok) { throw new Error('HTTP error: ' + response.status); }
           return response.json();
         })
@@ -417,6 +424,7 @@
           renderStats(data);
         })
         .catch(function(error) {
+          clearTimeout(timer);
           console.error('Dashboard error:', error);
           renderStats({ total_users: 0, admin_count: 0, verified_users: 0, total_games: 0 });
           showAlert('Could not connect to admin service: ' + error.message, 'warning');
@@ -476,7 +484,10 @@
 
         html += '<tr>';
         html += '<td><strong>' + user.username + '</strong></td>';
-        html += '<td>' + user.email + '</td>';
+        var verifiedBadge = user.verified
+          ? '<span class="badge badge-verified" style="font-size:0.75em;">&#10003; Verified</span>'
+          : '<span class="badge badge-unverified" style="font-size:0.75em;">&#33; Unverified</span>';
+        html += '<td><div class="email-verified-wrap">' + user.email + verifiedBadge + '</div></td>';
         html += '<td><span class="badge ' + roleClass + '">' + roleText + '</span></td>';
         html += '<td><span class="badge ' + statusClass + '"><span class="status-dot ' + dotClass + '"></span>' + statusLabel + '</span></td>';
         html += '<td>' + (user.games_count || 0) + '</td>';
@@ -490,8 +501,9 @@
             html += '<button class="btn btn-secondary btn-small" onclick="demoteUser(\'' + user.username + '\')">Demote</button>';
           } else {
             html += '<button class="btn btn-secondary btn-small" onclick="promoteUser(\'' + user.username + '\')">Promote</button>';
-          }
-          html += '<button class="btn btn-danger btn-small" onclick="deleteUser(\'' + user.username + '\')">Delete</button>';
+          }          if (!user.verified) {
+            html += '<button class="btn btn-secondary btn-small" onclick="resendVerification(\'' + user.username + '\')" title="Resend verification email">Resend Email</button>';
+          }          html += '<button class="btn btn-danger btn-small" onclick="deleteUser(\'' + user.username + '\')">Delete</button>';
         } else {
           html += '<span style="color: #999; font-size: 0.9em;">System Admin</span>';
         }
@@ -571,6 +583,23 @@
           loadUsers();
         })
         .catch(function(error) { showAlert('Error: ' + error.message, 'error'); });
+    }
+
+    function resendVerification(username) {
+      if (!confirm('Resend verification email to ' + username + '?')) return;
+      fetch(API_AUTH + '/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + adminToken },
+        body: JSON.stringify({ username: username })
+      })
+        .then(function(response) {
+          if (!response.ok) { throw new Error('HTTP error: ' + response.status); }
+          return response.json();
+        })
+        .then(function(data) {
+          showAlert('Verification email sent to ' + username + '!', 'success');
+        })
+        .catch(function(error) { showAlert('Failed to send email: ' + error.message, 'error'); });
     }
 
     function deleteUser(username) {
@@ -952,8 +981,7 @@
       }
 
     function handleLogout() {
-      if (!confirm('Are you sure you want to logout?')) return;
-
+      if (dashboardController) { dashboardController.abort(); }
       fetch(API_AUTH + '/auth/logout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
