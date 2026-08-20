@@ -14,6 +14,13 @@ $ENV_NAME   = "chess-ai-env"
 $DATA_SHARE = "chessdata"
 $USER_SHARE = "chessuserdata"
 $JWT_SECRET = "chess-ai-jwt-secret-change-me-in-prod"
+# SMTP — read from caller's environment; deployment proceeds without them but email
+# verification will be disabled on Azure until they are set.
+$SMTP_HOST      = $env:SMTP_HOST
+$SMTP_PORT      = if ($env:SMTP_PORT)      { $env:SMTP_PORT }      else { "587" }
+$SMTP_USER      = $env:SMTP_USER
+$SMTP_PASSWORD  = $env:SMTP_PASSWORD
+$SMTP_FROM      = if ($env:SMTP_FROM_EMAIL) { $env:SMTP_FROM_EMAIL } else { $SMTP_USER }
 # ───────────────────────────────────────────────────────────────────────────────
 
 Write-Host "=== Chess AI App - Azure Deployment ===" -ForegroundColor Cyan
@@ -381,6 +388,9 @@ az containerapp create `
   --cpu 0.25 --memory 0.5Gi `
   --min-replicas 1 --max-replicas 1 `
   --env-vars "JWT_SECRET_KEY=chess-ai-jwt-secret-change-me" "CHESS_DEV_MODE=false" `
+    "SMTP_HOST=$SMTP_HOST" "SMTP_PORT=$SMTP_PORT" `
+    "SMTP_USER=$SMTP_USER" "SMTP_PASSWORD=$SMTP_PASSWORD" `
+    "SMTP_FROM_EMAIL=$SMTP_FROM" `
   --volume-mount-path "/app/data" `
   --mount-volume-name chessdata `
   --output table
@@ -439,7 +449,16 @@ Write-Host "`n=== Deployment Complete! ===" -ForegroundColor Cyan
 
 # Print URLs
 Write-Host "`nPublic URL:" -ForegroundColor Cyan
-az containerapp show --name chess-ui --resource-group $RG --query "properties.configuration.ingress.fqdn" --output tsv
+$UI_FQDN = az containerapp show --name chess-ui --resource-group $RG --query "properties.configuration.ingress.fqdn" --output tsv
+Write-Host $UI_FQDN
+
+# Patch APP_BASE_URL into chess-auth so email verification links use the real URL
+if ($UI_FQDN) {
+  Write-Host "`nSetting APP_BASE_URL on chess-auth..." -ForegroundColor Yellow
+  az containerapp update --name chess-auth --resource-group $RG `
+    --set-env-vars "APP_BASE_URL=https://$UI_FQDN" --output none
+  Write-Host "APP_BASE_URL set to https://$UI_FQDN" -ForegroundColor Green
+}
 
 Write-Host "`nInternal service FQDNs:" -ForegroundColor Cyan
 az containerapp show --name chess-auth   --resource-group $RG --query "properties.configuration.ingress.fqdn" --output tsv

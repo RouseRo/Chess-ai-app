@@ -9,9 +9,14 @@ $ENV_NAME   = "chess-ai-env"
 $DATA_SHARE = "chessdata"
 $USER_SHARE = "chessuserdata"
 $JWT_SECRET = "chess-ai-jwt-secret-change-me-in-prod"
-$ACR_SERVER = "$ACR.azurecr.io"
-
-Write-Host "=== Chess AI Redeploy (UI + Container Apps) ===" -ForegroundColor Cyan
+# SMTP — read from caller's environment; email verification is disabled on Azure
+# until these are set (e.g. via $env:SMTP_HOST = '...' before running the script).
+$SMTP_HOST      = $env:SMTP_HOST
+$SMTP_PORT      = if ($env:SMTP_PORT)       { $env:SMTP_PORT }       else { "587" }
+$SMTP_USER      = $env:SMTP_USER
+$SMTP_PASSWORD  = $env:SMTP_PASSWORD
+$SMTP_FROM      = if ($env:SMTP_FROM_EMAIL) { $env:SMTP_FROM_EMAIL } else { $SMTP_USER }
+$ACR_SERVER     = "$ACR.azurecr.io"
 
 # Timestamp tag — forces a new ACA revision on every deploy
 $TAG = Get-Date -Format "yyyyMMdd-HHmm"
@@ -76,6 +81,16 @@ properties:
             value: $JWT_SECRET
           - name: CHESS_DEV_MODE
             value: "false"
+          - name: SMTP_HOST
+            value: $SMTP_HOST
+          - name: SMTP_PORT
+            value: "$SMTP_PORT"
+          - name: SMTP_USER
+            value: $SMTP_USER
+          - name: SMTP_PASSWORD
+            value: $SMTP_PASSWORD
+          - name: SMTP_FROM_EMAIL
+            value: $SMTP_FROM
         volumeMounts:
           - volumeName: $DATA_SHARE
             mountPath: /app/data
@@ -207,4 +222,13 @@ properties:
 "@
 
 Write-Host "`n=== Done! Public URL ===" -ForegroundColor Green
-az containerapp show --name chess-ui --resource-group $RG --query "properties.configuration.ingress.fqdn" --output tsv
+$UI_FQDN = az containerapp show --name chess-ui --resource-group $RG --query "properties.configuration.ingress.fqdn" --output tsv
+Write-Host $UI_FQDN
+
+# Patch APP_BASE_URL into chess-auth so email verification links use the real URL
+if ($UI_FQDN) {
+  Write-Host "`nSetting APP_BASE_URL on chess-auth..." -ForegroundColor Yellow
+  az containerapp update --name chess-auth --resource-group $RG `
+    --set-env-vars "APP_BASE_URL=https://$UI_FQDN" --output none
+  Write-Host "APP_BASE_URL set to https://$UI_FQDN" -ForegroundColor Green
+}
