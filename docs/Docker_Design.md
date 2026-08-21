@@ -112,8 +112,15 @@ chess-ai-app/
 ├── ui/                        # Frontend web UI
 │   ├── Dockerfile
 │   ├── nginx.conf
+│   ├── nginx.local.conf       # Local dev nginx config
+│   ├── package.json
+│   ├── tsconfig.json
 │   ├── index.html             # Login/Register + game interface (single-page app)
 │   ├── admin.html             # Admin dashboard
+│   ├── mobile.html            # Mobile-optimised interface
+│   ├── game-play.ts
+│   ├── player-selection.ts
+│   ├── helloworld.ts
 │   ├── chessboard.js
 │   ├── chessboard.css
 │   └── img/
@@ -121,6 +128,7 @@ chess-ai-app/
 ├── auth-service/              # Authentication service
 │   ├── Dockerfile
 │   ├── main.py
+│   ├── start.sh               # Launches both port 8002 and port 8003 processes
 │   └── requirements.txt
 │
 ├── admin-service/             # Admin management service
@@ -170,6 +178,7 @@ RUN npm install && chmod +x node_modules/.bin/tsc
 RUN npm run build
 RUN cp index.html dist/ || true
 RUN cp admin.html dist/ || true
+RUN cp mobile.html dist/ || true
 RUN [ -d "assets" ] && cp -r assets dist/ || true
 RUN cp chessboard.js dist/ || true
 RUN cp chessboard.css dist/ || true
@@ -296,9 +305,13 @@ COPY auth-service ./auth-service
 COPY engine ./engine
 COPY user_data ./user_data
 EXPOSE 8002
+EXPOSE 8003
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8002/health || exit 1
-CMD ["uvicorn", "auth-service.main:app", "--host", "0.0.0.0", "--port", "8002"]
+# Launches auth on 8002 (public) and admin_app on 8003 (internal)
+COPY auth-service/start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+CMD ["/bin/sh", "/app/start.sh"]
 ```
 
 ---
@@ -390,10 +403,18 @@ services:
     container_name: chess-auth-service
     ports:
       - "8002:8002"
+    expose:
+      - "8003"
     environment:
       - DATABASE_PATH=/app/data/users.db
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-chess-app-secret-key}
       - CHESS_DEV_MODE=${CHESS_DEV_MODE:-false}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-}
+      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:8080}
     volumes:
       - ./data:/app/data
     networks:
@@ -433,6 +454,7 @@ services:
       - "8080:80"
     volumes:
       - ./ui:/usr/share/nginx/html
+      - ./ui/nginx.local.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - chess-engine
       - auth-service
@@ -643,6 +665,14 @@ JWT_SECRET_KEY=your-secure-secret-key-change-in-production
 
 # Development Mode (auto-verifies new users)
 CHESS_DEV_MODE=false
+
+# Email verification (optional — users auto-verified if unset)
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASSWORD=
+SMTP_FROM_EMAIL=
+APP_BASE_URL=http://localhost:8080
 ```
 
 ---

@@ -620,6 +620,23 @@
        LANDSCAPE MODE  (device held horizontally)
        Board is placed on the left; tabs fill the right column.
     ══════════════════════════════════════════════════════════════════════════ */
+    /* ── Help bottom-sheet ───────────────────────────────────────────────── */
+    #m-help-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 1000; display: flex; flex-direction: column; justify-content: flex-end; }
+    .m-help-sheet { background: white; border-radius: 14px 14px 0 0; max-height: 86vh; display: flex; flex-direction: column; }
+    .m-help-sheet-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px 10px; border-bottom: 1px solid #e0e0e0; flex-shrink: 0; }
+    .m-help-sheet-header h2 { margin: 0; font-size: 1.05em; color: #1a237e; }
+    .m-help-sheet-close { background: none; border: none; font-size: 1.4em; cursor: pointer; color: #666; padding: 0 4px; line-height: 1; }
+    .m-help-body { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px 16px 32px; flex: 1; }
+    .m-help-section { margin-bottom: 18px; }
+    .m-help-section h3 { margin: 0 0 8px; font-size: 0.92em; color: #283593; border-bottom: 1px solid #e8eaf6; padding-bottom: 4px; }
+    .m-help-dl { display: flex; flex-direction: column; }
+    .m-help-row { display: flex; gap: 10px; padding: 5px 0; border-bottom: 1px solid #f5f5f5; font-size: 0.85em; }
+    .m-help-row:last-child { border-bottom: none; }
+    .m-help-row dt { font-weight: 600; color: #1565c0; flex-shrink: 0; width: 38%; line-height: 1.4; }
+    .m-help-row dd { margin: 0; color: #444; line-height: 1.45; flex: 1; }
+    .m-header-help { padding: 6px 10px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; color: white; font-size: 0.8em; cursor: pointer; font-weight: 700; }
+    .m-header-help:active { background: rgba(255,255,255,0.3); }
+
     @media (orientation: landscape) {
 
       /* Auth screen: compress vertically so the card fits without scrolling */
@@ -698,6 +715,8 @@
     // ────────────────────────────────────────────────────────────────────────
     // Global State
     // ────────────────────────────────────────────────────────────────────────
+    const MOBILE_UI_VERSION = '1.0.0';
+
     let authToken   = null;
     let currentUser = null;
     let board       = null;
@@ -1010,6 +1029,10 @@
     function loadGameScreen() {
       document.getElementById('app').innerHTML = buildGameScreenHTML();
       initBoard();
+      fetch('/engine-health').then(r => r.json()).then(d => {
+        const badge = document.getElementById('m-version-badge');
+        if (badge && d.version) badge.textContent = `UI ${MOBILE_UI_VERSION} | API ${d.version}`;
+      }).catch(() => {});
       updatePlayerDisplayM();
       checkGameStatus();
       renderCapturedPieces();
@@ -1020,9 +1043,11 @@
       return `
         <!-- ── Header ──────────────────────────────────────────────────── -->
         <header class="m-header">
-          <span class="m-header-title">♟ Chess AI</span>
+          <span class="m-header-title">&#x265F; Chess AI</span>
+          <span id="m-version-badge" style="font-size:0.62em; color:rgba(255,255,255,0.45); font-family:monospace; letter-spacing:0.02em; white-space:nowrap;">UI ${MOBILE_UI_VERSION}&nbsp;|&nbsp;API&nbsp;…</span>
           <div class="m-header-right">
             <span class="m-header-user">${currentUser || ''}</span>
+            <button class="m-header-help" onclick="openHelpM()">? Help</button>
             <button class="m-header-logout" onclick="handleLogout()">Logout</button>
           </div>
         </header>
@@ -2051,9 +2076,99 @@
           }());
 
     // ────────────────────────────────────────────────────────────────────────
+    // Help overlay
+    // ────────────────────────────────────────────────────────────────────────
+    function openHelpM() {
+      const el = document.getElementById('m-help-overlay');
+      if (el) el.style.display = 'flex';
+    }
+    function closeHelpM() {
+      const el = document.getElementById('m-help-overlay');
+      if (el) el.style.display = 'none';
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
     // Bootstrap
     // ────────────────────────────────────────────────────────────────────────
     window.onload = checkAuthentication;
   </script>
-</body>
-</html>
+
+<!-- Help bottom-sheet -->
+<div id="m-help-overlay" style="display:none;" onclick="if(event.target===this)closeHelpM()">
+  <div class="m-help-sheet">
+    <div class="m-help-sheet-header">
+      <h2>♟ Help</h2>
+      <button class="m-help-sheet-close" onclick="closeHelpM()">&#x2715;</button>
+    </div>
+    <div class="m-help-body">
+
+      <div class="m-help-section">
+        <h3>Header</h3>
+        <div class="m-help-dl">
+          <div class="m-help-row"><dt>[Username]</dt><dd>Your logged-in account name.</dd></div>
+          <div class="m-help-row"><dt>? Help</dt><dd>Opens this help sheet.</dd></div>
+          <div class="m-help-row"><dt>Logout</dt><dd>Signs you out and returns to the login screen.</dd></div>
+        </div>
+      </div>
+
+      <div class="m-help-section">
+        <h3>Board Area</h3>
+        <div class="m-help-dl">
+          <div class="m-help-row"><dt>Board</dt><dd>Drag or tap pieces to make moves when it is a human player&rsquo;s turn.</dd></div>
+          <div class="m-help-row"><dt>&#x21C5; Flip</dt><dd>Rotates the board so the other colour plays from the bottom.</dd></div>
+          <div class="m-help-row"><dt>Game Status</dt><dd>Shows whose turn it is and any check, checkmate, or draw state.</dd></div>
+          <div class="m-help-row"><dt>&#x2654; White / &#x265A; Black</dt><dd>Configured player name or AI engine for each side.</dd></div>
+          <div class="m-help-row"><dt>Captured pieces</dt><dd>Pieces taken by each side, with the material advantage score.</dd></div>
+        </div>
+      </div>
+
+      <div class="m-help-section">
+        <h3>&#x265F; Game Tab</h3>
+        <div class="m-help-dl">
+          <div class="m-help-row"><dt>&#x2659; New Game</dt><dd>Resets the board and starts a fresh game with the current player configuration.</dd></div>
+          <div class="m-help-row"><dt>&#x1F4C2; Load Save</dt><dd>Restores your most recently saved game from local storage.</dd></div>
+          <div class="m-help-row"><dt>&#x1F4BE; Save Game</dt><dd>Saves the current position and move history to local storage (keeps the 3 most recent saves).</dd></div>
+          <div class="m-help-row"><dt>&#x2699;&#xFE0F; Player Setup</dt><dd>Switches to the Setup tab to change who controls each side.</dd></div>
+          <div class="m-help-row"><dt>&#x1F3DB;&#xFE0F; Classic Games</dt><dd>Switches to the Learn tab to step through a famous historic game.</dd></div>
+          <div class="m-help-row"><dt>&#x1F3AF; Practice Openings</dt><dd>Switches to the Learn tab to load a well-known opening position.</dd></div>
+          <div class="m-help-row"><dt>Status log</dt><dd>Live feed of game events, moves played, and server responses.</dd></div>
+        </div>
+      </div>
+
+      <div class="m-help-section">
+        <h3>&#x2699; Setup Tab</h3>
+        <div class="m-help-dl">
+          <div class="m-help-row"><dt>Player Type</dt><dd>Choose <em>Human</em> (enter a name) or <em>AI</em> for each side.</dd></div>
+          <div class="m-help-row"><dt>AI Engine</dt><dd>Stockfish (local), OpenAI GPT, DeepSeek, or Claude.</dd></div>
+          <div class="m-help-row"><dt>Skill Level</dt><dd>1 = easiest, 20 = strongest. Applies to Stockfish only.</dd></div>
+          <div class="m-help-row"><dt>Start New Game</dt><dd>Begins a game using the current player settings.</dd></div>
+        </div>
+      </div>
+
+      <div class="m-help-section">
+        <h3>&#x1F4DA; Learn Tab</h3>
+        <div class="m-help-dl">
+          <div class="m-help-row"><dt>Classic Games</dt><dd>Select a famous game from the dropdown to load it for step-through review.</dd></div>
+          <div class="m-help-row"><dt>&#x23EE; &#x25C4; &#x25BA; &#x23ED;</dt><dd>Step backward/forward one move at a time, or jump to the start or end of the game. Commentary appears below the controls when available.</dd></div>
+          <div class="m-help-row"><dt>Practice Openings</dt><dd>Tap an opening name to load its starting position on the board so you can continue playing from there.</dd></div>
+        </div>
+      </div>
+
+      <div class="m-help-section">
+        <h3>&#x1F4CB; History Tab</h3>
+        <div class="m-help-dl">
+          <div class="m-help-row"><dt>Move table</dt><dd>Numbered list of every move played in the current game, showing the notation for White and Black each turn.</dd></div>
+        </div>
+      </div>
+
+      <div class="m-help-section">
+        <h3>&#x1F9E0; Expert Tab</h3>
+        <div class="m-help-dl">
+          <div class="m-help-row"><dt>Quick buttons</dt><dd>Pre-written prompts &mdash; <em>Analyse position</em>, <em>Best move</em>, <em>Opening</em>, <em>Strategy</em> &mdash; sent to the AI expert with one tap.</dd></div>
+          <div class="m-help-row"><dt>Input + Ask</dt><dd>Type any chess question; the AI answers in the context of the current board position.</dd></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>

@@ -647,6 +647,21 @@
     .reward-toast-grand { font-size: 0.82em; color: #6a1b9a; font-weight: 600; }
     .reward-toast-close { background: none; border: none; cursor: pointer; font-size: 1.1em; color: #999; padding: 0 2px; align-self: flex-start; margin-left: 4px; }
     .reward-toast-close:hover { color: #333; }
+    /* Help modal */
+    #help-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; display: flex; align-items: center; justify-content: center; }
+    .help-modal { background: #fff; border-radius: 8px; width: 560px; max-width: 95vw; max-height: 82vh; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,0.28); }
+    .help-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px 12px; border-bottom: 1px solid #e0e0e0; flex-shrink: 0; }
+    .help-modal-header h2 { margin: 0; font-size: 1.1em; }
+    .help-close-btn { background: none; border: none; font-size: 1.4em; cursor: pointer; color: #666; padding: 0 4px; line-height: 1; }
+    .help-close-btn:hover { color: #111; }
+    .help-modal-body { overflow-y: auto; padding: 16px 20px 20px; flex: 1; }
+    .help-section { margin-bottom: 18px; }
+    .help-section h3 { margin: 0 0 8px; font-size: 0.95em; color: #333; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+    .help-table { width: 100%; border-collapse: collapse; font-size: 0.87em; }
+    .help-table td { padding: 5px 6px; vertical-align: top; border-bottom: 1px solid #f0f0f0; }
+    .help-table tr:last-child td { border-bottom: none; }
+    .help-table td:first-child { font-weight: 600; white-space: nowrap; color: #1565c0; width: 38%; }
+    .help-table td:last-child { color: #444; line-height: 1.45; }
   </style>
 </head>
 <body>
@@ -657,6 +672,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
   
   <script>
+    const UI_VERSION = '1.0.0';
+
     let authToken = null;
     let currentUser = null;
     let board = null;
@@ -1368,6 +1385,17 @@
                             }
                             renderCommunityMessages();
                           }
+
+                            // ─── Help Modal ──────────────────────────────────────────────────────
+
+                            function openHelp() {
+                              const el = document.getElementById('help-overlay');
+                              if (el) el.style.display = 'flex';
+                            }
+                            function closeHelp() {
+                              const el = document.getElementById('help-overlay');
+                              if (el) el.style.display = 'none';
+                            }
 
                             // ─── AI Game Setup (from Community panel) ────────────────────────────
 
@@ -2160,7 +2188,9 @@
           <h1>Chess AI App</h1>
           <div style="display: flex; gap: 15px; align-items: center;">
             <span>Welcome, <strong>${currentUser}</strong></span>
+            <span id="version-badge" style="font-size:0.72em; color:rgba(255,255,255,0.55); font-family:monospace; letter-spacing:0.02em;">UI ${UI_VERSION}&nbsp;|&nbsp;API&nbsp;…</span>
             <button onclick="clearMyGameActivity()" title="Clear your game activity status" style="padding:6px 12px; font-size:0.85em; background:#607d8b; color:white; border:none; border-radius:4px; cursor:pointer;">Clear Activity</button>
+            <button onclick="openHelp()" title="Help" style="padding:6px 12px; font-size:0.85em; background:#455a64; color:white; border:none; border-radius:4px; cursor:pointer;">? Help</button>
             <button onclick="handleLogout()" class="btn-danger">Logout</button>
           </div>
         </header>
@@ -2588,6 +2618,11 @@
         updateStatusBox('Chessboard initialized successfully', 'success');
         updateFenDisplay();
         updatePlayerDisplay();
+        // Fetch engine version and fill in the API half of the version badge
+        fetch('/engine-health').then(r => r.json()).then(d => {
+          const badge = document.getElementById('version-badge');
+          if (badge && d.version) badge.textContent = `UI ${UI_VERSION} | API ${d.version}`;
+        }).catch(() => {});
                                     _updateMySavesBtn();
                                     // Start background community polling (unread badge while not on tab)
                                     communityLastId = 0;
@@ -3853,6 +3888,128 @@
 
       window.onload = checkAuthentication;
   </script>
+<!-- Help Modal -->
+<div id="help-overlay" style="display:none;" onclick="if(event.target===this)closeHelp()">
+  <div class="help-modal">
+    <div class="help-modal-header">
+      <h2>♟ Chess AI App — Help</h2>
+      <button class="help-close-btn" onclick="closeHelp()">&#x2715;</button>
+    </div>
+    <div class="help-modal-body">
+
+      <div class="help-section">
+        <h3>Header</h3>
+        <table class="help-table">
+          <tr><td>Welcome, [name]</td><td>Shows your logged-in username.</td></tr>
+          <tr><td>Clear Activity</td><td>Clears your online presence status (e.g. removes &ldquo;playing&rdquo; indicator visible to other community members).</td></tr>
+          <tr><td>? Help</td><td>Opens this help dialog.</td></tr>
+          <tr><td>Logout</td><td>Signs you out and returns to the login screen.</td></tr>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>Chessboard Area (left panel)</h3>
+        <table class="help-table">
+          <tr><td>Board</td><td>The interactive chessboard. Drag or click pieces to make moves when it is a human player&rsquo;s turn.</td></tr>
+          <tr><td>FEN</td><td>The current board position in Forsyth&ndash;Edwards Notation &mdash; a compact string used to describe any chess position.</td></tr>
+          <tr><td>Game Status</td><td>Shows whose turn it is, check/checkmate/draw state, and end-of-game results.</td></tr>
+          <tr><td>Player Info</td><td>Displays the configured name or AI type for White and Black.</td></tr>
+          <tr><td>Captured Pieces</td><td>Lists pieces each side has taken, plus the material advantage score.</td></tr>
+          <tr><td>Game ID box</td><td>Appears during a human-vs-human online game; shows the shared game identifier your opponent uses to join.</td></tr>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>Welcome Tab</h3>
+        <table class="help-table">
+          <tr><td>Start New Game</td><td>Resets the board and goes to Player Setup to configure a fresh game.</td></tr>
+          <tr><td>My Saves</td><td>Opens a list of games you have saved; click Load to restore one.</td></tr>
+          <tr><td>Practice</td><td>Shows endgame drills and puzzle positions to sharpen your skills.</td></tr>
+          <tr><td>Classic Games</td><td>Opens the Player Setup preset picker pre-focused on famous historic games.</td></tr>
+          <tr><td>Chess News</td><td>Displays a recent chess news headline fetched from the engine.</td></tr>
+          <tr><td>Chess Joke</td><td>Fetches a chess-themed joke from the AI expert.</td></tr>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>Player Setup Tab</h3>
+        <table class="help-table">
+          <tr><td>White / Black Player</td><td>Choose <em>Human</em> (enter a name) or <em>AI</em> (pick an engine and skill level 1&ndash;20).</td></tr>
+          <tr><td>AI Type</td><td>Stockfish (local engine), OpenAI GPT, DeepSeek, or Claude.</td></tr>
+          <tr><td>Skill Level</td><td>1 = easiest, 20 = strongest. Only applies to Stockfish.</td></tr>
+          <tr><td>White Opening / Black Defense</td><td>Optional strategic preference applied to the AI&rsquo;s early moves.</td></tr>
+          <tr><td>Classic Games preset</td><td>Loads the moves of a famous historic game for step-through review or replay.</td></tr>
+          <tr><td>Preset Openings</td><td>Jumps the board to the end of a well-known opening sequence.</td></tr>
+          <tr><td>Custom Moves</td><td>Type PGN notation (e.g. <code>1.e4 e5 2.Nf3</code>) to jump to any position.</td></tr>
+          <tr><td>Preview Position</td><td>Applies the custom or preset moves to the board without starting a game.</td></tr>
+          <tr><td>&#x23EE; &#9664; &#9654; &#x23ED; (nav arrows)</td><td>Step through a loaded game or opening move by move.</td></tr>
+          <tr><td>Start New Game</td><td>Begins a game with the current player and position configuration.</td></tr>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>Move History Tab</h3>
+        <table class="help-table">
+          <tr><td>Move list</td><td>Shows every move played in the current game in algebraic notation.</td></tr>
+          <tr><td>💾 Save As&hellip;</td><td>Saves the current game under a name you choose, accessible later via My Saves.</td></tr>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>Ask Expert Tab</h3>
+        <table class="help-table">
+          <tr><td>Quick action buttons</td><td>Pre-written prompts: <em>Analyze position</em>, <em>Best move?</em>, <em>Explain last move</em>, <em>Threats?</em>, <em>Who is winning?</em> &mdash; send instantly with one click.</td></tr>
+          <tr><td>Input + Send</td><td>Type any chess question; the AI expert answers in the context of the live game.</td></tr>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>Community Tab</h3>
+        <table class="help-table">
+          <tr><td>Online users sidebar</td><td>Lists who is currently online (green dot) or in a game (orange dot).</td></tr>
+          <tr><td>✉ DM button</td><td>Opens a compose area to send a private direct message to that user.</td></tr>
+          <tr><td>♟ Invite button</td><td>Sends a game invitation to that user; they can accept or decline.</td></tr>
+          <tr><td>Chat messages</td><td>Public chat visible to all online users. Your own messages are highlighted blue.</td></tr>
+          <tr><td>Message input + Send</td><td>Type and post a message to the public chat.</td></tr>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>Stats Tab</h3>
+        <table class="help-table">
+          <tr><td>Win / Loss / Draw cards</td><td>Lifetime totals across all opponents.</td></tr>
+          <tr><td>Per-opponent table</td><td>Breakdown of results against each opponent you have played.</td></tr>
+          <tr><td>Reset</td><td>Clears all locally stored statistics (cannot be undone).</td></tr>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>🏅 Rewards Tab</h3>
+        <table class="help-table">
+          <tr><td>Reward cards</td><td>Badges earned by completing classic game reviews. Locked badges show what is still to achieve.</td></tr>
+          <tr><td>Grand Scholar</td><td>Special badge awarded once you complete every available classic game review.</td></tr>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>💬 Feedback Tab</h3>
+        <table class="help-table">
+          <tr><td>Category</td><td>Tag your message as a Bug Report, Suggestion, or Feature Request.</td></tr>
+          <tr><td>Message + Submit</td><td>Sends your feedback to the admin; they will see it even when offline.</td></tr>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>Comm Tab</h3>
+        <table class="help-table">
+          <tr><td>Comm log</td><td>Developer diagnostics showing every HTTP request and response between the browser and the backend services. Useful for troubleshooting.</td></tr>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <!-- Color Choice Modal -->
 <div id="color-choice-overlay" class="color-choice-overlay" style="display:none;"
   onclick="if(event.target===this)closeColorChoiceModal()">
