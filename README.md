@@ -142,9 +142,6 @@ Chess-ai-app/
 ├── user_data/                 # AI model registry (engine volume)
 │   └── ai_models.json        # Registered AI models
 │
-├── data/                      # Shared database directory
-│   └── users.db              # SQLite database (shared volume)
-│
 ├── docs/                      # Documentation
 │   └── Docker_Design.md     # Architecture documentation
 │
@@ -468,6 +465,7 @@ This allows switching accounts without having to first navigate to the admin pan
 | `/auth/change-password` | POST | Update password |
 | `/auth/refresh` | POST | Refresh JWT token |
 | `/auth/activity` | POST | Update online/playing status |
+| `/auth/resend-verification` | POST | Resend email verification link |
 | `/admin-auth/login` | POST | **Admin-only login** — served on port 8003 (Docker-internal); rate limited to 3 attempts |
 
 ### Community API Endpoints
@@ -956,6 +954,33 @@ CREATE TABLE classic_game_reviews (
     game_key TEXT NOT NULL,
     completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(username, game_key)
+);
+```
+
+### Feedback Table Schema
+
+```sql
+CREATE TABLE feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    category TEXT NOT NULL,
+    message TEXT NOT NULL,
+    status TEXT DEFAULT 'open',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP
+);
+```
+
+### Community Messages Table Schema
+
+```sql
+CREATE TABLE community_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sender TEXT NOT NULL,
+    content TEXT NOT NULL,
+    message_type TEXT DEFAULT 'chat',
+    target_users TEXT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
