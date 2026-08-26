@@ -12,7 +12,12 @@ import os
 import secrets
 import bcrypt
 import jwt
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from datetime import datetime, timezone, timedelta
+from collections import defaultdict
+from threading import Lock
 
 app = FastAPI(title="Chess Auth Service", version="1.0.0")
 
@@ -30,6 +35,66 @@ JWT_SECRET = os.environ.get("JWT_SECRET_KEY", "chess-app-secret-key-change-in-pr
 JWT_EXPIRATION_HOURS = int(os.environ.get("JWT_EXPIRATION_HOURS", "24"))
 DATABASE_PATH = os.environ.get("DATABASE_PATH", "/app/data/users.db")
 DEV_MODE = os.environ.get("CHESS_DEV_MODE", "").lower() == "true"
+SMTP_HOST = os.environ.get("SMTP_HOST", "")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER", "")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+SMTP_FROM_EMAIL = os.environ.get("SMTP_FROM_EMAIL", SMTP_USER)
+APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:8080")
+
+def send_verification_email(to_email: str, username: str, token: str) -> None:
+    """Send email verification link via SMTP. Logs on failure without raising."""
+    if not SMTP_HOST or not SMTP_USER or not SMTP_PASSWORD:
+        print(f"[EMAIL] SMTP not configured — verification token for {username}: {token}")
+        return
+    verify_url = f"{APP_BASE_URL}/?verify_token={token}"
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "Verify your Chess AI account"
+    msg["From"] = SMTP_FROM_EMAIL or SMTP_USER
+    msg["To"] = to_email
+    html = (
+        f"<p>Hi {username},</p>"
+        f"<p>Click the link below to verify your email address:</p>"
+        f"<p><a href='{verify_url}'>Verify my account</a></p>"
+        f"<p>If you did not register, you can ignore this email.</p>"
+    )
+    msg.attach(MIMEText(html, "html"))
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(SMTP_USER, to_email, msg.as_string())
+    except Exception as e:
+        print(f"[EMAIL] Failed to send verification email to {to_email}: {e}")
+
+
+# Admin login rate limiting (3 failed attempts → 15-min lockout)
+_ADMIN_MAX_ATTEMPTS = 3
+_ADMIN_LOCKOUT_MINUTES = 15
+_admin_failed: dict = defaultdict(list)
+_admin_lock = Lock()
+
+
+def _admin_check_rate(key: str) -> tuple:
+    """Returns (is_locked, remaining_seconds)."""
+    with _admin_lock:
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(minutes=_ADMIN_LOCKOUT_MINUTES)
+        _admin_failed[key] = [t for t in _admin_failed[key] if t > cutoff]
+        if len(_admin_failed[key]) >= _ADMIN_MAX_ATTEMPTS:
+            unlock_at = _admin_failed[key][0] + timedelta(minutes=_ADMIN_LOCKOUT_MINUTES)
+            return True, max(0, int((unlock_at - now).total_seconds()))
+        return False, 0
+
+
+def _admin_record_failure(key: str):
+    with _admin_lock:
+        _admin_failed[key].append(datetime.now(timezone.utc))
+
+
+def _admin_clear(key: str):
+    with _admin_lock:
+        _admin_failed.pop(key, None)
 
 
 # Pydantic models
@@ -57,10 +122,20 @@ class VerifyEmailRequest(BaseModel):
     token: str
 
 
+class ResendVerificationRequest(BaseModel):
+    username: str
+
+
 # Database functions
+def _sqlite_connect(path: str) -> sqlite3.Connection:
+    """Open a SQLite connection using unix-dotfile VFS for Azure Files SMB compatibility."""
+    uri = f"file:{path}?vfs=unix-dotfile"
+    return sqlite3.connect(uri, uri=True, timeout=30, check_same_thread=False)
+
+
 def get_db():
     """Get database connection."""
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = _sqlite_connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -69,7 +144,7 @@ def init_db():
     """Initialize the database."""
     os.makedirs(os.path.dirname(DATABASE_PATH), exist_ok=True)
     
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = _sqlite_connect(DATABASE_PATH)
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -99,7 +174,30 @@ def init_db():
     ]:
         if col not in existing_columns:
             cursor.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
+
+    # Classic game reviews tracking
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS classic_game_reviews (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            game_key TEXT NOT NULL,
+            completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(username, game_key)
+        )
+    ''')
     
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS feedback (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            category TEXT NOT NULL,
+            message TEXT NOT NULL,
+            status TEXT DEFAULT 'open',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            resolved_at TIMESTAMP
+        )
+    ''')
+
     # Create default admin if not exists
     cursor.execute("SELECT id FROM users WHERE username = ?", ("admin",))
     if not cursor.fetchone():
@@ -147,6 +245,75 @@ def verify_jwt_token(token: str) -> Optional[dict]:
         return None
 
 
+# ── Admin auth app (port 8003 — Docker-internal only, not published to host) ──
+admin_app = FastAPI(title="Chess Admin Auth", version="1.0.0")
+admin_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.post("/admin-auth/login")
+@admin_app.post("/admin-auth/login")
+async def admin_login(request: LoginRequest):
+    """Admin-only login. Rate limited: 3 failed attempts triggers a 15-min lockout."""
+    username_key = request.username.strip().lower()
+
+    locked, remaining = _admin_check_rate(username_key)
+    if locked:
+        mins, secs = divmod(remaining, 60)
+        return {"success": False, "message": f"Too many failed attempts. Try again in {mins}m {secs}s."}
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT id, username, email, password_hash, is_admin, is_verified
+        FROM users
+        WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)
+    ''', (request.username, request.username))
+    user = cursor.fetchone()
+    conn.close()
+
+    if not user or not bool(user["is_admin"]):
+        _admin_record_failure(username_key)
+        return {"success": False, "message": "Invalid credentials."}
+
+    try:
+        if not bcrypt.checkpw(request.password.encode(), user["password_hash"].encode()):
+            _admin_record_failure(username_key)
+            return {"success": False, "message": "Invalid credentials."}
+    except Exception:
+        _admin_record_failure(username_key)
+        return {"success": False, "message": "Invalid credentials."}
+
+    if not user["is_verified"]:
+        return {"success": False, "message": "Account not verified."}
+
+    _admin_clear(username_key)
+    token = create_token(user["username"], True, user["email"])
+
+    conn2 = get_db()
+    cur2 = conn2.cursor()
+    now = datetime.now(timezone.utc).isoformat()
+    cur2.execute(
+        "UPDATE users SET last_login = ?, last_activity = ?, current_activity = 'online' WHERE username = ?",
+        (now, now, user["username"])
+    )
+    conn2.commit()
+    conn2.close()
+
+    return {
+        "success": True,
+        "message": f"Welcome back, {user['username']}!",
+        "token": token,
+        "username": user["username"],
+        "is_admin": True
+    }
+
+
 # Startup
 @app.on_event("startup")
 async def startup():
@@ -187,7 +354,11 @@ async def login(request: LoginRequest):
     
     if not user:
         return {"success": False, "message": "Invalid username or password."}
-    
+
+    # Admin accounts must use the dedicated secure endpoint (port 8003, Docker-internal only)
+    if bool(user["is_admin"]):
+        return {"success": False, "message": "Please use the admin login.", "use_admin_login": True}
+
     # Verify password
     try:
         if not bcrypt.checkpw(request.password.encode(), user["password_hash"].encode()):
@@ -261,10 +432,11 @@ async def register(request: RegisterRequest):
                 "message": "Registration successful! (Dev mode: auto-verified)",
                 "verification_token": verification_token
             }
-        
+
+        send_verification_email(request.email, request.username, verification_token)
         return {
             "success": True,
-            "message": "Registration successful! Please check your email for verification."
+            "message": "Registration successful! Please check your email for a verification link."
         }
         
     except sqlite3.IntegrityError as e:
@@ -319,6 +491,34 @@ async def verify_email(request: VerifyEmailRequest):
         "success": True,
         "message": f"Email verified successfully! You can now login, {user['username']}."
     }
+
+
+@app.post("/auth/resend-verification")
+async def resend_verification(request: ResendVerificationRequest):
+    """Resend the email verification link for an unverified user."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, username, email, is_verified FROM users WHERE LOWER(username) = LOWER(?)",
+        (request.username,)
+    )
+    user = cursor.fetchone()
+
+    if not user:
+        conn.close()
+        return {"success": False, "message": "User not found."}
+
+    if user["is_verified"]:
+        conn.close()
+        return {"success": False, "message": "User email is already verified."}
+
+    token = secrets.token_hex(32)
+    cursor.execute("UPDATE users SET verification_token = ? WHERE id = ?", (token, user["id"]))
+    conn.commit()
+    conn.close()
+
+    send_verification_email(user["email"], user["username"], token)
+    return {"success": True, "message": f"Verification email resent to {user['email']}."}
 
 
 @app.post("/auth/logout")
@@ -743,4 +943,277 @@ async def clear_game_activity(authorization: Optional[str] = Header(None)):
     )
     conn.commit()
     conn.close()
+    return {"success": True}
+
+
+# ========== Rewards Endpoints ==========
+
+CLASSIC_GAMES_CATALOG = {
+    'opera-game':         {'name': 'The Opera Game',          'badge': '🎭', 'title': 'Opera Maestro'},
+    'immortal-game':      {'name': 'The Immortal Game',       'badge': '♾️',  'title': 'Immortal Scholar'},
+    'evergreen-game':     {'name': 'The Evergreen Game',      'badge': '🌿', 'title': 'Evergreen Aficionado'},
+    'game-of-century':    {'name': 'Game of the Century',     'badge': '🏆', 'title': 'Century Witness'},
+    'fischer-spassky-g6': {'name': 'Fischer vs Spassky G6',   'badge': '⚔️',  'title': 'Cold War Classic'},
+    'kasparov-topalov':   {'name': "Kasparov's Immortal",     'badge': '👑', 'title': "Kasparov's Devotee"},
+}
+
+GRAND_SCHOLAR_BADGE = {'badge': '🎓', 'title': 'Grand Scholar', 'description': 'Reviewed all 6 classic games'}
+
+
+class CompleteReviewRequest(BaseModel):
+    game_key: str
+
+
+@app.post("/rewards/complete-review")
+async def complete_review(
+    request: CompleteReviewRequest,
+    authorization: Optional[str] = Header(None)
+):
+    """Record that the authenticated user has completed a classic game review."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+
+    game_key = request.game_key.strip()
+    if game_key not in CLASSIC_GAMES_CATALOG:
+        return {"success": False, "message": f"Unknown game key: {game_key}"}
+
+    username = payload.get("username")
+    now = datetime.now(timezone.utc).isoformat()
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Insert if not already recorded (UNIQUE constraint prevents duplicates)
+    cursor.execute(
+        "INSERT OR IGNORE INTO classic_game_reviews (username, game_key, completed_at) VALUES (?, ?, ?)",
+        (username, game_key, now)
+    )
+    newly_completed = cursor.rowcount == 1
+    conn.commit()
+
+    # Fetch all completed game keys for this user
+    cursor.execute(
+        "SELECT game_key FROM classic_game_reviews WHERE username = ?",
+        (username,)
+    )
+    completed_keys = {row["game_key"] for row in cursor.fetchall()}
+    conn.close()
+
+    game_info = CLASSIC_GAMES_CATALOG[game_key]
+    all_complete = completed_keys >= set(CLASSIC_GAMES_CATALOG.keys())
+
+    return {
+        "success": True,
+        "newly_completed": newly_completed,
+        "game_key": game_key,
+        "game_name": game_info["name"],
+        "badge": game_info["badge"],
+        "badge_title": game_info["title"],
+        "completed_count": len(completed_keys),
+        "total_games": len(CLASSIC_GAMES_CATALOG),
+        "grand_scholar_unlocked": all_complete and newly_completed and len(completed_keys) == len(CLASSIC_GAMES_CATALOG),
+    }
+
+
+@app.get("/rewards/my-reviews")
+async def my_reviews(authorization: Optional[str] = Header(None)):
+    """Return the authenticated user's classic game review progress and earned badges."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+
+    username = payload.get("username")
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT game_key, completed_at FROM classic_game_reviews WHERE username = ? ORDER BY completed_at",
+        (username,)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    completed = {row["game_key"]: row["completed_at"] for row in rows}
+
+    games = []
+    for key, info in CLASSIC_GAMES_CATALOG.items():
+        games.append({
+            "game_key": key,
+            "game_name": info["name"],
+            "badge": info["badge"],
+            "badge_title": info["title"],
+            "completed": key in completed,
+            "completed_at": completed.get(key),
+        })
+
+    all_complete = len(completed) == len(CLASSIC_GAMES_CATALOG)
+    return {
+        "success": True,
+        "username": username,
+        "games": games,
+        "completed_count": len(completed),
+        "total_games": len(CLASSIC_GAMES_CATALOG),
+        "grand_scholar": all_complete,
+        "grand_scholar_badge": GRAND_SCHOLAR_BADGE if all_complete else None,
+    }
+
+
+# ========== Feedback Endpoints ==========
+
+FEEDBACK_CATEGORIES = ('bug', 'suggestion', 'feature')
+FEEDBACK_CATEGORY_LABELS = {
+    'bug': 'Bug Report',
+    'suggestion': 'Suggestion',
+    'feature': 'Feature Request',
+}
+
+
+class FeedbackRequest(BaseModel):
+    category: str
+    message: str
+
+
+@app.post("/feedback/submit")
+async def submit_feedback(
+    request: FeedbackRequest,
+    authorization: Optional[str] = Header(None)
+):
+    """Submit a feedback message. Requires authentication."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+
+    category = request.category.strip().lower()
+    if category not in FEEDBACK_CATEGORIES:
+        return {"success": False, "message": f"Invalid category. Must be one of: {', '.join(FEEDBACK_CATEGORIES)}"}
+
+    message = request.message.strip()
+    if not message:
+        return {"success": False, "message": "Message cannot be empty."}
+    if len(message) > 2000:
+        return {"success": False, "message": "Message too long (max 2000 characters)."}
+
+    username = payload.get("username")
+    now = datetime.now(timezone.utc).isoformat()
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO feedback (username, category, message, created_at) VALUES (?, ?, ?, ?)",
+        (username, category, message, now)
+    )
+    conn.commit()
+    feedback_id = cursor.lastrowid
+    conn.close()
+
+    return {"success": True, "id": feedback_id, "message": "Feedback submitted. Thank you!"}
+
+
+@app.get("/feedback/list")
+async def list_feedback(
+    status: Optional[str] = None,
+    authorization: Optional[str] = Header(None)
+):
+    """Return all feedback. Admin only."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+    if not payload.get("is_admin"):
+        return {"success": False, "message": "Admin privileges required."}
+
+    conn = get_db()
+    cursor = conn.cursor()
+    if status in ('open', 'resolved'):
+        cursor.execute(
+            "SELECT id, username, category, message, status, created_at, resolved_at FROM feedback WHERE status = ? ORDER BY created_at DESC",
+            (status,)
+        )
+    else:
+        cursor.execute(
+            "SELECT id, username, category, message, status, created_at, resolved_at FROM feedback ORDER BY created_at DESC"
+        )
+    rows = cursor.fetchall()
+    conn.close()
+
+    return {
+        "success": True,
+        "feedback": [
+            {
+                "id": row["id"],
+                "username": row["username"],
+                "category": row["category"],
+                "category_label": FEEDBACK_CATEGORY_LABELS.get(row["category"], row["category"]),
+                "message": row["message"],
+                "status": row["status"],
+                "created_at": row["created_at"],
+                "resolved_at": row["resolved_at"],
+            }
+            for row in rows
+        ]
+    }
+
+
+@app.post("/feedback/{feedback_id}/resolve")
+async def resolve_feedback(
+    feedback_id: int,
+    authorization: Optional[str] = Header(None)
+):
+    """Mark a feedback item as resolved (or re-open if already resolved). Admin only."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+    if not payload.get("is_admin"):
+        return {"success": False, "message": "Admin privileges required."}
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, status FROM feedback WHERE id = ?", (feedback_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return {"success": False, "message": "Feedback not found."}
+
+    new_status = 'open' if row["status"] == 'resolved' else 'resolved'
+    resolved_at = datetime.now(timezone.utc).isoformat() if new_status == 'resolved' else None
+    cursor.execute(
+        "UPDATE feedback SET status = ?, resolved_at = ? WHERE id = ?",
+        (new_status, resolved_at, feedback_id)
+    )
+    conn.commit()
+    conn.close()
+    return {"success": True, "status": new_status}
+
+
+@app.delete("/feedback/{feedback_id}")
+async def delete_feedback(
+    feedback_id: int,
+    authorization: Optional[str] = Header(None)
+):
+    """Delete a feedback item. Admin only."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+    if not payload.get("is_admin"):
+        return {"success": False, "message": "Admin privileges required."}
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM feedback WHERE id = ?", (feedback_id,))
+    deleted = cursor.rowcount
+    conn.commit()
+    conn.close()
+    if not deleted:
+        return {"success": False, "message": "Feedback not found."}
     return {"success": True}

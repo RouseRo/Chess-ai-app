@@ -112,8 +112,15 @@ chess-ai-app/
 ├── ui/                        # Frontend web UI
 │   ├── Dockerfile
 │   ├── nginx.conf
+│   ├── nginx.local.conf       # Local dev nginx config
+│   ├── package.json
+│   ├── tsconfig.json
 │   ├── index.html             # Login/Register + game interface (single-page app)
 │   ├── admin.html             # Admin dashboard
+│   ├── mobile.html            # Mobile-optimised interface
+│   ├── game-play.ts
+│   ├── player-selection.ts
+│   ├── helloworld.ts
 │   ├── chessboard.js
 │   ├── chessboard.css
 │   └── img/
@@ -121,6 +128,7 @@ chess-ai-app/
 ├── auth-service/              # Authentication service
 │   ├── Dockerfile
 │   ├── main.py
+│   ├── start.sh               # Launches both port 8002 and port 8003 processes
 │   └── requirements.txt
 │
 ├── admin-service/             # Admin management service
@@ -131,9 +139,7 @@ chess-ai-app/
 ├── data/                      # Shared database directory
 │   └── users.db              # SQLite database (shared volume)
 │
-├── scripts/                   # Utility scripts
-│   ├── setup_test_user.py    # Create/reset test users
-│   └── migrate_json_to_sqlite.py
+├── scripts/                   # Utility scripts (currently empty)
 │
 ├── docs/                      # Documentation
 │   └── Docker_Design.md
@@ -151,7 +157,8 @@ chess-ai-app/
 **Purpose:** Serves the frontend web application with interactive chessboard.
 
 **Tech Stack:**
-- nginx (Alpine-based)
+- Node.js 20 / TypeScript (build stage)
+- nginx (Alpine-based, serve stage)
 - HTML/CSS/JavaScript
 - chessboard.js library
 - chess.js for move validation
@@ -162,10 +169,23 @@ chess-ai-app/
 | `index.html` | Login/Register + game interface (single-page app) |
 | `admin.html` | Admin dashboard |
 
-**Dockerfile:**
+**Dockerfile** (multi-stage build — TypeScript compiled before serving):
 ```dockerfile
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY . .
+RUN npm install && chmod +x node_modules/.bin/tsc
+RUN npm run build
+RUN cp index.html dist/ || true
+RUN cp admin.html dist/ || true
+RUN cp mobile.html dist/ || true
+RUN [ -d "assets" ] && cp -r assets dist/ || true
+RUN cp chessboard.js dist/ || true
+RUN cp chessboard.css dist/ || true
+RUN [ -d "img" ] && cp -r img dist/ || true
+
 FROM nginx:alpine
-COPY . /usr/share/nginx/html
+COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 ```
@@ -196,11 +216,18 @@ EXPOSE 80
 ```dockerfile
 FROM python:3.12-slim
 WORKDIR /app
-COPY requirements.txt .
+RUN apt-get update && apt-get install -y \
+    curl \
+    stockfish \
+    && rm -rf /var/lib/apt/lists/*
+COPY engine/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
+COPY engine/ ./engine/
+COPY src/ ./src/
+COPY user_data/ ./user_data/
+ENV STOCKFISH_PATH=/usr/games/stockfish
 EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "engine.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 ---
@@ -228,8 +255,15 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 | `/auth/verify-email` | POST | Verify email with token |
 | `/auth/refresh` | POST | Refresh JWT token |
 | `/auth/logout` | POST | Logout (client-side) |
-| `/auth/change-password` | POST | Update password |
-
+| `/auth/change-password` | POST | Update password || `/auth/activity` | POST | Update online/playing status |
+| `/community/online-users` | GET | List currently online users |
+| `/community/messages` | GET | Get recent chat and DMs |
+| `/community/messages` | POST | Post a public chat message |
+| `/community/dm` | POST | Send a direct message |
+| `/community/game-invite` | POST | Send a game invitation |
+| `/community/clear-activity` | POST | Clear own game activity status |
+| `/rewards/complete-review` | POST | Record a classic game review completion |
+| `/rewards/my-reviews` | GET | Fetch review progress and earned badges |
 **Login Request (supports username OR email):**
 ```json
 {
@@ -264,11 +298,20 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```dockerfile
 FROM python:3.12-slim
 WORKDIR /app
-COPY requirements.txt .
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+COPY auth-service/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
+COPY auth-service ./auth-service
+COPY engine ./engine
+COPY user_data ./user_data
 EXPOSE 8002
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8002"]
+EXPOSE 8003
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8002/health || exit 1
+# Launches auth on 8002 (public) and admin_app on 8003 (internal)
+COPY auth-service/start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+CMD ["/bin/sh", "/app/start.sh"]
 ```
 
 ---
@@ -287,11 +330,13 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8002"]
 |----------|--------|------|-------------|
 | `/health` | GET | No | Health check |
 | `/admin/stats` | GET | No | System statistics |
-| `/admin/users` | GET | No | List all users |
-| `/admin/users/{username}/promote` | POST | Yes | Promote user to admin |
-| `/admin/users/{username}/demote` | POST | Yes | Demote admin to user |
-| `/admin/users/{username}/verify` | POST | Yes | Manually verify user |
-| `/admin/users/{username}` | DELETE | Yes | Delete user |
+| `/admin/users` | GET | No | List all users with online status |
+| `/admin/users/{username}` | GET | No | Get detailed user info |
+| `/admin/users/{username}/promote` | POST | No | Promote user to admin |
+| `/admin/users/{username}/demote` | POST | No | Demote admin to user |
+| `/admin/users/{username}/verify` | POST | No | Manually verify user |
+| `/admin/users/{username}` | DELETE | No | Delete user |
+| `/admin/models` | GET | Yes | List configured AI models |
 
 **Stats Response Example:**
 ```json
@@ -308,11 +353,16 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8002"]
 ```dockerfile
 FROM python:3.12-slim
 WORKDIR /app
-COPY requirements.txt .
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+COPY admin-service/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
+COPY admin-service ./admin-service
+COPY engine ./engine
+COPY user_data ./user_data
 EXPOSE 8001
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:8001/health')"
+CMD ["uvicorn", "admin-service.main:app", "--host", "0.0.0.0", "--port", "8001"]
 ```
 
 ---
@@ -321,17 +371,22 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
 
 **docker-compose.yml:**
 ```yaml
-version: '3.8'
-
 services:
   chess-engine:
-    build: ./engine
+    build:
+      context: .
+      dockerfile: engine/Dockerfile
     container_name: chess-engine
     ports:
       - "8000:8000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-chess-ai-secret-key-change-in-production}
+      - AUTH_SERVICE_URL=http://auth-service:8002
+    volumes:
+      - ./engine:/app/engine
+      - ./src:/app/src
+      - ./user_data:/app/user_data
     networks:
       - chess-network
     healthcheck:
@@ -339,28 +394,27 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
-  chess-ui:
-    build: ./ui
-    container_name: chess-ui
-    ports:
-      - "8080:80"
-    depends_on:
-      - chess-engine
-      - auth-service
-    networks:
-      - chess-network
+      start_period: 10s
 
   auth-service:
-    build: ./auth-service
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
     container_name: chess-auth-service
     ports:
       - "8002:8002"
+    expose:
+      - "8003"
     environment:
       - DATABASE_PATH=/app/data/users.db
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-chess-app-secret-key}
-      - JWT_EXPIRATION_HOURS=${JWT_EXPIRATION_HOURS:-24}
       - CHESS_DEV_MODE=${CHESS_DEV_MODE:-false}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-}
+      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:8080}
     volumes:
       - ./data:/app/data
     networks:
@@ -370,9 +424,12 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
 
   admin-service:
-    build: ./admin-service
+    build:
+      context: .
+      dockerfile: admin-service/Dockerfile
     container_name: chess-admin-service
     ports:
       - "8001:8001"
@@ -380,8 +437,7 @@ services:
       - DATABASE_PATH=/app/data/users.db
     volumes:
       - ./data:/app/data
-    depends_on:
-      - auth-service
+      - ./user_data:/app/user_data
     networks:
       - chess-network
     healthcheck:
@@ -389,6 +445,22 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
+
+  chess-ui:
+    build: ./ui
+    container_name: chess-ui
+    ports:
+      - "8080:80"
+    volumes:
+      - ./ui:/usr/share/nginx/html
+      - ./ui/nginx.local.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - chess-engine
+      - auth-service
+      - admin-service
+    networks:
+      - chess-network
 
 networks:
   chess-network:
@@ -420,7 +492,22 @@ CREATE TABLE IF NOT EXISTS users (
     is_verified BOOLEAN DEFAULT 0,
     verification_token TEXT,
     games_count INTEGER DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login TIMESTAMP,
+    last_activity TIMESTAMP,
+    current_activity TEXT DEFAULT 'offline'
+);
+```
+
+### Classic Game Reviews Table Schema
+
+```sql
+CREATE TABLE classic_game_reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    game_key TEXT NOT NULL,
+    completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(username, game_key)
 );
 ```
 
@@ -431,15 +518,15 @@ Created automatically on first startup or via setup script:
 | Username | Email | Password | Admin | Verified |
 |----------|-------|----------|-------|----------|
 | `admin` | `admin@chess.local` | `admin123` | Yes | Yes |
+| `testuser` | `testuser@chess.local` | `Chess123` | No | Yes |
 | `johndoe` | `john@example.com` | `password123` | No | Yes |
 
 ### Setup Test Users
 
-```powershell
-# Run the setup script
-python scripts/setup_test_user.py
+Default users are created automatically by the auth service on first startup. To reset or inspect user data, connect to the running container:
 
-# Copy database to container (if needed)
+```powershell
+# Copy an existing database into the container (if needed)
 docker cp data/users.db chess-auth-service:/app/data/users.db
 
 # Restart auth service
@@ -572,14 +659,20 @@ Create a `.env` file in the project root:
 ```env
 # AI API Keys
 OPENAI_API_KEY=your_openai_key
-DEEPSEEK_API_KEY=your_deepseek_key
 
 # JWT Configuration
 JWT_SECRET_KEY=your-secure-secret-key-change-in-production
-JWT_EXPIRATION_HOURS=24
 
 # Development Mode (auto-verifies new users)
 CHESS_DEV_MODE=false
+
+# Email verification (optional — users auto-verified if unset)
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASSWORD=
+SMTP_FROM_EMAIL=
+APP_BASE_URL=http://localhost:8080
 ```
 
 ---
@@ -594,7 +687,7 @@ CHESS_DEV_MODE=false
 | JWT Authentication | ✅ Implemented |
 | Unified User Storage | ✅ Single SQLite database |
 | CORS | ⚠️ Open (restrict in prod) |
-| HTTPS | ❌ Not configured |
+| HTTPS | ✅ Enabled on Azure (Container Apps TLS) / ❌ Local Docker only |
 | Rate Limiting | ❌ Not implemented |
 | Input Validation | ✅ Basic |
 
@@ -605,7 +698,7 @@ CHESS_DEV_MODE=false
 3. **Add Rate Limiting** - Prevent brute force attacks
 4. **Use Strong JWT Secret** - Generate secure random key
 5. **Database Backup** - Regular SQLite backups
-6. **Change Default Passwords** - Update admin/johndoe on first use
+6. **Change Default Passwords** - Update admin/testuser/johndoe on first use
 7. **Environment Variables** - Never commit secrets to git
 
 ---
@@ -637,31 +730,85 @@ docker exec -it chess-admin-service /bin/bash
 
 ---
 
+## Azure Deployment
+
+The application is deployed to **Azure Container Apps** (ACA) with all four services running as separate container apps in a shared environment.
+
+### Deployed Services
+
+| Container App | Ingress | Port | Description |
+|---------------|---------|------|-------------|
+| `chess-ui` | External (public) | 80 | Nginx frontend — the only public entry point |
+| `chess-engine` | Internal | 8000 | Chess engine & game logic |
+| `chess-auth` | External (public) | 8002 | JWT authentication service |
+| `chess-admin` | Internal | 8001 | Admin dashboard backend |
+
+### Public URLs
+
+| Service | URL |
+|---------|-----|
+| Chess UI | `https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
+| Chess Auth | `https://chess-auth.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
+
+### nginx Proxy Routing (chess-ui)
+
+All browser requests go to `chess-ui`. nginx routes them to the appropriate backend:
+
+| Path prefix | Proxy target | Transport |
+|-------------|-------------|----------|
+| `/auth/`, `/community/`, `/rewards/` | `chess-auth` external HTTPS URL | HTTPS (external ACA URL) |
+| `/admin/` | `chess-admin` internal ACA FQDN | HTTPS (internal ACA FQDN) |
+| `/move`, `/game/`, `/expert/` | `chess-engine` K8s ClusterIP | HTTP (internal) |
+
+> **Note:** `chess-auth` uses its public HTTPS URL rather than the K8s ClusterIP because ACA's internal Envoy routing can become corrupted after a container app is deleted and recreated. Using the external URL bypasses this. `chess-admin` uses the internal ACA FQDN (`chess-admin.internal.calmdesert-0b7461a5.eastus.azurecontainerapps.io`) for the same reason, while keeping the service private.
+
+### Persistent Storage
+
+Both `chess-auth` and `chess-admin` mount the same Azure Files share (`chessdata`) for the SQLite database:
+
+| Share | Mount path | Used by |
+|-------|-----------|--------|
+| `chessdata` | `/app/data` | chess-auth, chess-admin |
+| `chessuserdata` | `/app/user_data` | chess-engine |
+
+> **SQLite on Azure Files:** Azure Files (SMB) does not support POSIX `fcntl()` advisory locks. All `sqlite3.connect()` calls use the `unix-dotfile` VFS with a 30-second timeout: `sqlite3.connect("file:path?vfs=unix-dotfile", uri=True, timeout=30)`.
+
+### Azure Resources
+
+| Resource | Name |
+|----------|------|
+| Resource Group | `chess-ai-rg` |
+| Location | `eastus` |
+| Container Registry | `chessairegistry7646` |
+| Storage Account | `chessaistorage4996` |
+| Container Apps Environment | `chess-ai-env` |
+
+---
+
 ## Migration from JSON to SQLite
 
-If you have existing users in JSON files (`user_data/users/profiles/*.json`), run the migration script:
-
-```powershell
-python scripts/migrate_json_to_sqlite.py
-docker cp data/users.db chess-auth-service:/app/data/users.db
-docker-compose restart auth-service
-```
+If you have existing users in JSON files (`user_data/users/profiles/*.json`), import them manually into the SQLite database (`data/users.db`) before starting the services.
 
 ---
 
 ## Future Enhancements
 
-- [ ] WebSocket support for real-time games
+- [ ] WebSocket support for real-time games (currently 2-second polling)
 - [ ] Redis for session management
 - [ ] PostgreSQL for production database
 - [ ] Kubernetes deployment
 - [ ] CI/CD pipeline
-- [ ] Game history and replay
-- [ ] Multiplayer support
+- [ ] Full game history and replay from saved games
+- [x] Human vs Human multiplayer (browser-to-browser sync via `/game/sync`)
+- [x] Community chat, DMs, and game invitations
+- [x] Classic game review with step-through and move commentary
+- [x] Classic game reward badges and Grand Scholar award
 - [ ] ELO rating system
 - [ ] Email verification with real SMTP
 - [ ] Password reset functionality
 - [ ] OAuth2 social login
+- [ ] Mobile responsive design
+- [ ] Tournament mode
 
 ---
 

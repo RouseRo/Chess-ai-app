@@ -179,6 +179,28 @@
     .expert-quick-btn:hover {
       background-color: #e0e0e0;
     }
+    .expert-quick-btn:active {
+      background-color: #bbdefb;
+      border-color: #2196F3;
+      color: #1565c0;
+    }
+    .expert-loading {
+      cursor: wait !important;
+      opacity: 0.6;
+      animation: expert-pulse 0.9s ease-in-out infinite;
+    }
+    .expert-send-btn.expert-loading {
+      background-color: #90caf9;
+    }
+    .expert-quick-btn.expert-loading {
+      background-color: #e3f2fd;
+      border-color: #90caf9;
+      color: #1565c0;
+    }
+    @keyframes expert-pulse {
+      0%, 100% { opacity: 0.6; }
+      50%       { opacity: 0.25; }
+    }
     .expert-qa-entry {
       border: 1px solid #e0e0e0;
       border-radius: 4px;
@@ -522,6 +544,16 @@
       display: inline-block; background: #f44336; color: white; border-radius: 10px;
       font-size: 0.7em; padding: 1px 5px; margin-left: 4px; vertical-align: middle; line-height: 1.4;
     }
+    /* Classic game review badges */
+    .classic-game-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+    .classic-game-badge {
+      display: inline-block; padding: 2px 7px; border-radius: 10px;
+      font-size: 0.74em; font-weight: 600; line-height: 1.5; white-space: nowrap;
+    }
+    .cgb-era    { background: #e3f2fd; color: #1565c0; border: 1px solid #90caf9; }
+    .cgb-theme  { background: #fce4ec; color: #880e4f; border: 1px solid #f48fb1; }
+    .cgb-result { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+    .cgb-fact   { background: #fff8e1; color: #e65100; border: 1px solid #ffcc80; }
     /* Direct Message styling */
     .comm-msg-dm { background: #f3e5f5; border-left: 3px solid #9c27b0; }
     .comm-msg-dm .comm-msg-sender { color: #6a1b9a; }
@@ -579,6 +611,57 @@
     #dm-compose .dm-compose-header { font-size: 0.82em; color: #6a1b9a; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
     #dm-compose .dm-input-row { display: flex; gap: 5px; }
     #dm-compose-input { flex: 1; padding: 5px 8px; border: 1px solid #ce93d8; border-radius: 4px; font-size: 0.9em; }
+    /* ── Rewards system ───────────────────────────────────────────────────── */
+    .rewards-header { margin-bottom: 12px; }
+    .rewards-progress-bar-wrap { height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; }
+    .rewards-progress-bar { height: 100%; background: linear-gradient(90deg, #4CAF50, #81C784); border-radius: 4px; transition: width 0.5s ease; }
+    .rewards-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .reward-card { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 6px; border: 1px solid #e0e0e0; background: #fafafa; }
+    .reward-card-earned { background: #f1f8e9; border-color: #a5d6a7; }
+    .reward-card-locked { opacity: 0.55; filter: grayscale(60%); }
+    .reward-card-badge { font-size: 1.8em; flex-shrink: 0; width: 36px; text-align: center; }
+    .reward-card-info { flex: 1; min-width: 0; }
+    .reward-card-title { font-weight: 700; font-size: 0.9em; color: #2e7d32; }
+    .reward-card-locked .reward-card-title { color: #757575; }
+    .reward-card-game { font-size: 0.82em; color: #555; }
+    .reward-card-date { font-size: 0.78em; color: #888; margin-top: 2px; }
+    .reward-grand-scholar { display: flex; align-items: center; gap: 14px; margin-top: 14px; padding: 12px 16px; background: linear-gradient(135deg, #ede7f6, #f3e5f5); border: 2px solid #9c27b0; border-radius: 8px; }
+    .reward-grand-scholar strong { display: block; font-size: 1em; color: #4a148c; }
+    /* Reward toast notification */
+    .reward-toast {
+      position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+      display: flex; align-items: flex-start; gap: 12px;
+      background: #fff; border: 2px solid #4CAF50; border-radius: 10px;
+      padding: 14px 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+      max-width: 340px; animation: rewardSlideIn 0.35s ease;
+    }
+    @keyframes rewardSlideIn {
+      from { opacity: 0; transform: translateY(30px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .reward-toast-badge { font-size: 2.4em; flex-shrink: 0; }
+    .reward-toast-body { flex: 1; min-width: 0; }
+    .reward-toast-title { font-weight: 700; font-size: 0.95em; color: #2e7d32; margin-bottom: 2px; }
+    .reward-toast-game { font-size: 0.85em; color: #555; margin-bottom: 4px; }
+    .reward-toast-progress { font-size: 0.8em; color: #888; }
+    .reward-toast-grand { font-size: 0.82em; color: #6a1b9a; font-weight: 600; }
+    .reward-toast-close { background: none; border: none; cursor: pointer; font-size: 1.1em; color: #999; padding: 0 2px; align-self: flex-start; margin-left: 4px; }
+    .reward-toast-close:hover { color: #333; }
+    /* Help modal */
+    #help-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; display: flex; align-items: center; justify-content: center; }
+    .help-modal { background: #fff; border-radius: 8px; width: 560px; max-width: 95vw; max-height: 82vh; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,0.28); }
+    .help-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px 12px; border-bottom: 1px solid #e0e0e0; flex-shrink: 0; }
+    .help-modal-header h2 { margin: 0; font-size: 1.1em; }
+    .help-close-btn { background: none; border: none; font-size: 1.4em; cursor: pointer; color: #666; padding: 0 4px; line-height: 1; }
+    .help-close-btn:hover { color: #111; }
+    .help-modal-body { overflow-y: auto; padding: 16px 20px 20px; flex: 1; }
+    .help-section { margin-bottom: 18px; }
+    .help-section h3 { margin: 0 0 8px; font-size: 0.95em; color: #333; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+    .help-table { width: 100%; border-collapse: collapse; font-size: 0.87em; }
+    .help-table td { padding: 5px 6px; vertical-align: top; border-bottom: 1px solid #f0f0f0; }
+    .help-table tr:last-child td { border-bottom: none; }
+    .help-table td:first-child { font-weight: 600; white-space: nowrap; color: #1565c0; width: 38%; }
+    .help-table td:last-child { color: #444; line-height: 1.45; }
   </style>
 </head>
 <body>
@@ -589,6 +672,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
   
   <script>
+    const UI_VERSION = '1.0.0';
+
     let authToken = null;
     let currentUser = null;
     let board = null;
@@ -612,8 +697,19 @@
           let _pendingInviteId = null;
           let _pendingInviterUsername = null;
             let _aiGameSetupColor = 'random';
+            let setupReviewMoves = [];   // parsed SAN moves for step-through review
+            let setupReviewIndex = -1;   // current position: 0 = start, n = after n moves
+              let setupReviewComments = {}; // ply-index → commentary string (populated for classic games)
+                  let activeClassicGameKey = '';  // key of the classic game currently under review
 
     function checkAuthentication() {
+      const params = new URLSearchParams(window.location.search);
+      const emailVerifyToken = params.get('verify_token');
+      if (emailVerifyToken) {
+        handleEmailVerification(emailVerifyToken);
+        return;
+      }
+
       const token = localStorage.getItem('authToken');
       const user = localStorage.getItem('currentUser');
 
@@ -626,6 +722,38 @@
       currentUser = user;
       verifyToken(token);
     }
+
+        function handleEmailVerification(token) {
+          document.getElementById('app').innerHTML = `
+        <div id="auth-container" style="text-align:center;">
+          <h2>Chess AI App</h2>
+          <p>Verifying your email address&#8230;</p>
+        </div>`;
+          fetch('/auth/verify-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token })
+          })
+            .then(r => r.json())
+            .then(data => {
+              document.getElementById('app').innerHTML = `
+            <div id="auth-container" style="text-align:center;">
+              <h2>Chess AI App</h2>
+              <p style="color:${data.success ? '#4CAF50' : 'red'}">${data.message}</p>
+              <button onclick="history.replaceState(null,'',location.pathname);showLoginInterface()"
+                style="padding:10px 24px;background:#4CAF50;color:#fff;border:none;border-radius:4px;cursor:pointer;">Go to Login</button>
+            </div>`;
+            })
+            .catch(() => {
+              document.getElementById('app').innerHTML = `
+            <div id="auth-container" style="text-align:center;">
+              <h2>Chess AI App</h2>
+              <p style="color:red">Verification failed. Please try again or contact support.</p>
+              <button onclick="history.replaceState(null,'',location.pathname);showLoginInterface()"
+                style="padding:10px 24px;background:#4CAF50;color:#fff;border:none;border-radius:4px;cursor:pointer;">Go to Login</button>
+            </div>`;
+            });
+        }
 
     function showLoginInterface() {
       const loginHTML = `
@@ -675,7 +803,7 @@
 
         logCommMessage('req', 'AUTH', '/auth/login', { username }, null);
         let _loginStatus = null;
-      fetch('http://localhost:8002/auth/login', {
+        fetch('/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
@@ -695,6 +823,35 @@
             } else {
               loadChessboardInterface();
             }
+          } else if (data.use_admin_login) {
+            // Admin accounts are served by the secure internal endpoint (port 8003)
+            logCommMessage('req', 'AUTH', '/admin-auth/login', { username }, null);
+            let _adminStatus = null;
+            fetch('/admin-auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username, password })
+            })
+              .then(r => { _adminStatus = r.status; return r.json(); })
+              .then(adminData => {
+                logCommMessage('res', 'AUTH', '/admin-auth/login', adminData, _adminStatus);
+                if (adminData.success && adminData.token) {
+                  authToken = adminData.token;
+                  currentUser = username;
+                  localStorage.setItem('authToken', authToken);
+                  localStorage.setItem('currentUser', currentUser);
+                  localStorage.setItem('isAdmin', 'true');
+                  window.location.href = 'admin.html';
+                } else {
+                  errorDiv.textContent = adminData.message || 'Admin login failed';
+                  errorDiv.style.display = 'block';
+                }
+              })
+              .catch(err => {
+                logCommMessage('err', 'AUTH', '/admin-auth/login', { message: err.message }, null);
+                errorDiv.textContent = 'Error: ' + err.message;
+                errorDiv.style.display = 'block';
+              });
           } else {
             errorDiv.textContent = data.detail || data.message || 'Login failed';
             errorDiv.style.display = 'block';
@@ -721,7 +878,7 @@
 
         logCommMessage('req', 'AUTH', '/auth/register', { username, email }, null);
         let _registerStatus = null;
-      fetch('http://localhost:8002/auth/register', {
+        fetch('/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email, password })
@@ -730,8 +887,10 @@
         .then(data => {
           logCommMessage('res', 'AUTH', '/auth/register', data, _registerStatus);
           if (data.success) {
-            alert('Registration successful! Please login.');
-            showLoginInterface();
+            document.getElementById('register-error').style.display = 'none';
+            document.getElementById('auth-form').innerHTML = `
+              <p style="color:#4CAF50;text-align:center;">Registration successful!<br>Please check your email for a verification link.</p>
+              <button onclick="showLoginInterface()" style="width:100%;padding:10px;background-color:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer;">Go to Login</button>`;
           } else {
             errorDiv.textContent = data.detail || data.message || 'Registration failed';
             errorDiv.style.display = 'block';
@@ -744,10 +903,44 @@
         });
     }
 
+        function showAlreadyLoggedIn(username, isAdmin) {
+          const role = isAdmin ? 'Admin' : 'User';
+          const loginHTML = `
+          <div id="auth-container" style="text-align:center;">
+            <h2>Chess AI App</h2>
+            <p>You are already logged in as <strong>${username}</strong> (${role}).</p>
+            ${isAdmin ? '<button onclick="window.location.href=\'admin.html\'" style="width:100%;padding:10px;margin:5px 0;background-color:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer;">Go to Admin Panel</button>' : '<button onclick="loadChessboardInterface()" style="width:100%;padding:10px;margin:5px 0;background-color:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer;">Go to Game</button>'}
+            <button onclick="handleSwitchUser()" style="width:100%;padding:10px;margin:5px 0;background-color:#f44336;color:white;border:none;border-radius:4px;cursor:pointer;">Logout / Switch User</button>
+          </div>
+        `;
+          document.getElementById('app').innerHTML = loginHTML;
+        }
+
+        function handleSwitchUser() {
+          const token = localStorage.getItem('authToken');
+          if (token) {
+            fetch('/auth/logout', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token })
+            }).catch(() => { }).finally(() => {
+              localStorage.removeItem('authToken');
+              localStorage.removeItem('currentUser');
+              localStorage.removeItem('isAdmin');
+              showLoginInterface();
+            });
+          } else {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('currentUser');
+            localStorage.removeItem('isAdmin');
+            showLoginInterface();
+          }
+        }
+
       function verifyToken(token) {
         logCommMessage('req', 'AUTH', '/auth/verify', { token: '(stored token)' }, null);
         let _verifyStatus = null;
-      fetch('http://localhost:8002/auth/verify', {
+        fetch('/auth/verify', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + token }
       })
@@ -757,12 +950,7 @@
           if (data.success) {
             currentUser = data.username;
             localStorage.setItem('isAdmin', data.is_admin ? 'true' : 'false');
-
-            if (data.is_admin) {
-              window.location.href = 'admin.html';
-            } else {
-              loadChessboardInterface();
-            }
+            showAlreadyLoggedIn(data.username, data.is_admin);
           } else {
             localStorage.removeItem('authToken');
             localStorage.removeItem('currentUser');
@@ -872,6 +1060,7 @@
                           let communityUsersPollTimer = null;
                           let communityTabOpen = false;
                           let communityUnreadCount = 0;
+                                  let communityInitialized = false;
                           let communityHideBefore = parseInt(localStorage.getItem('communityHideBefore') || '0', 10);
 
                           function openCommunityTab() {
@@ -905,7 +1094,7 @@
 
                           function refreshCommunityMessages() {
                             if (!authToken) return;
-                            fetch('http://localhost:8002/community/messages?limit=60', {
+                            fetch('/community/messages?limit=60', {
                               headers: { 'Authorization': 'Bearer ' + authToken }
                             })
                               .then(r => r.json())
@@ -914,7 +1103,13 @@
                                 const msgs = data.messages || [];
                                 // Find any new messages since our last known id
                                 const newMsgs = msgs.filter(m => m.id > communityLastId);
-                                if (newMsgs.length > 0) {
+                                if (!communityInitialized) {
+                                  // Seed on first load — don't count existing messages as unread
+                                  communityInitialized = true;
+                                  communityMessages = msgs;
+                                  communityLastId = msgs.length > 0 ? Math.max(...msgs.map(m => m.id)) : 0;
+                                  renderCommunityMessages();
+                                } else if (newMsgs.length > 0) {
                                   communityMessages = msgs;
                                   communityLastId = msgs.length > 0 ? Math.max(...msgs.map(m => m.id)) : communityLastId;
                                   renderCommunityMessages();
@@ -922,12 +1117,6 @@
                                     communityUnreadCount += newMsgs.length;
                                     renderCommunityUnreadBadge();
                                   }
-                                } else if (communityMessages.length === 0 && msgs.length > 0) {
-                                  communityMessages = msgs;
-                                  communityLastId = Math.max(...msgs.map(m => m.id));
-                                  renderCommunityMessages();
-                                } else if (communityMessages.length === 0) {
-                                  communityLastId = 0;
                                 }
                               })
                               .catch(() => { });
@@ -1008,7 +1197,7 @@
                             const content = input.value.trim();
                             if (!content || !authToken) return;
                             input.value = '';
-                            fetch('http://localhost:8002/community/messages', {
+                            fetch('/community/messages', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
                               body: JSON.stringify({ content })
@@ -1045,7 +1234,7 @@
                             const content = input.value.trim();
                             if (!content) return;
                             input.value = '';
-                            fetch('http://localhost:8002/community/dm', {
+                            fetch('/community/dm', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
                               body: JSON.stringify({ recipient: dmRecipient, content })
@@ -1064,7 +1253,7 @@
 
                           function sendGameInvite(recipient) {
                             if (!authToken) return;
-                            fetch('http://localhost:8002/community/game-invite', {
+                            fetch('/community/game-invite', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
                               body: JSON.stringify({ recipient })
@@ -1136,7 +1325,7 @@
                             // Notify inviter via DM
                             if (authToken && inviterUsername) {
                               const dmContent = `I accepted your game invitation! I will play as ${myLabel}${randomNote} — you will play as ${opponentLabel}.`;
-                              fetch('http://localhost:8002/community/dm', {
+                              fetch('/community/dm', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
                                 body: JSON.stringify({ recipient: inviterUsername, content: dmContent })
@@ -1188,7 +1377,7 @@
                             localStorage.setItem('respondedInvites', JSON.stringify([...respondedInvites]));
                             // Send a DM reply to the inviter
                             if (authToken && inviterUsername) {
-                              fetch('http://localhost:8002/community/dm', {
+                              fetch('/community/dm', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
                                 body: JSON.stringify({ recipient: inviterUsername, content: 'Sorry, I declined your chess game invitation.' })
@@ -1196,6 +1385,17 @@
                             }
                             renderCommunityMessages();
                           }
+
+                            // ─── Help Modal ──────────────────────────────────────────────────────
+
+                            function openHelp() {
+                              const el = document.getElementById('help-overlay');
+                              if (el) el.style.display = 'flex';
+                            }
+                            function closeHelp() {
+                              const el = document.getElementById('help-overlay');
+                              if (el) el.style.display = 'none';
+                            }
 
                             // ─── AI Game Setup (from Community panel) ────────────────────────────
 
@@ -1301,7 +1501,7 @@
 
                           function refreshOnlineUsers() {
                             if (!authToken) return;
-                            fetch('http://localhost:8002/community/online-users', {
+                            fetch('/community/online-users', {
                               headers: { 'Authorization': 'Bearer ' + authToken }
                             })
                               .then(r => r.json())
@@ -1518,16 +1718,71 @@
         } else if (type === 'news') {
           const item = CHESS_NEWS_ITEMS[Math.floor(Math.random() * CHESS_NEWS_ITEMS.length)];
           area.innerHTML = `<h4>📰 ${item.title}</h4><p style="margin:0 0 8px;">${item.body}</p><div id="news-details" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid #ddd;color:#444;line-height:1.6;font-size:0.92em;">${item.details}</div><a href="#" id="news-read-more" onclick="toggleNewsDetails(event)" style="font-size:0.85em;color:#1565c0;text-decoration:none;font-weight:500;">Read More →</a>`;
-        } else if (type === 'openings') {
+        } else if (type === 'practice') {
           area.innerHTML = `<h4>📖 Practice Openings</h4>
-              <ul>
+              <ul style="margin:4px 0 8px;">
                 <li><strong>Ruy López</strong> — 1.e4 e5 2.Nf3 Nc6 3.Bb5</li>
                 <li><strong>Sicilian Defence</strong> — 1.e4 c5</li>
                 <li><strong>Italian Game</strong> — 1.e4 e5 2.Nf3 Nc6 3.Bc4</li>
                 <li><strong>Queen's Gambit</strong> — 1.d4 d5 2.c4</li>
                 <li><strong>King's Indian Defence</strong> — 1.d4 Nf6 2.c4 g6</li>
               </ul>
-              <p style="color:#888;margin:4px 0 0;font-size:0.9em;">Set up the position on the board using Player Setup.</p>`;
+              <p style="color:#888;margin:0 0 10px;font-size:0.9em;">Set up an opening using <em>Player Setup → Preset Openings</em>.</p>
+              <hr style="border:none;border-top:1px solid #e0e0e0;margin:0 0 10px;">
+              <h4 style="margin:0 0 6px;">🏁 Practice Endgames — choose a drill:</h4>
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <button class="endgame-drill-btn" onclick="loadEndgamePosition(
+                  '8/8/4k3/4P3/4K3/8/8/8 w - - 0 1',
+                  'King &amp; Pawn vs King',
+                  ['White to move. Can the pawn promote?',
+                   'Tip: Place your king in front of the pawn to escort it.',
+                   'Key concept: Direct opposition — kings facing each other with one square between them.',
+                   'If White king reaches e6 with the pawn on e5, the pawn will promote.']
+                )">
+                  <span style="font-size:1.2em;">♙</span>
+                  <span><strong>King &amp; Pawn vs King</strong><br><small>Opposition &amp; key squares</small></span>
+                </button>
+                <button class="endgame-drill-btn" onclick="loadEndgamePosition(
+                  '4k3/8/8/8/4K3/8/8/R7 w - - 0 1',
+                  'King &amp; Rook vs King',
+                  ['White to move. Drive the black king to the edge and deliver checkmate.',
+                   'Tip: Use your king actively — the rook alone cannot force mate.',
+                   'Key concept: Cut off the black king rank by rank using the rook.',
+                   'Bring your king toward the black king to tighten the net.',
+                   'Final mate typically occurs on the edge or corner of the board.']
+                )">
+                  <span style="font-size:1.2em;">♖</span>
+                  <span><strong>King &amp; Rook vs King</strong><br><small>Basic mating pattern</small></span>
+                </button>
+                <button class="endgame-drill-btn" onclick="loadEndgamePosition(
+                  '1K1k4/1P6/8/8/8/8/r7/2R5 w - - 0 1',
+                  'Lucena Position',
+                  ['White to move and win. The pawn is on the 7th rank — promote it!',
+                   'Key technique: Build a bridge to shelter your king from rook checks.',
+                   'Step 1: Play Rc4 \u2014 use the rook to shield the king from checks.',
+                   'Step 2: Advance your king from b8 with the rook shielding on c4.',
+                   'Step 3: Once the king is safe, the pawn will queen.']
+                )">
+                  <span style="font-size:1.2em;">♖</span>
+                  <span><strong>Lucena Position</strong><br><small>Build a bridge — winning technique</small></span>
+                </button>
+                <button class="endgame-drill-btn" onclick="loadEndgamePosition(
+                  '4k3/8/r7/4PK2/8/8/8/5R2 b - - 0 1',
+                  'Philidor Position',
+                  ['Black to move and draw! This is the classic Philidor defensive technique.',
+                   'Key concept: Keep your rook on rank 6 to cut off the White king.',
+                   'Do NOT let the white king advance past the 6th rank.',
+                   'When the pawn advances to e6, switch immediately to checking from behind (Ra1, Rb1 etc).',
+                   'Checks from behind force the white king in front of the pawn, blocking its own rook.']
+                )">
+                  <span style="font-size:1.2em;">♖</span>
+                  <span><strong>Philidor Position</strong><br><small>Drawing defence with a rook</small></span>
+                </button>
+                <button class="endgame-drill-btn endgame-drill-locked" disabled title="Coming soon">
+                  <span style="font-size:1.2em;">♕</span>
+                  <span><strong>Queen vs Pawn</strong><br><small>Promotion race — coming soon</small></span>
+                </button>
+              </div>`;
         } else if (type === 'endgames') {
           area.innerHTML = `<h4>🏁 Practice Endgames — choose a drill:</h4>
               <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">
@@ -1559,7 +1814,7 @@
                   'Lucena Position',
                   ['White to move and win. The pawn is on the 7th rank — promote it!',
                    'Key technique: Build a bridge to shelter your king from rook checks.',
-                   'Step 1: Play Rc4 to prepare to block the black rook\'s checks.',
+                   'Step 1: Play Rc4 \u2014 use the rook to shield the king from checks.',
                    'Step 2: Advance your king from b8 with the rook shielding on c4.',
                    'Step 3: Once the king is safe, the pawn will queen.']
                 )">
@@ -1570,7 +1825,7 @@
                   '4k3/8/r7/4PK2/8/8/8/5R2 b - - 0 1',
                   'Philidor Position',
                   ['Black to move and draw! This is the classic Philidor defensive technique.',
-                   'Key concept: Keep your rook on the 6th rank (rank 3) to cut off White\'s king.',
+                   'Key concept: Keep your rook on rank 6 to cut off the White king.',
                    'Do NOT let the white king advance past the 6th rank.',
                    'When the pawn advances to e6, switch immediately to checking from behind (Ra1, Rb1 etc).',
                    'Checks from behind force the white king in front of the pawn, blocking its own rook.']
@@ -1933,7 +2188,9 @@
           <h1>Chess AI App</h1>
           <div style="display: flex; gap: 15px; align-items: center;">
             <span>Welcome, <strong>${currentUser}</strong></span>
+            <span id="version-badge" style="font-size:0.72em; color:rgba(255,255,255,0.55); font-family:monospace; letter-spacing:0.02em;">UI ${UI_VERSION}&nbsp;|&nbsp;API&nbsp;…</span>
             <button onclick="clearMyGameActivity()" title="Clear your game activity status" style="padding:6px 12px; font-size:0.85em; background:#607d8b; color:white; border:none; border-radius:4px; cursor:pointer;">Clear Activity</button>
+            <button onclick="openHelp()" title="Help" style="padding:6px 12px; font-size:0.85em; background:#455a64; color:white; border:none; border-radius:4px; cursor:pointer;">? Help</button>
             <button onclick="handleLogout()" class="btn-danger">Logout</button>
           </div>
         </header>
@@ -1994,6 +2251,8 @@
                   <button class="tab-panel-button" onclick="switchTab('community-panel'); openCommunityTab();">Community<span id="community-unread-badge" class="comm-unread-badge" style="display:none;"></span></button>
                   <button class="tab-panel-button" onclick="switchTab('comm-panel')">Comm</button>
                   <button class="tab-panel-button" onclick="switchTab('stats-panel'); renderStatsPanel();">Stats</button>
+                  <button class="tab-panel-button" onclick="switchTab('rewards-panel'); loadMyRewards();">🏅 Rewards</button>
+                  <button class="tab-panel-button" onclick="switchTab('feedback-panel'); initFeedbackTab();">💬 Feedback</button>
                 </div>
 
                 <!-- Welcome Tab -->
@@ -2010,11 +2269,11 @@
                     <button id="my-saves-btn" class="welcome-tab-btn wb-continue" onclick="showMySaves()">
                       <span class="wb-icon">📂</span> My Saves
                     </button>
-                    <button class="welcome-tab-btn" onclick="showWelcomeInfo('openings')">
-                      <span class="wb-icon">📖</span> Practice Openings
+                    <button class="welcome-tab-btn" onclick="showWelcomeInfo('practice')">
+                      <span class="wb-icon">🎯</span> Practice
                     </button>
-                    <button class="welcome-tab-btn" onclick="showWelcomeInfo('endgames')">
-                      <span class="wb-icon">🏁</span> Practice Endgames
+                    <button class="welcome-tab-btn" onclick="startNewGame(); navigateToTab('player-setup-panel'); setTimeout(()=>{var el=document.getElementById('setup-classic-preset');if(el)el.focus();},200);">
+                      <span class="wb-icon">🏆</span> Classic Games
                     </button>
                     <button class="welcome-tab-btn" onclick="showWelcomeInfo('news')">
                       <span class="wb-icon">📰</span> Chess News
@@ -2030,6 +2289,8 @@
                 <div id="player-setup-panel" class="tab-panel-content">
                   <h3 style="margin-top: 0;">Player Setup</h3>
                   
+                  <!-- White Player, Black Player, and Strategy (hidden during classic game review) -->
+                  <div id="player-strategy-sections">
                   <!-- White Player Section -->
                   <div style="border: 1px solid #ddd; padding: 10px; margin: 10px 0; border-radius: 4px;">
                     <label style="display: block; margin: 10px 0; font-weight: bold;">
@@ -2115,6 +2376,79 @@
                     </label>
                   </div>
 
+                  </div><!-- /#player-strategy-sections -->
+
+                  <!-- Position Setup from Moves -->
+                  <div style="border: 1px solid #ddd; padding: 10px; margin: 10px 0; border-radius: 4px;">
+                    <h4 style="margin-top: 0;">Setup Position from Moves</h4>
+                    <label style="display: block; margin-bottom: 8px; font-size: 0.88em; color: #555;">
+                      Classic Games:
+                      <select id="setup-classic-preset" onchange="applyClassicGamePreset()" style="width: 100%; padding: 5px; margin-top: 3px;">
+                        <option value="">-- Select a classic game --</option>
+                        <optgroup label="19th Century">
+                          <option value="opera-game">The Opera Game &mdash; Morphy vs Duke &amp; Count (Paris, 1858)</option>
+                          <option value="immortal-game">The Immortal Game &mdash; Anderssen vs Kieseritzky (London, 1851)</option>
+                          <option value="evergreen-game">The Evergreen Game &mdash; Anderssen vs Dufresne (Berlin, 1852)</option>
+                        </optgroup>
+                        <optgroup label="20th Century">
+                          <option value="game-of-century">Game of the Century &mdash; Byrne vs Fischer (New York, 1956)</option>
+                          <option value="fischer-spassky-g6">Fischer vs Spassky, Game 6 &mdash; World Ch. (Reykjavik, 1972)</option>
+                        </optgroup>
+                        <optgroup label="Modern Era">
+                          <option value="kasparov-topalov">Kasparov&#39;s Immortal &mdash; Kasparov vs Topalov (Wijk aan Zee, 1999)</option>
+                        </optgroup>
+                      </select>
+                    </label>
+                    <div id="setup-classic-info" style="font-size:0.78em; color:#555; font-style:italic; margin-bottom:4px; min-height:1.1em;"></div>
+                    <div id="setup-classic-badges" class="classic-game-badges"></div>
+                    <hr style="border:none; border-top:1px solid #e0e0e0; margin:2px 0 10px;">
+                    <label style="display: block; margin-bottom: 8px; font-size: 0.88em; color: #555;">
+                      Preset Openings:
+                      <select id="setup-opening-preset" onchange="applyOpeningPreset()" style="width: 100%; padding: 5px; margin-top: 3px;">
+                        <option value="">-- Select a preset --</option>
+                        <option value="1.e4 e5 2.Nf3 Nc6 3.Bb5">Ruy López (1.e4 e5 2.Nf3 Nc6 3.Bb5)</option>
+                        <option value="1.e4 e5 2.Nf3 Nc6 3.Bc4">Italian Game (1.e4 e5 2.Nf3 Nc6 3.Bc4)</option>
+                        <option value="1.e4 e5 2.Nf3 Nc6 3.d4">Scotch Game (1.e4 e5 2.Nf3 Nc6 3.d4)</option>
+                        <option value="1.e4 e5 2.f4">King's Gambit (1.e4 e5 2.f4)</option>
+                        <option value="1.e4 c5">Sicilian Defense (1.e4 c5)</option>
+                        <option value="1.e4 e6">French Defense (1.e4 e6)</option>
+                        <option value="1.e4 c6">Caro-Kann Defense (1.e4 c6)</option>
+                        <option value="1.d4 d5 2.c4">Queen's Gambit (1.d4 d5 2.c4)</option>
+                        <option value="1.d4 Nf6 2.c4 g6">King's Indian Defense (1.d4 Nf6 2.c4 g6)</option>
+                        <option value="1.d4 Nf6 2.c4 e6 3.Nc3 Bb4">Nimzo-Indian Defense (1.d4 Nf6 2.c4 e6 3.Nc3 Bb4)</option>
+                        <option value="1.d4 d5 2.Nf3 Nf6 3.Bf4">London System (1.d4 d5 2.Nf3 Nf6 3.Bf4)</option>
+                        <option value="1.c4">English Opening (1.c4)</option>
+                      </select>
+                    </label>
+                    <div id="setup-opening-info" style="font-size:0.78em; color:#555; font-style:italic; margin-bottom:6px; min-height:1.1em;"></div>
+                    <label style="display: block; margin-bottom: 8px; font-size: 0.88em; color: #555;">
+                      Custom Moves (PGN notation):
+                      <textarea id="setup-moves-input" rows="3"
+                        placeholder="e.g. 1.e4 e5 2.Nf3 Nc6 3.Bb5"
+                        style="width: 100%; padding: 5px; box-sizing: border-box; font-family: monospace; font-size: 0.9em; margin-top: 3px; border: 1px solid #ccc; border-radius: 3px; resize: vertical;"></textarea>
+                    </label>
+                    <div style="display: flex; gap: 6px; margin-top: 2px;">
+                      <button onclick="previewSetupPosition()" style="flex:1; padding: 7px; background:#2196F3; color:white; border:none; border-radius:4px; cursor:pointer; font-size:0.88em; font-weight:600;">Preview Position</button>
+                      <button onclick="clearSetupPosition()" style="padding: 7px 12px; background:#f5f5f5; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:0.88em; color:#555;">Clear</button>
+                    </div>
+                    <div id="setup-moves-status" style="margin-top: 6px; font-size: 0.82em; color: #888;"></div>
+                    <div id="setup-nav-controls" style="display:none; margin-top:8px;">
+                      <div style="display:flex; gap:4px; align-items:center; justify-content:center;">
+                        <button id="setup-nav-first" onclick="stepReview(-9999)" title="First move"
+                          style="padding:5px 8px; background:#f5f5f5; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:1em;">&#x23EE;</button>
+                        <button id="setup-nav-prev" onclick="stepReview(-1)" title="Previous move"
+                          style="padding:5px 10px; background:#f5f5f5; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:1em;">&#9664;</button>
+                        <span id="setup-nav-label"
+                          style="flex:1; text-align:center; font-size:0.82em; color:#555; min-width:90px; font-family:monospace;"></span>
+                        <button id="setup-nav-next" onclick="stepReview(1)" title="Next move"
+                          style="padding:5px 10px; background:#f5f5f5; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:1em;">&#9654;</button>
+                        <button id="setup-nav-last" onclick="stepReview(9999)" title="Last move"
+                          style="padding:5px 8px; background:#f5f5f5; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:1em;">&#x23ED;</button>
+                      </div>
+                      <div id="setup-move-comment" style="display:none; margin-top:7px; padding:8px 10px; font-size:0.81em; line-height:1.5; color:#333; background:#fffde7; border-left:3px solid #f9a825; border-radius:0 4px 4px 0;"></div>
+                    </div>
+                  </div>
+
                   <button onclick="startNewGame()" class="btn-primary" style="margin-top: 15px;">Start New Game</button>
                 </div>
 
@@ -2173,7 +2507,36 @@
                   <div id="stats-opponent-list"><p class="stats-empty">No games played yet.</p></div>
                 </div>
 
-                <!-- Community Tab -->
+                <!-- Rewards Tab -->
+                <div id="rewards-panel" class="tab-panel-content" style="display:none; overflow-y:auto; padding:4px 2px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h3 style="margin:0;">🏅 Rewards</h3>
+                  </div>
+                  <div id="rewards-panel-content">
+                    <p style="color:#999; font-size:0.9em;">Loading your rewards…</p>
+                  </div>
+                </div>
+
+                <!-- Feedback Tab -->
+                <div id="feedback-panel" class="tab-panel-content" style="display:none; overflow-y:auto; padding:4px 2px;">
+                  <h3 style="margin:0 0 10px;">💬 Send Feedback</h3>
+                  <p style="color:#666; font-size:0.87em; margin:0 0 12px;">Report a problem, suggest an improvement, or request a new feature. The admin will review your message even if they are not currently online.</p>
+                  <div style="margin-bottom:10px;">
+                    <label style="display:block; font-size:0.88em; font-weight:bold; margin-bottom:4px;">Category</label>
+                    <select id="feedback-category" style="width:100%; padding:7px; border:1px solid #ccc; border-radius:4px; font-size:0.95em;">
+                      <option value="bug">🐛 Bug Report</option>
+                      <option value="suggestion">💡 Suggestion</option>
+                      <option value="feature">✨ Feature Request</option>
+                    </select>
+                  </div>
+                  <div style="margin-bottom:10px;">
+                    <label style="display:block; font-size:0.88em; font-weight:bold; margin-bottom:4px;">Message</label>
+                    <textarea id="feedback-message" rows="5" maxlength="2000" placeholder="Describe the issue or idea in as much detail as possible…" style="width:100%; padding:7px; border:1px solid #ccc; border-radius:4px; font-size:0.9em; box-sizing:border-box; resize:vertical;"></textarea>
+                    <div style="text-align:right; font-size:0.78em; color:#999;"><span id="feedback-char-count">0</span> / 2000</div>
+                  </div>
+                  <button onclick="submitFeedback()" style="width:100%; padding:10px; background:#4CAF50; color:white; border:none; border-radius:4px; font-size:0.95em; cursor:pointer;">Submit Feedback</button>
+                  <div id="feedback-result" style="margin-top:10px; font-size:0.9em;"></div>
+                </div>
                 <div id="community-panel" class="tab-panel-content">
                   <div style="display:flex; flex-direction:column; height:100%; min-height:0;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-shrink:0;">
@@ -2255,11 +2618,17 @@
         updateStatusBox('Chessboard initialized successfully', 'success');
         updateFenDisplay();
         updatePlayerDisplay();
+        // Fetch engine version and fill in the API half of the version badge
+        fetch('/engine-health').then(r => r.json()).then(d => {
+          const badge = document.getElementById('version-badge');
+          if (badge && d.version) badge.textContent = `UI ${UI_VERSION} | API ${d.version}`;
+        }).catch(() => {});
                                     _updateMySavesBtn();
                                     // Start background community polling (unread badge while not on tab)
                                     communityLastId = 0;
                                     communityMessages = [];
                                     communityUnreadCount = 0;
+        communityInitialized = false;
                                     refreshCommunityMessages();
                                     refreshOnlineUsers();
                                     communityPollTimer = setInterval(refreshCommunityMessages, 5000);
@@ -2269,6 +2638,8 @@
                                     setInterval(() => postActivity('online'), 60000);
         // Ensure Welcome tab is active and in focus on login
         navigateToTab('welcome-panel');
+        // Pre-load rewards in background
+        loadMyRewards();
         // Show Chess News on first login of the day
         const _today = new Date().toDateString();
         const _newsKey = 'chessNewsDailyShown_' + currentUser;
@@ -2280,7 +2651,7 @@
 
                                   function postActivity(status) {
                                     if (!authToken) return;
-                                    fetch('http://localhost:8002/auth/activity', {
+                                    fetch('/auth/activity', {
                                       method: 'POST',
                                       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
                                       body: JSON.stringify({ activity: status })
@@ -2290,7 +2661,7 @@
                                     function clearMyGameActivity() {
                                       if (!authToken) return;
                                       logCommMessage('req', 'AUTH', '/community/clear-activity', {}, null);
-                                      fetch('http://localhost:8002/community/clear-activity', {
+                                      fetch('/community/clear-activity', {
                                         method: 'POST',
                                         headers: { 'Authorization': 'Bearer ' + authToken }
                                       })
@@ -2382,6 +2753,592 @@
                               fenDisplay.textContent = game.fen();
                             }
                           }
+
+                                // ── Position Setup from Moves ────────────────────────────────────────────
+
+                                    const classicGamesData = {
+                                      'opera-game': {
+                                        white: 'Paul Morphy',
+                                        black: 'Duke Karl \u0026 Count Isouard',
+                                        info: "Paul Morphy vs Duke Karl & Count Isouard \u00b7 Paris Opera, 1858 \u00b7 1-0 (17 moves) \u00b7 Philidor Defence",
+                                        badges: [
+                                          { label: '19th Century', cls: 'cgb-era' },
+                                          { label: '♟ Philidor Defence', cls: 'cgb-theme' },
+                                          { label: '🎯 Sacrifices', cls: 'cgb-theme' },
+                                          { label: '⚡ 17 Moves', cls: 'cgb-fact' },
+                                          { label: '1–0', cls: 'cgb-result' }
+                                        ],
+                                        pgn: '1.e4 e5 2.Nf3 d6 3.d4 Bg4 4.dxe5 Bxf3 5.Qxf3 dxe5 6.Bc4 Nf6 7.Qb3 Qe7 8.Nc3 c6 9.Bg5 b5 10.Nxb5 cxb5 11.Bxb5+ Nbd7 12.O-O-O Rd8 13.Rxd7 Rxd7 14.Rd1 Qe6 15.Bxd7+ Nxd7 16.Qb8+ Nxb8 17.Rd8#',
+                                        comments: {
+                                          0: "Played during a Paris opera performance in 1858! Duke Karl of Brunswick and Count Isouard played Black together, consulting with each other, while the 21-year-old Paul Morphy played alone. This game is considered a teaching masterpiece: Morphy demolishes an undeveloped army in 17 moves through rapid development, piece activity, and an unstoppable attack.",
+                                          4: "2\u2026d6 \u2014 the Philidor Defence, a solid but passive setup. Black plans ...Nf6 and ...Be7 but will fall behind in development.",
+                                          6: "3\u2026Bg4? \u2014 a premature pin on White\u2019s knight. Rather than developing naturally, Black reaches out with this bishop and loses time. Morphy will simply blow open the center and benefit from it.",
+                                          9: "5.Qxf3 \u2014 White\u2019s queen is powerfully centralized. Black traded a bishop for a knight (even material) but at the cost of White\u2019s queen becoming extremely active. Notice how many of Black\u2019s pieces are still on their starting squares.",
+                                          13: "7.Qb3 \u2014 Morphy simultaneously eyes the f7 pawn (a chronic weakness near the Black king) and threatens the b7 pawn. This multi-purpose move puts Black under immediate pressure \u2014 every Morphy move does double duty.",
+                                          15: "8.Nc3 \u2014 development before greed! Morphy does NOT play 8.Qxb7 (winning a pawn) because 8\u2026Qb4+ would let Black counterattack and equalize. Morphy\u2019s entire army will be fully mobilized before he strikes. \u201cHelp your pieces help each other.\u201d",
+                                          17: "9.Bg5 \u2014 White pins the knight on f6 against the queen. All five White pieces are now developed and pointing at Black\u2019s position. Black\u2019s undeveloped queenside (Ra8, Nb8, Bc8) is a ticking time bomb.",
+                                          18: "9\u2026b5?? \u2014 a blunder! Black tries to gain time by chasing the bishop, but this allows a stunning sacrifice. The correct defensive try was 9\u2026Be7, accepting a cramped but defensible position.",
+                                          19: "10.Nxb5!! \u2014 the sacrificial blow! Morphy tears open the queenside. After 10\u2026cxb5 11.Bxb5+, the Black king is exposed and Black\u2019s undeveloped pieces cannot come back in time to defend.",
+                                          21: "11.Bxb5+ \u2014 check! The bishop arrives on b5 with tempo, forcing the blocking move 11\u2026Nbd7. White has sacrificed a whole knight to destroy Black\u2019s pawn cover.",
+                                          23: "12.O-O-O \u2014 castles long! Morphy\u2019s rook instantly enters the game on the open d-file. Compare the armies: ALL of White\u2019s pieces are developed, active, and coordinated. Black\u2019s queenside is still completely undeveloped.",
+                                          24: "12\u2026Rd8 \u2014 Black tries to contest the d-file. But White has a stunning combination prepared that exploits the overloaded d7 knight.",
+                                          25: "13.Rxd7!! \u2014 a rook sacrifice! Morphy gives up the exchange to shatter Black\u2019s defenses. After 13\u2026Rxd7, White\u2019s remaining rook enters on d1 with unstoppable force.",
+                                          27: "14.Rd1 \u2014 the second rook storms in. White threatens 15.Bxd7+ followed by a queen check. Black\u2019s only move is 14\u2026Qe6, trying to guard d7 but exposing the queen to a final trick.",
+                                          31: "16.Qb8+!! \u2014 the queen sacrifice, the most beautiful move of the game! By giving up the queen, Morphy forces 16\u2026Nxb8, after which 17.Rd8# is an inescapable back-rank checkmate, guarded by the bishop on b5. Black cannot avoid it.",
+                                          33: "17.Rd8# \u2014 checkmate! The rook lands on d8, supported by the bishop on b5. In 17 moves Morphy sacrificed a knight, a rook, and his queen to force a model back-rank mate. He reportedly returned to watching the opera without missing a beat."
+                                        }
+                                      },
+                                      'immortal-game': {
+                                        white: 'Adolf Anderssen',
+                                        black: 'Lionel Kieseritzky',
+                                        info: "Adolf Anderssen vs Lionel Kieseritzky \u00b7 London, 1851 \u00b7 1-0 (23 moves) \u00b7 King\u2019s Gambit",
+                                        badges: [
+                                          { label: '19th Century', cls: 'cgb-era' },
+                                          { label: "♟ King's Gambit", cls: 'cgb-theme' },
+                                          { label: '🎯 Sacrifices', cls: 'cgb-theme' },
+                                          { label: '♛ Queen Sacrifice', cls: 'cgb-theme' },
+                                          { label: '1–0', cls: 'cgb-result' }
+                                        ],
+                                        pgn: '1.e4 e5 2.f4 exf4 3.Bc4 Qh4+ 4.Kf1 b5 5.Bxb5 Nf6 6.Nf3 Qh6 7.d3 Nh5 8.Nh4 Qg5 9.Nf5 c6 10.g4 Nf6 11.Rg1 cxb5 12.h4 Qg6 13.h5 Qg5 14.Qf3 Ng8 15.Bxf4 Qf6 16.Nc3 Bc5 17.Nd5 Qxb2 18.Bd6 Bxg1 19.e5 Qxa1+ 20.Ke2 Na6 21.Nxg7+ Kd8 22.Qf6+ Nxf6 23.Be7#',
+                                        comments: {
+                                          0: "The \u2018Immortal Game\u2019 \u2014 played during a break at the 1851 London international tournament. Anderssen gives up both rooks, a bishop, and his queen for a mating attack! Kieseritzky was so impressed he telegraphed the moves to his chess club in Paris. It became \u2018immortal\u2019 because Anderssen\u2019s sacrifices are recklessly beautiful and purely for checkmate.",
+                                          3: "2.f4 \u2014 the King\u2019s Gambit! White offers a pawn to open the f-file and seize the initiative. A beloved romantic-era opening full of fire and sacrifices.",
+                                          7: "4.Kf1!! \u2014 Anderssen deliberately steps into the check by the queen, sacrificing his right to castle in order to keep a pawn on g2 that holds the attacking structure together. An extraordinary positional decision for 1851.",
+                                          9: "5.Bxb5 \u2014 another piece sacrifice! Anderssen keeps investing material to develop rapidly and attack. Kieseritzky is winning pawns and pieces, but White\u2019s initiative is overwhelming.",
+                                          21: "11.Rg1!! \u2014 the first great sacrifice! Anderssen gives up his g5 bishop deliberately (Black plays 11\u2026cxb5 taking it) to keep the kingside attack alive. He refuses to retreat a single piece.",
+                                          35: "18.Bd6!! \u2014 a stunning bishop sacrifice! The bishop cannot be taken safely. Anderssen now has the rook on g1, the queen on f3, and the knight on d5 all converging on Black\u2019s exposed king.",
+                                          37: "19.e5 \u2014 with the queen on a1 and both rooks gone, Black looks to be winning materially. But Anderssen ignores it! The attack is now unstoppable \u2014 Black\u2019s king will be mated.",
+                                          43: "22.Qf6+!! \u2014 the queen sacrifice, the game\u2019s climax! After 22\u2026Nxf6, the bishop delivers checkmate on e7. Anderssen has sacrificed two rooks, a bishop, and now his queen.",
+                                          45: "23.Be7# \u2014 checkmate! Anderssen has given up two rooks, a bishop, and his queen to deliver this final blow. The game was sent by telegraph across Europe and has been celebrated ever since as chess art at its purest."
+                                        }
+                                      },
+                                      'evergreen-game': {
+                                        white: 'Adolf Anderssen',
+                                        black: 'Jean Dufresne',
+                                        info: "Adolf Anderssen vs Jean Dufresne \u00b7 Berlin, 1852 \u00b7 1-0 (24 moves) \u00b7 Evans Gambit",
+                                        badges: [
+                                          { label: '19th Century', cls: 'cgb-era' },
+                                          { label: '♟ Evans Gambit', cls: 'cgb-theme' },
+                                          { label: '🎯 Sacrifices', cls: 'cgb-theme' },
+                                          { label: '♛ Queen Sacrifice', cls: 'cgb-theme' },
+                                          { label: '1–0', cls: 'cgb-result' }
+                                        ],
+                                        pgn: '1.e4 e5 2.Nf3 Nc6 3.Bc4 Bc5 4.b4 Bxb4 5.c3 Ba5 6.d4 exd4 7.O-O d3 8.Qb3 Qf6 9.e5 Qg6 10.Re1 Nge7 11.Ba3 b5 12.Qxb5 Rb8 13.Qa4 Bb6 14.Nbd2 Bb7 15.Ne4 Qf5 16.Bxd3 Qh5 17.Nf6+ gxf6 18.exf6 Rg8 19.Rad1 Qxf3 20.Rxe7+ Nxe7 21.Qxd7+ Kxd7 22.Bf5+ Ke8 23.Bd7+ Kf8 24.Bxe7#',
+                                        comments: {
+                                          0: "The \u2018Evergreen Game\u2019 \u2014 played in Berlin in 1852, also by Adolf Anderssen. The game features a queen sacrifice and three piece sacrifices leading to a beautiful checkmate. Its appeal is so enduring that Wilhelm Steinitz (the first World Champion) called it \u2018the most beautiful game ever played,\u2019 and it has remained \u2018evergreen\u2019 \u2014 always fresh \u2014 for over 170 years.",
+                                          7: "4.b4! \u2014 the Evans Gambit! White sacrifices a second pawn to accelerate development dramatically. A gambit within a gambit. Black accepts (4\u2026Bxb4) but White will gain tremendous piece activity in return.",
+                                          13: "7.O-O \u2014 White castles to safety while the position is still chaotic. White has sacrificed a pawn but has open lines, active pieces, and king safety. This is the spirit of the Evans Gambit.",
+                                          21: "11.Ba3 \u2014 a quiet developing move with a deadly threat! The bishop eyes the b2\u2013e8 diagonal. White is about to win back material while keeping the attack going.",
+                                          33: "17.Nf6+!! \u2014 the combination begins! Anderssen sacrifices the knight to expose Black\u2019s king. After 17\u2026gxf6 18.exf6, the f6 pawn cuts through Black\u2019s position like a sword.",
+                                          39: "20.Rxe7+!! \u2014 a rook sacrifice! The rook is thrown into the position to expose the king. After 20\u2026Nxe7, the queen delivers a devastating check on d7.",
+                                          41: "21.Qxd7+!! \u2014 the queen sacrifice! Black must take: 21\u2026Kxd7. Then follows a series of bishop checks that drive the king to its doom.",
+                                          47: "24.Bxe7# \u2014 checkmate! Anderssen has sacrificed a rook, his queen, and used two bishops to force this final mate. Steinitz later said this was \u2018the most beautiful game ever played.\u2019"
+                                        }
+                                      },
+                                      'game-of-century': {
+                                        white: 'Donald Byrne',
+                                        black: 'Bobby Fischer',
+                                        info: "Donald Byrne vs Bobby Fischer \u00b7 Rosenwald Trophy, New York, 1956 \u00b7 0-1 (41 moves) \u00b7 Gr\u00fcnfeld Defence",
+                                        badges: [
+                                          { label: '20th Century', cls: 'cgb-era' },
+                                          { label: '♟ Grünfeld Defence', cls: 'cgb-theme' },
+                                          { label: '♛ Queen Sacrifice', cls: 'cgb-theme' },
+                                          { label: '👶 Age 13 Prodigy', cls: 'cgb-fact' },
+                                          { label: '0–1', cls: 'cgb-result' }
+                                        ],
+                                        pgn: '1.Nf3 Nf6 2.c4 g6 3.Nc3 Bg7 4.d4 O-O 5.Bf4 d5 6.Qb3 dxc4 7.Qxc4 c6 8.e4 Nbd7 9.Rd1 Nb6 10.Qc5 Bg4 11.Bg5 Na4 12.Qa3 Nxc3 13.bxc3 Nxe4 14.Bxe7 Qb6 15.Bc4 Nxc3 16.Bc5 Rfe8+ 17.Kf1 Be6 18.Bxb6 Bxc4+ 19.Kg1 Ne2+ 20.Kf1 Nxd4+ 21.Kg1 Ne2+ 22.Kf1 Nc3+ 23.Kg1 axb6 24.Qb4 Ra4 25.Qxb6 Nxd1 26.h3 Rxa2 27.Kh2 Nxf2 28.Re1 Rxe1 29.Qd8+ Bf8 30.Nxe1 Bd5 31.Nf3 Ne4 32.Qb8 b5 33.h4 h5 34.Ne5 Kg7 35.Kg1 Bc5+ 36.Kf1 Ng3+ 37.Ke1 Bb4+ 38.Kd1 Bb3+ 39.Kc1 Ne2+ 40.Kb1 Nc3+ 41.Kc1 Rc2#',
+                                        comments: {
+                                          0: "The \u2018Game of the Century\u2019 \u2014 named by chess journalist Hans Kmoch at the time. Bobby Fischer was only 13 years old! His opponent Donald Byrne was a strong U.S. Master. On move 17 Fischer makes a breathtaking queen sacrifice that initiates one of the most complex combinations ever seen. It remains the most celebrated junior performance in chess history.",
+                                          26: "13\u2026Nxe4! \u2014 Fischer grabs a pawn and opens the position. Byrne has underestimated what the 13-year-old has prepared.",
+                                          34: "17\u2026Be6!! \u2014 the queen sacrifice! Fischer offers his queen for just a bishop and a rook. After 18.Bxb6 Bxc4+ 19.Kg1 Ne2+, a brilliant series of forcing moves wins back the material with a dominant position. Hans Kmoch wrote: \u2018A boy of 13 sacrifices a queen. A master of 26 years accepts. The boy wins.\u2019",
+                                          36: "18\u2026Bxc4+ \u2014 the combination unfolds. Fischer has calculated a long forcing sequence that regains the queen with a vastly superior position.",
+                                          48: "24\u2026Ra4! \u2014 the complications have resolved and Fischer is materially ahead with two minor pieces and a rook versus Byrne\u2019s queen. More importantly, Fischer\u2019s pieces are far more active.",
+                                          82: "41\u2026Rc2# \u2014 checkmate! Fischer converts with clinical precision. At age 13, he produced the game that journalist Kmoch immediately dubbed \u2018The Game of the Century\u2019 \u2014 a title it has kept for nearly 70 years."
+                                        }
+                                      },
+                                      'fischer-spassky-g6': {
+                                        white: 'Bobby Fischer',
+                                        black: 'Boris Spassky',
+                                        info: "Bobby Fischer vs Boris Spassky \u00b7 World Championship Game 6, Reykjavik, 1972 \u00b7 1-0 (41 moves) \u00b7 QGD Tartakower",
+                                        badges: [
+                                          { label: '20th Century', cls: 'cgb-era' },
+                                          { label: '🏆 World Championship', cls: 'cgb-fact' },
+                                          { label: '♟ QGD Tartakower', cls: 'cgb-theme' },
+                                          { label: '⚙️ Strategy', cls: 'cgb-theme' },
+                                          { label: '1–0', cls: 'cgb-result' }
+                                        ],
+                                        pgn: '1.c4 e6 2.Nf3 d5 3.d4 Nf6 4.Nc3 Be7 5.Bg5 O-O 6.e3 h6 7.Bh4 b6 8.cxd5 Nxd5 9.Bxe7 Qxe7 10.Nxd5 exd5 11.Rc1 Be6 12.Qa4 c5 13.Qa3 Rc8 14.Bb5 a6 15.dxc5 bxc5 16.O-O Ra7 17.Be2 Nd7 18.Nd4 Qf8 19.Nxe6 fxe6 20.e4 d4 21.f4 Qe7 22.e5 Rb8 23.Bc4 Kh8 24.Qh3 Nf8 25.b3 a5 26.f5 exf5 27.Rxf5 Nh7 28.Rcf1 Qd8 29.Qg3 Re7 30.h4 Rbb7 31.e6 Rbc7 32.Qe5 Qe8 33.a4 Qd8 34.R1f2 Qe8 35.R2f3 Qd8 36.Bd3 Qe8 37.Qe4 Nf6 38.Rxf6 gxf6 39.Rxf6 Kg8 40.Bc4 Kh8 41.Qf4',
+                                        comments: {
+                                          0: "From the 1972 World Championship \u2014 the \u2018Match of the Century\u2019 between Fischer and Spassky. Game 6 is considered one of the greatest strategic masterpieces ever played. Fischer employs the Queen\u2019s Gambit Declined (a surprise \u2014 he usually avoided it) with profound positional understanding. Spassky was reportedly so impressed that he applauded Fischer when he resigned.",
+                                          37: "19.Nxe6! \u2014 White captures, and after 19\u2026fxe6, Black\u2019s doubled isolated e-pawns become a permanent structural weakness. Fischer will exploit this pawn weakness for the rest of the game with precision.",
+                                          39: "20.e4! \u2014 Fischer seizes the center. The pawn on e5 will become a battering ram. Black is strategically squeezed.",
+                                          51: "26.f5! \u2014 the pawn storm begins. Fischer advances on the kingside to pry open lines against Spassky\u2019s king. Every White move has a clear strategic purpose.",
+                                          75: "38.Rxf6!! \u2014 a rook sacrifice to remove Black\u2019s defensive knight! After 38\u2026gxf6 39.Rxf6, White\u2019s attack is crushing and Fischer has a winning position.",
+                                          81: "41.Qf4 \u2014 Spassky resigns. He can see no defense against Fischer\u2019s coming attack on the f5 pawn and kingside. Spassky stood up and applauded \u2014 one of the most memorable moments in chess history. Fischer later called this his favorite game."
+                                        }
+                                      },
+                                      'kasparov-topalov': {
+                                        white: 'Garry Kasparov',
+                                        black: 'Veselin Topalov',
+                                        info: "Garry Kasparov vs Veselin Topalov \u00b7 Hoogovens, Wijk aan Zee, 1999 \u00b7 1-0 (44 moves) \u00b7 Pirc Defence",
+                                        badges: [
+                                          { label: 'Modern Era', cls: 'cgb-era' },
+                                          { label: '♟ Pirc Defence', cls: 'cgb-theme' },
+                                          { label: '🎯 Sacrifices', cls: 'cgb-theme' },
+                                          { label: '👑 King Hunt', cls: 'cgb-theme' },
+                                          { label: '1–0', cls: 'cgb-result' }
+                                        ],
+                                        pgn: '1.e4 d6 2.d4 Nf6 3.Nc3 g6 4.Be3 Bg7 5.Qd2 c6 6.f3 b5 7.Nge2 Nbd7 8.Bh6 Bxh6 9.Qxh6 Bb7 10.a3 e5 11.O-O-O Qe7 12.Kb1 a6 13.Nc1 O-O-O 14.Nb3 exd4 15.Rxd4 c5 16.Rd1 Nb6 17.g3 Kb8 18.Na5 Ba8 19.Bh3 d5 20.Qf4+ Ka7 21.Rhe1 d4 22.Nd5 Nbxd5 23.exd5 Qd6 24.Rxd4 cxd4 25.Re7+ Kb6 26.Qxd4+ Kxa5 27.b4+ Ka4 28.Qc3 Qxd5 29.Ra7 Bb7 30.Rxb7 Qc4 31.Qxf6 Kxa3 32.Qxa6+ Kxb4 33.c3+ Kxc3 34.Qa1+ Kd2 35.Qb2+ Kd1 36.Bf1 Rd2 37.Rd7 Rxd7 38.Bxc4 bxc4 39.Qxh8 Rd3 40.Qa8 c3 41.Qa4+ Ke1 42.f4 f5 43.Kc1 Rd2 44.Qa7',
+                                        comments: {
+                                          0: "Kasparov\u2019s Immortal \u2014 played at the Hoogovens tournament in Wijk aan Zee, 1999. Many consider this the greatest game of the computer era. Kasparov sacrifices a rook on move 24 and hunts Topalov\u2019s king across the entire board \u2014 from b6 all the way to e1 \u2014 over 20 moves. Kasparov himself called it one of his best games.",
+                                          47: "24.Rxd4!! \u2014 the rook sacrifice that starts everything! Kasparov gives up the exchange to open lines and launch an unstoppable king hunt. Topalov\u2019s king will be chased from b8 to its eventual doom.",
+                                          49: "25.Re7+ \u2014 the rook cuts off the king\u2019s retreat as the hunt begins. Kasparov\u2019s pieces coordinate with frightening precision.",
+                                          51: "26.Qxd4+ \u2014 check! The king is forced into the open. From here Kasparov drives Topalov\u2019s king from b6 \u2192 a5 \u2192 a4 \u2192 a3 \u2192 b4 \u2192 c3 \u2192 d2 \u2192 d1 \u2192 e1 across nine squares.",
+                                          87: "44.Qa7 \u2014 Topalov resigns. He cannot stop Kasparov\u2019s queen from coordinating with the f4/f5 pawns for a decisive promotion or checkmate. The Black king has been driven from b8 to e1 \u2014 a 9-square odyssey. One of the most spectacular attacking games of the modern era."
+                                        }
+                                      }
+                                    };
+
+                                    function applyClassicGamePreset() {
+                                      const select = document.getElementById('setup-classic-preset');
+                                      const infoEl = document.getElementById('setup-classic-info');
+                                      const input = document.getElementById('setup-moves-input');
+                                      if (!select) return;
+                                      const key = select.value;
+                                      if (!key) {
+                                        if (infoEl) infoEl.textContent = '';
+                                        const badgesElReset = document.getElementById('setup-classic-badges');
+                                        if (badgesElReset) badgesElReset.innerHTML = '';
+                                        activeClassicGameKey = '';
+                                        const playerSectionsReset = document.getElementById('player-strategy-sections');
+                                        if (playerSectionsReset) playerSectionsReset.style.display = '';
+                                        clearSetupPosition();
+                                        return;
+                                      }
+                                      activeClassicGameKey = key;
+                                      const data = classicGamesData[key];
+                                      if (!data) return;
+                                      if (infoEl) infoEl.textContent = data.info;
+                                      // Render badges
+                                      const badgesEl = document.getElementById('setup-classic-badges');
+                                      if (badgesEl) {
+                                        badgesEl.innerHTML = (data.badges || [])
+                                          .map(b => `<span class="classic-game-badge ${b.cls}">${b.label}</span>`)
+                                          .join('');
+                                      }
+                                      const playerSections = document.getElementById('player-strategy-sections');
+                                      if (playerSections) playerSections.style.display = 'none';
+                                      // Show historic player names in the sidebar display
+                                      const whiteDisplayEl = document.getElementById('white-player-display');
+                                      const blackDisplayEl = document.getElementById('black-player-display');
+                                      if (whiteDisplayEl) whiteDisplayEl.textContent = data.white || 'White';
+                                      if (blackDisplayEl) blackDisplayEl.textContent = data.black || 'Black';
+                                      // Clear the opening-preset dropdown to avoid confusion
+                                      const presetSel = document.getElementById('setup-opening-preset');
+                                      if (presetSel) presetSel.value = '';
+                                      if (input) input.value = data.pgn;
+                                      setupReviewComments = data.comments || {};
+                                      previewSetupPosition();
+                                      // Update the board banner with the classic game name
+                                      const gameName = select.options[select.selectedIndex].text;
+                                      const bannerDiv = document.getElementById('game-status');
+                                      if (bannerDiv) {
+                                        bannerDiv.innerHTML = `<p style="font-size:0.9em;color:#555;">&#127942; Reviewing: <strong>${gameName}</strong></p>`;
+                                      }
+                                      // Start review from the very beginning
+                                      if (setupReviewMoves.length > 0) {
+                                        stepReview(-9999);
+                                      }
+                                    }
+
+                                  // ── Opening Preset Descriptions ──────────────────────────────────────────
+                                  const openingPresetsData = {
+                                    '1.e4 e5 2.Nf3 Nc6 3.Bb5': { name: 'Ruy L\u00f3pez', info: 'One of the oldest and most classical openings. White pins Black\u2019s knight to pressure the e5 pawn. Leads to rich strategic middlegames and is a favourite at the highest levels.' },
+                                    '1.e4 e5 2.Nf3 Nc6 3.Bc4': { name: 'Italian Game', info: 'A classical 1.e4 opening aiming for rapid development and kingside pressure. Quieter than the Ruy L\u00f3pez but full of deep strategic ideas, especially in the Giuoco Piano.' },
+                                    '1.e4 e5 2.Nf3 Nc6 3.d4': { name: 'Scotch Game', info: 'White strikes in the centre early with 3.d4, forcing immediate exchanges. Leads to open, direct, tactical play. A favourite of Kasparov in his World Championship matches.' },
+                                    '1.e4 e5 2.f4': { name: "King's Gambit", info: 'A bold romantic-era gambit \u2014 White offers the f-pawn to seize the centre and launch a rapid kingside attack. Highly tactical and was the most popular opening of the 19th century.' },
+                                    '1.e4 c5': { name: 'Sicilian Defense', info: 'The most popular response to 1.e4. Black fights for the centre asymmetrically, creating rich imbalanced positions with winning chances for both sides. Favoured by Fischer, Kasparov and Tal.' },
+                                    '1.e4 e6': { name: 'French Defense', info: 'Black builds a solid pawn chain with 1\u2026e6, preparing ...d5. Leads to closed, strategic battles with clearly defined pawn structures. White often gains kingside space; Black counterattacks on the queenside.' },
+                                    '1.e4 c6': { name: 'Caro-Kann Defense', info: 'A solid, resilient defence. Black prepares ...d5 with 1\u2026c6, maintaining a sound pawn structure. Less committal than the French \u2014 the dark-squared bishop stays free. Popular at all levels.' },
+                                    '1.d4 d5 2.c4': { name: "Queen's Gambit", info: 'White offers a queenside pawn to gain central control. One of the most respected openings in chess, leading to rich positional battles. Black can accept (QGA) or decline (QGD).' },
+                                    '1.d4 Nf6 2.c4 g6': { name: "King's Indian Defense", info: 'Black allows White a broad centre and then strikes back with ...e5 or ...c5. A dynamic, fighting defence packed with tactical complexity. A lifelong favourite of Fischer and Kasparov.' },
+                                    '1.d4 Nf6 2.c4 e6 3.Nc3 Bb4': { name: 'Nimzo-Indian Defense', info: 'Black pins White\u2019s knight with ...Bb4, creating lasting structural imbalances. Highly respected at top level for its strategic depth. Invented by Aron Nimzowitsch in the 1920s.' },
+                                    '1.d4 d5 2.Nf3 Nf6 3.Bf4': { name: 'London System', info: 'A solid, low-theory setup for White. White builds with d4, Nf3 and Bf4 \u2014 reliable, flexible, and hard to refute. Has surged in popularity at all levels in recent years.' },
+                                    '1.c4': { name: 'English Opening', info: 'A flexible flank opening. White controls d5 with c4 and can transpose into many different structures. Avoids sharp early theory. Used extensively by Fischer, Kasparov and Kramnik.' }
+                                  };
+
+                                function applyOpeningPreset() {
+                                  const preset = document.getElementById('setup-opening-preset');
+                                  const input = document.getElementById('setup-moves-input');
+                                  if (!preset || !input) return;
+                                  // Clear classic-game selection and restore hidden sections
+                                  const classicSel = document.getElementById('setup-classic-preset');
+                                  const classicInfo = document.getElementById('setup-classic-info');
+                                  if (classicSel) classicSel.value = '';
+                                  if (classicInfo) classicInfo.textContent = '';
+                                  const playerSections = document.getElementById('player-strategy-sections');
+                                  if (playerSections) playerSections.style.display = '';
+                                  if (typeof updatePlayerDisplay === 'function') updatePlayerDisplay();
+                                  // Show opening info and update board banner
+                                  const openingInfoEl = document.getElementById('setup-opening-info');
+                                  const data = openingPresetsData[preset.value] || null;
+                                  if (openingInfoEl) openingInfoEl.textContent = data ? data.info : '';
+                                  const bannerDiv = document.getElementById('game-status');
+                                  if (preset.value && data) {
+                                    if (bannerDiv) bannerDiv.innerHTML = `<p style="font-size:0.9em;color:#555;">&#9822; Opening: <strong>${data.name}</strong></p>`;
+                                    input.value = preset.value;
+                                    previewSetupPosition();
+                                  } else {
+                                    clearSetupPosition();
+                                  }
+                                }
+
+                                function parseMoveNotation(text) {
+                                  // Strip block comments, variations, NAG annotations, and result tokens
+                                  let cleaned = text
+                                    .replace(/\{[^}]*\}/g, '')
+                                    .replace(/\([^)]*\)/g, '')
+                                    .replace(/\$\d+/g, '')
+                                    .replace(/[!?]+/g, '')
+                                    .replace(/1-0|0-1|1\/2-1\/2|\*/g, '');
+                                  // Split into tokens, strip leading move-number prefixes from each token
+                                  // (handles both standalone "1." and combined "1.e4" → "e4")
+                                  return cleaned.trim().split(/\s+/)
+                                    .filter(t => t.length > 0)
+                                    .map(t => t.replace(/^\d+\.{1,3}/, ''))
+                                    .filter(t => t.length > 0);
+                                }
+
+                                function previewSetupPosition() {
+                                  const input = document.getElementById('setup-moves-input');
+                                  const status = document.getElementById('setup-moves-status');
+                                  if (!input || !game) return;
+
+                                  const text = input.value.trim();
+                                  if (!text) {
+                                    if (status) status.textContent = '';
+                                    return;
+                                  }
+
+                                  const moves = parseMoveNotation(text);
+                                  if (moves.length === 0) {
+                                    if (status) { status.textContent = 'No valid moves found.'; status.style.color = '#c62828'; }
+                                    return;
+                                  }
+
+                                  // Validate moves against a temporary game instance
+                                  const tempGame = new Chess();
+                                  let applied = 0;
+                                  for (const san of moves) {
+                                    if (!tempGame.move(san, { sloppy: true })) {
+                                      if (status) {
+                                        status.textContent = 'Invalid move "' + san + '" after ' + applied + ' move' + (applied !== 1 ? 's' : '') + '.';
+                                        status.style.color = '#c62828';
+                                      }
+                                      return;
+                                    }
+                                    applied++;
+                                  }
+
+                                  // Store moves for step-through review
+                                  setupReviewMoves = moves;
+                                  setupReviewIndex = moves.length;
+
+                                  // Apply validated FEN to live board for preview
+                                  const previewFen = tempGame.fen();
+                                  game.load(previewFen);
+                                  if (board) board.position(previewFen);
+                                  updateFenDisplay();
+
+                                  // Show navigation controls
+                                  const navControls = document.getElementById('setup-nav-controls');
+                                  if (navControls) navControls.style.display = 'block';
+                                  updateReviewNavState();
+
+                                  if (status) {
+                                    status.textContent = '\u2713 ' + applied + ' move' + (applied !== 1 ? 's' : '') + ' loaded \u2014 use \u25c4 \u25ba to step through.';
+                                    status.style.color = '#2e7d32';
+                                  }
+                                }
+
+                                function updateReviewNavState() {
+                                  const total = setupReviewMoves.length;
+                                  const idx = setupReviewIndex;
+                                  const firstBtn = document.getElementById('setup-nav-first');
+                                  const prevBtn = document.getElementById('setup-nav-prev');
+                                  const nextBtn = document.getElementById('setup-nav-next');
+                                  const lastBtn = document.getElementById('setup-nav-last');
+                                  const label = document.getElementById('setup-nav-label');
+                                  if (firstBtn) firstBtn.disabled = idx <= 0;
+                                  if (prevBtn) prevBtn.disabled = idx <= 0;
+                                  if (nextBtn) nextBtn.disabled = idx >= total;
+                                  if (lastBtn) lastBtn.disabled = idx >= total;
+                                  if (label) {
+                                    label.textContent = idx === 0
+                                      ? 'Start'
+                                      : idx + '\u00a0/\u00a0' + total + '\u2002' + setupReviewMoves[idx - 1];
+                                  }
+                                }
+
+                                function stepReview(delta) {
+                                  if (setupReviewMoves.length === 0) return;
+                                  setupReviewIndex = Math.max(0, Math.min(setupReviewMoves.length, setupReviewIndex + delta));
+
+                                  const tempGame = new Chess();
+                                  capturedByWhite = [];
+                                  capturedByBlack = [];
+                                  for (let i = 0; i < setupReviewIndex; i++) {
+                                    const mv = tempGame.move(setupReviewMoves[i], { sloppy: true });
+                                    if (mv && mv.captured) {
+                                      if (mv.color === 'w') capturedByWhite.push(mv.captured);
+                                      else capturedByBlack.push(mv.captured);
+                                    }
+                                  }
+                                  renderCapturedPieces();
+                                  const fen = tempGame.fen();
+                                  game.load(fen);
+                                  if (board) board.position(fen);
+                                  updateFenDisplay();
+                                  updateReviewNavState();
+
+                                  // Update move commentary if available
+                                  const commentEl = document.getElementById('setup-move-comment');
+                                  if (commentEl) {
+                                    const comment = setupReviewComments[setupReviewIndex];
+                                    if (comment) {
+                                      commentEl.textContent = comment;
+                                      commentEl.style.display = 'block';
+                                    } else {
+                                      commentEl.style.display = 'none';
+                                      commentEl.textContent = '';
+                                    }
+                                  }
+
+                                  const status = document.getElementById('setup-moves-status');
+                                  if (status) {
+                                    const idx = setupReviewIndex;
+                                    const total = setupReviewMoves.length;
+                                    if (idx === 0) {
+                                      status.textContent = 'Start position.';
+                                    } else {
+                                      const side = idx % 2 === 1 ? 'White' : 'Black';
+                                      status.textContent = 'Move ' + idx + ' of ' + total + ' \u2014 ' + side + ': ' + setupReviewMoves[idx - 1];
+                                    }
+                                    status.style.color = '#2e7d32';
+                                  }
+
+                                  // Reward: record completion when user reaches the final move of a classic game
+                                  if (activeClassicGameKey && setupReviewIndex === setupReviewMoves.length) {
+                                    recordClassicGameReview(activeClassicGameKey);
+                                  }
+                                }
+
+                                function clearSetupPosition() {
+                                  const input = document.getElementById('setup-moves-input');
+                                  const preset = document.getElementById('setup-opening-preset');
+                                  const status = document.getElementById('setup-moves-status');
+                                  if (input) input.value = '';
+                                  if (preset) preset.value = '';
+                                  if (status) { status.textContent = ''; }
+                                  const openingInfoClear = document.getElementById('setup-opening-info');
+                                  if (openingInfoClear) openingInfoClear.textContent = '';
+                                  setupReviewMoves = [];
+                                  setupReviewIndex = -1;
+                                  setupReviewComments = {};
+                                  activeClassicGameKey = '';
+                                  const commentEl2 = document.getElementById('setup-move-comment');
+                                  if (commentEl2) { commentEl2.style.display = 'none'; commentEl2.textContent = ''; }
+                                  const navControls = document.getElementById('setup-nav-controls');
+                                  if (navControls) navControls.style.display = 'none';
+                                  // Restore player/strategy sections and player display
+                                  const playerSectionsClear = document.getElementById('player-strategy-sections');
+                                  if (playerSectionsClear) playerSectionsClear.style.display = '';
+                                  if (typeof updatePlayerDisplay === 'function') updatePlayerDisplay();
+                                  // Reset the board banner
+                                  const clearClassicSel = document.getElementById('setup-classic-preset');
+                                  if (clearClassicSel) clearClassicSel.value = '';
+                                  const clearClassicInfo = document.getElementById('setup-classic-info');
+                                  if (clearClassicInfo) clearClassicInfo.textContent = '';
+                                  const clearClassicBadges = document.getElementById('setup-classic-badges');
+                                  if (clearClassicBadges) clearClassicBadges.innerHTML = '';
+                                  const bannerDiv2 = document.getElementById('game-status');
+                                  if (bannerDiv2) bannerDiv2.innerHTML = '<p>Game Status: <strong>Ready to play</strong></p>';
+                                  // Reset captured pieces display
+                                  capturedByWhite = [];
+                                  capturedByBlack = [];
+                                  renderCapturedPieces();
+                                  if (game) { game.reset(); }
+                                  if (board) board.start();
+                                  updateFenDisplay();
+                                }
+
+                                // ─────────────────────────────────────────────────────────────────────────
+
+                                  // ── Classic Game Rewards ─────────────────────────────────────────────────
+
+                                  let _rewardInFlight = new Set(); // prevent duplicate calls per session
+
+                                  function recordClassicGameReview(gameKey) {
+                                    if (!authToken || !gameKey) return;
+                                    if (_rewardInFlight.has(gameKey)) return;
+                                    _rewardInFlight.add(gameKey);
+
+                                    fetch('/rewards/complete-review', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                                      body: JSON.stringify({ game_key: gameKey })
+                                    })
+                                      .then(r => r.json())
+                                      .then(data => {
+                                        if (data.success && data.newly_completed) {
+                                          showRewardToast(data.badge, data.badge_title, data.game_name,
+                                            data.completed_count, data.total_games, data.grand_scholar_unlocked);
+                                          // Refresh rewards panel if it's open
+                                          if (document.getElementById('rewards-panel') &&
+                                            document.getElementById('rewards-panel').style.display !== 'none') {
+                                            loadMyRewards();
+                                          }
+                                        }
+                                      })
+                                      .catch(() => { _rewardInFlight.delete(gameKey); });
+                                  }
+
+                                  function showRewardToast(badge, title, gameName, count, total, grandScholar) {
+                                    const existing = document.getElementById('reward-toast');
+                                    if (existing) existing.remove();
+
+                                    const toast = document.createElement('div');
+                                    toast.id = 'reward-toast';
+                                    toast.className = 'reward-toast';
+                                    const grandLine = grandScholar
+                                      ? `<div class="reward-toast-grand">🎓 Grand Scholar badge unlocked — you've reviewed all ${total} classics!</div>`
+                                      : `<div class="reward-toast-progress">${count} of ${total} classic games reviewed</div>`;
+                                    toast.innerHTML = `
+                                    <div class="reward-toast-badge">${badge}</div>
+                                    <div class="reward-toast-body">
+                                      <div class="reward-toast-title">Badge earned: <strong>${title}</strong></div>
+                                      <div class="reward-toast-game">${gameName}</div>
+                                      ${grandLine}
+                                    </div>
+                                    <button class="reward-toast-close" onclick="this.parentElement.remove()">✕</button>
+                                  `;
+                                    document.body.appendChild(toast);
+                                    // Auto-dismiss after 8 seconds
+                                    setTimeout(() => { if (toast.parentElement) toast.remove(); }, 8000);
+                                  }
+
+                                  function loadMyRewards() {
+                                    if (!authToken) return;
+                                    fetch('/rewards/my-reviews', {
+                                      headers: { 'Authorization': 'Bearer ' + authToken }
+                                    })
+                                      .then(r => r.json())
+                                      .then(data => {
+                                        if (!data.success) return;
+                                        renderRewardsPanel(data);
+                                      })
+                                      .catch(() => { });
+                                  }
+
+                                  function renderRewardsPanel(data) {
+                                    const panel = document.getElementById('rewards-panel-content');
+                                    if (!panel) return;
+
+                                    const progressPct = Math.round((data.completed_count / data.total_games) * 100);
+                                    let html = `
+                                    <div class="rewards-header">
+                                      <h4 style="margin:0 0 4px;">Classic Game Reviews</h4>
+                                      <p style="margin:0 0 10px;font-size:0.85em;color:#666;">
+                                        Complete a classic game review by stepping through all its moves.
+                                      </p>
+                                      <div class="rewards-progress-bar-wrap">
+                                        <div class="rewards-progress-bar" style="width:${progressPct}%"></div>
+                                      </div>
+                                      <div style="font-size:0.82em;color:#555;text-align:right;margin-top:3px;">
+                                        ${data.completed_count} / ${data.total_games} reviewed
+                                      </div>
+                                    </div>
+                                    <div class="rewards-grid">`;
+
+                                    for (const g of data.games) {
+                                      const cls = g.completed ? 'reward-card reward-card-earned' : 'reward-card reward-card-locked';
+                                      const dateStr = g.completed_at
+                                        ? new Date(g.completed_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+                                        : '';
+                                      html += `
+                                      <div class="${cls}">
+                                        <div class="reward-card-badge">${g.completed ? g.badge : '🔒'}</div>
+                                        <div class="reward-card-info">
+                                          <div class="reward-card-title">${g.completed ? g.badge_title : '???'}</div>
+                                          <div class="reward-card-game">${g.game_name}</div>
+                                          ${g.completed ? `<div class="reward-card-date">Completed ${dateStr}</div>` : '<div class="reward-card-date">Not yet reviewed</div>'}
+                                        </div>
+                                      </div>`;
+                                    }
+                                    html += '</div>';
+
+                                    if (data.grand_scholar) {
+                                      html += `
+                                      <div class="reward-grand-scholar">
+                                        <span style="font-size:2em;">🎓</span>
+                                        <div>
+                                          <strong>Grand Scholar</strong>
+                                          <div style="font-size:0.85em;color:#4a148c;">You've reviewed all ${data.total_games} classic games!</div>
+                                        </div>
+                                      </div>`;
+                                    }
+
+                                    panel.innerHTML = html;
+                                  }
+
+                                  // ─────────────────────────────────────────────────────────────────────────
+
+                                    function initFeedbackTab() {
+                                      const msgEl = document.getElementById('feedback-message');
+                                      const countEl = document.getElementById('feedback-char-count');
+                                      if (msgEl && countEl) {
+                                        msgEl.addEventListener('input', function () {
+                                          countEl.textContent = msgEl.value.length;
+                                        });
+                                      }
+                                      document.getElementById('feedback-result').innerHTML = '';
+                                    }
+
+                                    function submitFeedback() {
+                                      if (!authToken) return;
+                                      const category = document.getElementById('feedback-category').value;
+                                      const message = document.getElementById('feedback-message').value.trim();
+                                      const resultEl = document.getElementById('feedback-result');
+
+                                      if (!message) {
+                                        resultEl.innerHTML = '<span style="color:red;">Please enter a message.</span>';
+                                        return;
+                                      }
+
+                                      fetch('/feedback/submit', {
+                                        method: 'POST',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                          'Authorization': 'Bearer ' + authToken
+                                        },
+                                        body: JSON.stringify({ category, message })
+                                      })
+                                        .then(r => r.json())
+                                        .then(data => {
+                                          if (data.success) {
+                                            document.getElementById('feedback-message').value = '';
+                                            document.getElementById('feedback-char-count').textContent = '0';
+                                            resultEl.innerHTML = '<span style="color:#4CAF50;">✔ ' + data.message + '</span>';
+                                          } else {
+                                            resultEl.innerHTML = '<span style="color:red;">Error: ' + (data.message || 'Submission failed.') + '</span>';
+                                          }
+                                        })
+                                        .catch(() => {
+                                          resultEl.innerHTML = '<span style="color:red;">Network error. Please try again.</span>';
+                                        });
+                                    }
+
+                                    // ─────────────────────────────────────────────────────────────────────────
 
                           function checkGameStatus() {
                             const statusDiv = document.getElementById('game-status');
@@ -2493,6 +3450,19 @@
         board.start();
       }
 
+                            // Apply setup moves if the user has entered a position
+                            (function () {
+                              const setupInput = document.getElementById('setup-moves-input');
+                              if (!setupInput || !setupInput.value.trim()) return;
+                              const setupMoves = parseMoveNotation(setupInput.value.trim());
+                              if (!setupMoves.length) return;
+                              for (const san of setupMoves) {
+                                if (!game.move(san, { sloppy: true })) break;
+                              }
+                              if (board) board.position(game.fen());
+                              updateStatusBox('Position set from ' + setupMoves.length + ' move' + (setupMoves.length !== 1 ? 's' : ''), 'info');
+                            })();
+
       document.getElementById('move-history').innerHTML = '<p style="color: #999;">No moves yet</p>';
         const expertResp = document.getElementById('expert-response');
         if (expertResp) expertResp.innerHTML = '<p style="color: #999; margin: 0;">Ask a question and get expert chess analysis</p>';
@@ -2569,7 +3539,7 @@
         logCommMessage('req', 'ENGINE', '/move', { move, fen, request_ai_move: requestAiMove, ai_type: aiType, skill_level: skillLevel }, null);
         let _moveStatus = null;
     
-      fetch('http://localhost:8000/move', {
+        fetch('/move', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2693,7 +3663,7 @@
             if (!syncGameId || !authToken || !game) return;
             const whiteNameEl = document.getElementById('white-human-name');
             const blackNameEl = document.getElementById('black-human-name');
-            fetch('http://localhost:8000/game/sync', {
+            fetch('/game/sync', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
               body: JSON.stringify({
@@ -2710,7 +3680,7 @@
 
           function pollGameSync() {
             if (!syncGameId || !authToken || !isSyncGame || !game) return;
-            fetch('http://localhost:8000/game/sync/' + syncGameId, {
+            fetch('/game/sync/' + syncGameId, {
               headers: { 'Authorization': 'Bearer ' + authToken }
             })
               .then(r => r.json())
@@ -2833,6 +3803,20 @@
           return;
         }
 
+        // --- loading state ---
+        document.body.style.cursor = 'wait';
+        document.querySelectorAll('.expert-quick-btn, .expert-send-btn').forEach(btn => {
+          btn.disabled = true;
+          btn.classList.add('expert-loading');
+        });
+        function _clearExpertLoading() {
+          document.body.style.cursor = '';
+          document.querySelectorAll('.expert-quick-btn, .expert-send-btn').forEach(btn => {
+            btn.disabled = false;
+            btn.classList.remove('expert-loading');
+          });
+        }
+
         updateStatusBox(`Asking expert: "${question}"`, 'info');
         document.getElementById('expert-input').value = '';
 
@@ -2841,7 +3825,7 @@
 
         logCommMessage('req', 'ENGINE', '/expert/question', { question, fen: ctx ? ctx.fen : null }, null);
         let _expertStatus = null;
-        fetch('http://localhost:8000/expert/question', {
+        fetch('/expert/question', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -2861,14 +3845,17 @@
           .then(data => {
             logCommMessage('res', 'ENGINE', '/expert/question', data, _expertStatus);
             if (data.error) {
+              _clearExpertLoading();
               addExpertQA(question, 'Error: ' + data.error, true);
               updateStatusBox(`Expert error: ${data.error}`, 'error');
             } else {
+              _clearExpertLoading();
               addExpertQA(question, data.response || 'No response', false);
               updateStatusBox('Expert response received', 'success');
             }
           })
           .catch(error => {
+            _clearExpertLoading();
             if (error.message !== 'Unauthorized') {
               logCommMessage('err', 'ENGINE', '/expert/question', { message: error.message }, null);
               addExpertQA(question, 'Connection error: ' + error.message, true);
@@ -2882,7 +3869,7 @@
           if (syncPollInterval) { clearInterval(syncPollInterval); syncPollInterval = null; }
           isSyncGame = false;
           logCommMessage('req', 'AUTH', '/auth/logout', {}, null);
-          fetch('http://localhost:8002/auth/logout', {
+          fetch('/auth/logout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ token: authToken })
@@ -2901,6 +3888,128 @@
 
       window.onload = checkAuthentication;
   </script>
+<!-- Help Modal -->
+<div id="help-overlay" style="display:none;" onclick="if(event.target===this)closeHelp()">
+  <div class="help-modal">
+    <div class="help-modal-header">
+      <h2>♟ Chess AI App — Help</h2>
+      <button class="help-close-btn" onclick="closeHelp()">&#x2715;</button>
+    </div>
+    <div class="help-modal-body">
+
+      <div class="help-section">
+        <h3>Header</h3>
+        <table class="help-table">
+          <tr><td>Welcome, [name]</td><td>Shows your logged-in username.</td></tr>
+          <tr><td>Clear Activity</td><td>Clears your online presence status (e.g. removes &ldquo;playing&rdquo; indicator visible to other community members).</td></tr>
+          <tr><td>? Help</td><td>Opens this help dialog.</td></tr>
+          <tr><td>Logout</td><td>Signs you out and returns to the login screen.</td></tr>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>Chessboard Area (left panel)</h3>
+        <table class="help-table">
+          <tr><td>Board</td><td>The interactive chessboard. Drag or click pieces to make moves when it is a human player&rsquo;s turn.</td></tr>
+          <tr><td>FEN</td><td>The current board position in Forsyth&ndash;Edwards Notation &mdash; a compact string used to describe any chess position.</td></tr>
+          <tr><td>Game Status</td><td>Shows whose turn it is, check/checkmate/draw state, and end-of-game results.</td></tr>
+          <tr><td>Player Info</td><td>Displays the configured name or AI type for White and Black.</td></tr>
+          <tr><td>Captured Pieces</td><td>Lists pieces each side has taken, plus the material advantage score.</td></tr>
+          <tr><td>Game ID box</td><td>Appears during a human-vs-human online game; shows the shared game identifier your opponent uses to join.</td></tr>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>Welcome Tab</h3>
+        <table class="help-table">
+          <tr><td>Start New Game</td><td>Resets the board and goes to Player Setup to configure a fresh game.</td></tr>
+          <tr><td>My Saves</td><td>Opens a list of games you have saved; click Load to restore one.</td></tr>
+          <tr><td>Practice</td><td>Shows endgame drills and puzzle positions to sharpen your skills.</td></tr>
+          <tr><td>Classic Games</td><td>Opens the Player Setup preset picker pre-focused on famous historic games.</td></tr>
+          <tr><td>Chess News</td><td>Displays a recent chess news headline fetched from the engine.</td></tr>
+          <tr><td>Chess Joke</td><td>Fetches a chess-themed joke from the AI expert.</td></tr>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>Player Setup Tab</h3>
+        <table class="help-table">
+          <tr><td>White / Black Player</td><td>Choose <em>Human</em> (enter a name) or <em>AI</em> (pick an engine and skill level 1&ndash;20).</td></tr>
+          <tr><td>AI Type</td><td>Stockfish (local engine), OpenAI GPT, DeepSeek, or Claude.</td></tr>
+          <tr><td>Skill Level</td><td>1 = easiest, 20 = strongest. Only applies to Stockfish.</td></tr>
+          <tr><td>White Opening / Black Defense</td><td>Optional strategic preference applied to the AI&rsquo;s early moves.</td></tr>
+          <tr><td>Classic Games preset</td><td>Loads the moves of a famous historic game for step-through review or replay.</td></tr>
+          <tr><td>Preset Openings</td><td>Jumps the board to the end of a well-known opening sequence.</td></tr>
+          <tr><td>Custom Moves</td><td>Type PGN notation (e.g. <code>1.e4 e5 2.Nf3</code>) to jump to any position.</td></tr>
+          <tr><td>Preview Position</td><td>Applies the custom or preset moves to the board without starting a game.</td></tr>
+          <tr><td>&#x23EE; &#9664; &#9654; &#x23ED; (nav arrows)</td><td>Step through a loaded game or opening move by move.</td></tr>
+          <tr><td>Start New Game</td><td>Begins a game with the current player and position configuration.</td></tr>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>Move History Tab</h3>
+        <table class="help-table">
+          <tr><td>Move list</td><td>Shows every move played in the current game in algebraic notation.</td></tr>
+          <tr><td>💾 Save As&hellip;</td><td>Saves the current game under a name you choose, accessible later via My Saves.</td></tr>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>Ask Expert Tab</h3>
+        <table class="help-table">
+          <tr><td>Quick action buttons</td><td>Pre-written prompts: <em>Analyze position</em>, <em>Best move?</em>, <em>Explain last move</em>, <em>Threats?</em>, <em>Who is winning?</em> &mdash; send instantly with one click.</td></tr>
+          <tr><td>Input + Send</td><td>Type any chess question; the AI expert answers in the context of the live game.</td></tr>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>Community Tab</h3>
+        <table class="help-table">
+          <tr><td>Online users sidebar</td><td>Lists who is currently online (green dot) or in a game (orange dot).</td></tr>
+          <tr><td>✉ DM button</td><td>Opens a compose area to send a private direct message to that user.</td></tr>
+          <tr><td>♟ Invite button</td><td>Sends a game invitation to that user; they can accept or decline.</td></tr>
+          <tr><td>Chat messages</td><td>Public chat visible to all online users. Your own messages are highlighted blue.</td></tr>
+          <tr><td>Message input + Send</td><td>Type and post a message to the public chat.</td></tr>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>Stats Tab</h3>
+        <table class="help-table">
+          <tr><td>Win / Loss / Draw cards</td><td>Lifetime totals across all opponents.</td></tr>
+          <tr><td>Per-opponent table</td><td>Breakdown of results against each opponent you have played.</td></tr>
+          <tr><td>Reset</td><td>Clears all locally stored statistics (cannot be undone).</td></tr>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>🏅 Rewards Tab</h3>
+        <table class="help-table">
+          <tr><td>Reward cards</td><td>Badges earned by completing classic game reviews. Locked badges show what is still to achieve.</td></tr>
+          <tr><td>Grand Scholar</td><td>Special badge awarded once you complete every available classic game review.</td></tr>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>💬 Feedback Tab</h3>
+        <table class="help-table">
+          <tr><td>Category</td><td>Tag your message as a Bug Report, Suggestion, or Feature Request.</td></tr>
+          <tr><td>Message + Submit</td><td>Sends your feedback to the admin; they will see it even when offline.</td></tr>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>Comm Tab</h3>
+        <table class="help-table">
+          <tr><td>Comm log</td><td>Developer diagnostics showing every HTTP request and response between the browser and the backend services. Useful for troubleshooting.</td></tr>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <!-- Color Choice Modal -->
 <div id="color-choice-overlay" class="color-choice-overlay" style="display:none;"
   onclick="if(event.target===this)closeColorChoiceModal()">

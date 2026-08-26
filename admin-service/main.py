@@ -70,8 +70,9 @@ class AIModelResponse(BaseModel):
 # ========== Helper Functions ==========
 
 def get_db_connection():
-    """Get SQLite database connection."""
-    conn = sqlite3.connect(DATABASE_PATH)
+    """Get SQLite database connection using unix-dotfile VFS for Azure Files SMB compatibility."""
+    uri = f"file:{DATABASE_PATH}?vfs=unix-dotfile"
+    conn = sqlite3.connect(uri, uri=True, timeout=30, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
