@@ -662,6 +662,32 @@
     .help-table tr:last-child td { border-bottom: none; }
     .help-table td:first-child { font-weight: 600; white-space: nowrap; color: #1565c0; width: 38%; }
     .help-table td:last-child { color: #444; line-height: 1.45; }
+    .settings-menu { position: relative; }
+    .settings-btn { padding: 6px 12px; font-size: 0.85em; background: #546e7a; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    .settings-btn:hover { background: #455a64; }
+    .settings-dropdown { display: none; position: absolute; top: calc(100% + 6px); right: 0; min-width: 170px; background: white; border: 1px solid #cfd8dc; border-radius: 5px; box-shadow: 0 6px 18px rgba(0,0,0,0.18); z-index: 1600; overflow: hidden; }
+    .settings-dropdown.open { display: block; }
+    .settings-menu-item { width: 100%; padding: 9px 12px; background: white; border: none; text-align: left; color: #263238; font-size: 0.9em; cursor: pointer; }
+    .settings-menu-item:hover { background: #eceff1; }
+    #board-theme-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; display: flex; align-items: center; justify-content: center; }
+    .white-1e1d7 { background-color: var(--board-light-square, #f0d9b5); color: var(--board-dark-square, #b58863); }
+    .black-3c85d { background-color: var(--board-dark-square, #b58863); color: var(--board-light-square, #f0d9b5); }
+    .board-theme-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+    .board-theme-option { display: flex; gap: 10px; align-items: center; padding: 9px; background: #fff; border: 1px solid #d9dee2; border-radius: 6px; cursor: pointer; text-align: left; }
+    .board-theme-option:hover { background: #f5f7f8; border-color: #b0bec5; }
+    .board-theme-option.active { border-color: #2196F3; box-shadow: 0 0 0 2px rgba(33,150,243,0.16); }
+    .board-theme-swatch { display: grid; grid-template-columns: repeat(2, 18px); grid-template-rows: repeat(2, 18px); border: 1px solid #404040; flex-shrink: 0; }
+    .board-theme-name { font-weight: 700; color: #263238; font-size: 0.92em; }
+    .board-theme-colors { color: #667; font-family: monospace; font-size: 0.78em; margin-top: 2px; }
+    #piece-set-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; display: flex; align-items: center; justify-content: center; }
+    .piece-set-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+    .piece-set-option { display: flex; gap: 10px; align-items: center; padding: 9px; background: #fff; border: 1px solid #d9dee2; border-radius: 6px; cursor: pointer; text-align: left; }
+    .piece-set-option:hover { background: #f5f7f8; border-color: #b0bec5; }
+    .piece-set-option.active { border-color: #2196F3; box-shadow: 0 0 0 2px rgba(33,150,243,0.16); }
+    .piece-set-sample { display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; background: #eef2f4; border: 1px solid #cfd8dc; border-radius: 5px; flex-shrink: 0; }
+    .piece-set-sample img { width: 34px; height: 34px; }
+    .piece-set-name { font-weight: 700; color: #263238; font-size: 0.92em; }
+    .piece-set-description { color: #667; font-size: 0.78em; margin-top: 2px; line-height: 1.35; }
   </style>
 </head>
 <body>
@@ -673,6 +699,33 @@
   
   <script>
     const UI_VERSION = '1.0.0';
+    const BOARD_THEME_STORAGE_KEY = 'chessBoardTheme';
+    const PIECE_SET_STORAGE_KEY = 'chessPieceSetTheme';
+    const BOARD_THEMES = [
+      { id: 'classic-wood', name: 'Classic Wood', light: '#f0d9b5', dark: '#b58863' },
+      { id: 'tournament-green', name: 'Tournament Green', light: '#eeeed2', dark: '#769656' },
+      { id: 'blue-steel', name: 'Blue Steel', light: '#dee3e6', dark: '#8ca2ad' },
+      { id: 'slate', name: 'Slate', light: '#d9e0e6', dark: '#6f7f8f' },
+      { id: 'walnut', name: 'Walnut', light: '#ead7b7', dark: '#8b5e3c' },
+      { id: 'forest', name: 'Forest', light: '#f2f5df', dark: '#6b8f4e' },
+      { id: 'burgundy', name: 'Burgundy', light: '#f3dfd8', dark: '#9c5b5b' },
+      { id: 'marble-gray', name: 'Marble Gray', light: '#eeeeee', dark: '#9e9e9e' },
+      { id: 'navy-sand', name: 'Navy Sand', light: '#f1e6c8', dark: '#4f6478' },
+      { id: 'espresso', name: 'Espresso', light: '#e8d0aa', dark: '#5a3a28' }
+    ];
+    const PIECE_GLYPHS = { wK: '♔', wQ: '♕', wR: '♖', wB: '♗', wN: '♘', wP: '♙', bK: '♚', bQ: '♛', bR: '♜', bB: '♝', bN: '♞', bP: '♟' };
+    const PIECE_SETS = [
+      { id: 'wikipedia', name: 'Wikipedia', description: 'Current classic image set.', imagePath: 'img/chesspieces/wikipedia/{piece}.png' },
+      { id: 'alpha', name: 'Alpha', description: 'Clean modern pieces with bold silhouettes.', font: 'Arial Rounded MT Bold, Arial, sans-serif', white: '#f8fafc', black: '#172033', stroke: '#0f172a' },
+      { id: 'merida', name: 'Merida', description: 'Detailed classic study-board style.', font: 'Georgia, serif', white: '#fff7df', black: '#322016', stroke: '#5f3b22' },
+      { id: 'leipzig', name: 'Leipzig', description: 'Book-like analysis diagram pieces.', font: 'Times New Roman, serif', white: '#f7f2e8', black: '#202020', stroke: '#111111' },
+      { id: 'chess24', name: 'Chess24', description: 'Sleek tournament-inspired pieces.', font: 'Trebuchet MS, sans-serif', white: '#f3f7fb', black: '#1d3557', stroke: '#102a43' },
+      { id: 'lichess-cburnett', name: 'Lichess / Cburnett', description: 'Familiar online-chess inspired pieces.', font: 'Arial, sans-serif', white: '#fafafa', black: '#2b2b2b', stroke: '#000000' },
+      { id: 'staunty', name: 'Staunty', description: 'Polished modern Staunton feel.', font: 'Georgia, serif', white: '#f8f1dc', black: '#263238', stroke: '#263238' },
+      { id: 'cardinal', name: 'Cardinal', description: 'Bold, high-contrast diagram style.', font: 'Verdana, sans-serif', white: '#fff4f4', black: '#5b1f2e', stroke: '#3f0f1a' },
+      { id: 'spatial-3d', name: 'Spatial / 3D-style', description: 'Dimensional pieces with a soft shadow.', font: 'Arial Black, Arial, sans-serif', white: '#fdf6e3', black: '#334155', stroke: '#1e293b', shadow: true },
+      { id: 'minimal-monochrome', name: 'Minimal / Monochrome', description: 'Simple monochrome glyphs for a clean board.', font: 'Segoe UI Symbol, Arial, sans-serif', white: '#ffffff', black: '#111111', stroke: '#111111' }
+    ];
 
     let authToken = null;
     let currentUser = null;
@@ -1395,6 +1448,141 @@
                             function closeHelp() {
                               const el = document.getElementById('help-overlay');
                               if (el) el.style.display = 'none';
+                            }
+
+                            function toggleSettingsMenu(event) {
+                              if (event) event.stopPropagation();
+                              const menu = document.getElementById('settings-dropdown');
+                              if (menu) menu.classList.toggle('open');
+                            }
+
+                            function closeSettingsMenu() {
+                              const menu = document.getElementById('settings-dropdown');
+                              if (menu) menu.classList.remove('open');
+                            }
+
+                            function openBoardThemeSettings() {
+                              closeSettingsMenu();
+                              renderBoardThemeOptions();
+                              const el = document.getElementById('board-theme-overlay');
+                              if (el) el.style.display = 'flex';
+                            }
+
+                            function closeBoardThemeSettings() {
+                              const el = document.getElementById('board-theme-overlay');
+                              if (el) el.style.display = 'none';
+                            }
+
+                            function openPieceSetSettings() {
+                              closeSettingsMenu();
+                              renderPieceSetOptions();
+                              const el = document.getElementById('piece-set-overlay');
+                              if (el) el.style.display = 'flex';
+                            }
+
+                            function closePieceSetSettings() {
+                              const el = document.getElementById('piece-set-overlay');
+                              if (el) el.style.display = 'none';
+                            }
+
+                            document.addEventListener('click', closeSettingsMenu);
+
+                            function getSelectedBoardTheme() {
+                              const savedThemeId = localStorage.getItem(BOARD_THEME_STORAGE_KEY) || 'classic-wood';
+                              return BOARD_THEMES.find(theme => theme.id === savedThemeId) || BOARD_THEMES[0];
+                            }
+
+                            function applyBoardTheme(themeId) {
+                              const theme = BOARD_THEMES.find(item => item.id === themeId) || BOARD_THEMES[0];
+                              document.documentElement.style.setProperty('--board-light-square', theme.light);
+                              document.documentElement.style.setProperty('--board-dark-square', theme.dark);
+                              localStorage.setItem(BOARD_THEME_STORAGE_KEY, theme.id);
+                              renderBoardThemeOptions();
+                            }
+
+                            function renderBoardThemeOptions() {
+                              const container = document.getElementById('board-theme-options');
+                              if (!container) return;
+                              const selectedTheme = getSelectedBoardTheme();
+                              container.innerHTML = BOARD_THEMES.map(theme => {
+                                const isActive = theme.id === selectedTheme.id;
+                                return `
+                                  <button type="button" class="board-theme-option${isActive ? ' active' : ''}" onclick="applyBoardTheme('${theme.id}')" aria-pressed="${isActive}">
+                                    <span class="board-theme-swatch" aria-hidden="true">
+                                      <span style="background:${theme.light}"></span><span style="background:${theme.dark}"></span>
+                                      <span style="background:${theme.dark}"></span><span style="background:${theme.light}"></span>
+                                    </span>
+                                    <span>
+                                      <span class="board-theme-name">${theme.name}</span>
+                                      <span class="board-theme-colors">${theme.light} / ${theme.dark}</span>
+                                    </span>
+                                  </button>`;
+                              }).join('');
+                            }
+
+                            applyBoardTheme(getSelectedBoardTheme().id);
+
+                            function getSelectedPieceSet() {
+                              const savedPieceSetId = localStorage.getItem(PIECE_SET_STORAGE_KEY) || 'wikipedia';
+                              return PIECE_SETS.find(set => set.id === savedPieceSetId) || PIECE_SETS[0];
+                            }
+
+                            function buildGeneratedPieceSvg(piece, pieceSet) {
+                              const isWhite = piece.charAt(0) === 'w';
+                              const glyph = PIECE_GLYPHS[piece] || piece.charAt(1);
+                              const fill = isWhite ? pieceSet.white : pieceSet.black;
+                              const textStroke = isWhite ? pieceSet.stroke : '#050505';
+                              const shadow = pieceSet.shadow ? '<filter id="s"><feDropShadow dx="2" dy="3" stdDeviation="1.5" flood-opacity="0.35"/></filter>' : '';
+                              const filter = pieceSet.shadow ? ' filter="url(#s)"' : '';
+                              const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">${shadow}<rect width="80" height="80" fill="none"/><text x="40" y="58" text-anchor="middle" font-size="56" font-family="${pieceSet.font}" fill="${fill}" stroke="${textStroke}" stroke-width="1.8" paint-order="stroke"${filter}>${glyph}</text></svg>`;
+                              return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+                            }
+
+                            function getPieceThemeConfig() {
+                              const pieceSet = getSelectedPieceSet();
+                              if (pieceSet.imagePath) return pieceSet.imagePath;
+                              return piece => buildGeneratedPieceSvg(piece, pieceSet);
+                            }
+
+                            function recreateBoardWithPieceSet() {
+                              if (!board || !game) return;
+                              const orientation = board.orientation ? board.orientation() : 'white';
+                              const fen = game.fen();
+                              board.destroy();
+                              board = Chessboard('board', {
+                                draggable: true,
+                                position: fen,
+                                orientation: orientation,
+                                pieceTheme: getPieceThemeConfig(),
+                                onDragStart: onDragStart,
+                                onDrop: onDrop,
+                                onSnapEnd: onSnapEnd
+                              });
+                            }
+
+                            function applyPieceSetTheme(pieceSetId) {
+                              const pieceSet = PIECE_SETS.find(set => set.id === pieceSetId) || PIECE_SETS[0];
+                              localStorage.setItem(PIECE_SET_STORAGE_KEY, pieceSet.id);
+                              recreateBoardWithPieceSet();
+                              renderPieceSetOptions();
+                            }
+
+                            function renderPieceSetOptions() {
+                              const container = document.getElementById('piece-set-options');
+                              if (!container) return;
+                              const selectedPieceSet = getSelectedPieceSet();
+                              container.innerHTML = PIECE_SETS.map(pieceSet => {
+                                const isActive = pieceSet.id === selectedPieceSet.id;
+                                const sampleSrc = pieceSet.imagePath ? pieceSet.imagePath.replace('{piece}', 'wN') : buildGeneratedPieceSvg('wN', pieceSet);
+                                return `
+                                  <button type="button" class="piece-set-option${isActive ? ' active' : ''}" onclick="applyPieceSetTheme('${pieceSet.id}')" aria-pressed="${isActive}">
+                                    <span class="piece-set-sample" aria-hidden="true"><img src="${sampleSrc}" alt=""></span>
+                                    <span>
+                                      <span class="piece-set-name">${pieceSet.name}</span>
+                                      <span class="piece-set-description">${pieceSet.description}</span>
+                                    </span>
+                                  </button>`;
+                              }).join('');
                             }
 
                             // ─── AI Game Setup (from Community panel) ────────────────────────────
@@ -2190,6 +2378,13 @@
             <span>Welcome, <strong>${currentUser}</strong></span>
             <span id="version-badge" style="font-size:0.72em; color:rgba(255,255,255,0.55); font-family:monospace; letter-spacing:0.02em;">UI ${UI_VERSION}&nbsp;|&nbsp;API&nbsp;…</span>
             <button onclick="clearMyGameActivity()" title="Clear your game activity status" style="padding:6px 12px; font-size:0.85em; background:#607d8b; color:white; border:none; border-radius:4px; cursor:pointer;">Clear Activity</button>
+            <div class="settings-menu">
+              <button onclick="toggleSettingsMenu(event)" title="Settings" class="settings-btn">⚙ Settings</button>
+              <div id="settings-dropdown" class="settings-dropdown">
+                <button type="button" class="settings-menu-item" onclick="openBoardThemeSettings()">Board Theme</button>
+                <button type="button" class="settings-menu-item" onclick="openPieceSetSettings()">Piece Set Theme</button>
+              </div>
+            </div>
             <button onclick="openHelp()" title="Help" style="padding:6px 12px; font-size:0.85em; background:#455a64; color:white; border:none; border-radius:4px; cursor:pointer;">? Help</button>
             <button onclick="handleLogout()" class="btn-danger">Logout</button>
           </div>
@@ -2608,7 +2803,7 @@
       board = Chessboard('board', {
         draggable: true,
         position: 'start',
-        pieceTheme: 'img/chesspieces/wikipedia/{piece}.png',
+        pieceTheme: getPieceThemeConfig(),
         onDragStart: onDragStart,
         onDrop: onDrop,
         onSnapEnd: onSnapEnd
@@ -3888,6 +4083,36 @@
 
       window.onload = checkAuthentication;
   </script>
+<!-- Board Theme Modal -->
+<div id="board-theme-overlay" style="display:none;" onclick="if(event.target===this)closeBoardThemeSettings()">
+  <div class="help-modal">
+    <div class="help-modal-header">
+      <h2>Board Theme</h2>
+      <button class="help-close-btn" onclick="closeBoardThemeSettings()">&#x2715;</button>
+    </div>
+    <div class="help-modal-body">
+      <div class="help-section">
+        <h3>Color Combination</h3>
+        <div id="board-theme-options" class="board-theme-options"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Piece Set Theme Modal -->
+<div id="piece-set-overlay" style="display:none;" onclick="if(event.target===this)closePieceSetSettings()">
+  <div class="help-modal">
+    <div class="help-modal-header">
+      <h2>Piece Set Theme</h2>
+      <button class="help-close-btn" onclick="closePieceSetSettings()">&#x2715;</button>
+    </div>
+    <div class="help-modal-body">
+      <div class="help-section">
+        <h3>Piece Set</h3>
+        <div id="piece-set-options" class="piece-set-options"></div>
+      </div>
+    </div>
+  </div>
+</div>
 <!-- Help Modal -->
 <div id="help-overlay" style="display:none;" onclick="if(event.target===this)closeHelp()">
   <div class="help-modal">
@@ -3902,6 +4127,7 @@
         <table class="help-table">
           <tr><td>Welcome, [name]</td><td>Shows your logged-in username.</td></tr>
           <tr><td>Clear Activity</td><td>Clears your online presence status (e.g. removes &ldquo;playing&rdquo; indicator visible to other community members).</td></tr>
+          <tr><td>Settings</td><td>Opens app settings, including Board Theme and Piece Set Theme.</td></tr>
           <tr><td>? Help</td><td>Opens this help dialog.</td></tr>
           <tr><td>Logout</td><td>Signs you out and returns to the login screen.</td></tr>
         </table>

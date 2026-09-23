@@ -134,6 +134,13 @@
       align-items: center;
       gap: 8px;
     }
+    .m-settings-menu { position: relative; }
+    .m-settings-dropdown { display: none; position: absolute; top: calc(100% + 6px); right: 0; min-width: 150px; background: white; border: 1px solid #c5cae9; border-radius: 7px; box-shadow: 0 6px 18px rgba(0,0,0,0.24); z-index: 900; overflow: hidden; }
+    .m-settings-dropdown.open { display: block; }
+    .m-settings-item { width: 100%; padding: 10px 12px; background: white; border: none; text-align: left; color: #1a237e; font-size: 0.86em; font-weight: 600; cursor: pointer; }
+    .m-settings-item:active { background: #e8eaf6; }
+    .white-1e1d7 { background-color: var(--board-light-square, #f0d9b5); color: var(--board-dark-square, #b58863); }
+    .black-3c85d { background-color: var(--board-dark-square, #b58863); color: var(--board-light-square, #f0d9b5); }
     .m-header-user {
       font-size: 0.8em;
       color: rgba(255,255,255,0.8);
@@ -180,11 +187,6 @@
       font-family: monospace;
       font-size: 11px;
       margin-bottom: 4px;
-    }
-
-    /* Board wrapper — sets the size used by chessboard.js */
-    #board {
-      /* Width is set dynamically via JS; height follows automatically from chessboard.js */
     }
 
     /* ── Compact info strip below the board ───────────────────────────────── */
@@ -622,6 +624,7 @@
     ══════════════════════════════════════════════════════════════════════════ */
     /* ── Help bottom-sheet ───────────────────────────────────────────────── */
     #m-help-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 1000; display: flex; flex-direction: column; justify-content: flex-end; }
+    #m-board-theme-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 1000; display: flex; flex-direction: column; justify-content: flex-end; }
     .m-help-sheet { background: white; border-radius: 14px 14px 0 0; max-height: 86vh; display: flex; flex-direction: column; }
     .m-help-sheet-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px 10px; border-bottom: 1px solid #e0e0e0; flex-shrink: 0; }
     .m-help-sheet-header h2 { margin: 0; font-size: 1.05em; color: #1a237e; }
@@ -636,6 +639,20 @@
     .m-help-row dd { margin: 0; color: #444; line-height: 1.45; flex: 1; }
     .m-header-help { padding: 6px 10px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; color: white; font-size: 0.8em; cursor: pointer; font-weight: 700; }
     .m-header-help:active { background: rgba(255,255,255,0.3); }
+    .m-board-theme-options { display: flex; flex-direction: column; gap: 8px; }
+    .m-board-theme-option { display: flex; align-items: center; gap: 10px; padding: 9px; background: white; border: 1px solid #d9dee2; border-radius: 8px; text-align: left; }
+    .m-board-theme-option.active { border-color: #1565c0; box-shadow: 0 0 0 2px rgba(21,101,192,0.14); }
+    .m-board-theme-swatch { display: grid; grid-template-columns: repeat(2, 18px); grid-template-rows: repeat(2, 18px); border: 1px solid #404040; flex-shrink: 0; }
+    .m-board-theme-name { display: block; font-weight: 700; color: #1a237e; font-size: 0.9em; }
+    .m-board-theme-colors { display: block; color: #666; font-family: monospace; font-size: 0.76em; margin-top: 2px; }
+    #m-piece-set-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 1000; display: flex; flex-direction: column; justify-content: flex-end; }
+    .m-piece-set-options { display: flex; flex-direction: column; gap: 8px; }
+    .m-piece-set-option { display: flex; align-items: center; gap: 10px; padding: 9px; background: white; border: 1px solid #d9dee2; border-radius: 8px; text-align: left; }
+    .m-piece-set-option.active { border-color: #1565c0; box-shadow: 0 0 0 2px rgba(21,101,192,0.14); }
+    .m-piece-set-sample { display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; background: #eef2f4; border: 1px solid #cfd8dc; border-radius: 6px; flex-shrink: 0; }
+    .m-piece-set-sample img { width: 34px; height: 34px; }
+    .m-piece-set-name { display: block; font-weight: 700; color: #1a237e; font-size: 0.9em; }
+    .m-piece-set-description { display: block; color: #666; font-size: 0.76em; line-height: 1.35; margin-top: 2px; }
 
     @media (orientation: landscape) {
 
@@ -716,6 +733,33 @@
     // Global State
     // ────────────────────────────────────────────────────────────────────────
     const MOBILE_UI_VERSION = '1.0.0';
+    const BOARD_THEME_STORAGE_KEY = 'chessBoardTheme';
+    const PIECE_SET_STORAGE_KEY = 'chessPieceSetTheme';
+    const BOARD_THEMES = [
+      { id: 'classic-wood', name: 'Classic Wood', light: '#f0d9b5', dark: '#b58863' },
+      { id: 'tournament-green', name: 'Tournament Green', light: '#eeeed2', dark: '#769656' },
+      { id: 'blue-steel', name: 'Blue Steel', light: '#dee3e6', dark: '#8ca2ad' },
+      { id: 'slate', name: 'Slate', light: '#d9e0e6', dark: '#6f7f8f' },
+      { id: 'walnut', name: 'Walnut', light: '#ead7b7', dark: '#8b5e3c' },
+      { id: 'forest', name: 'Forest', light: '#f2f5df', dark: '#6b8f4e' },
+      { id: 'burgundy', name: 'Burgundy', light: '#f3dfd8', dark: '#9c5b5b' },
+      { id: 'marble-gray', name: 'Marble Gray', light: '#eeeeee', dark: '#9e9e9e' },
+      { id: 'navy-sand', name: 'Navy Sand', light: '#f1e6c8', dark: '#4f6478' },
+      { id: 'espresso', name: 'Espresso', light: '#e8d0aa', dark: '#5a3a28' }
+    ];
+    const PIECE_GLYPHS = { wK: '♔', wQ: '♕', wR: '♖', wB: '♗', wN: '♘', wP: '♙', bK: '♚', bQ: '♛', bR: '♜', bB: '♝', bN: '♞', bP: '♟' };
+    const PIECE_SETS = [
+      { id: 'wikipedia', name: 'Wikipedia', description: 'Current classic image set.', imagePath: 'img/chesspieces/wikipedia/{piece}.png' },
+      { id: 'alpha', name: 'Alpha', description: 'Clean modern pieces with bold silhouettes.', font: 'Arial Rounded MT Bold, Arial, sans-serif', white: '#f8fafc', black: '#172033', stroke: '#0f172a' },
+      { id: 'merida', name: 'Merida', description: 'Detailed classic study-board style.', font: 'Georgia, serif', white: '#fff7df', black: '#322016', stroke: '#5f3b22' },
+      { id: 'leipzig', name: 'Leipzig', description: 'Book-like analysis diagram pieces.', font: 'Times New Roman, serif', white: '#f7f2e8', black: '#202020', stroke: '#111111' },
+      { id: 'chess24', name: 'Chess24', description: 'Sleek tournament-inspired pieces.', font: 'Trebuchet MS, sans-serif', white: '#f3f7fb', black: '#1d3557', stroke: '#102a43' },
+      { id: 'lichess-cburnett', name: 'Lichess / Cburnett', description: 'Familiar online-chess inspired pieces.', font: 'Arial, sans-serif', white: '#fafafa', black: '#2b2b2b', stroke: '#000000' },
+      { id: 'staunty', name: 'Staunty', description: 'Polished modern Staunton feel.', font: 'Georgia, serif', white: '#f8f1dc', black: '#263238', stroke: '#263238' },
+      { id: 'cardinal', name: 'Cardinal', description: 'Bold, high-contrast diagram style.', font: 'Verdana, sans-serif', white: '#fff4f4', black: '#5b1f2e', stroke: '#3f0f1a' },
+      { id: 'spatial-3d', name: 'Spatial / 3D-style', description: 'Dimensional pieces with a soft shadow.', font: 'Arial Black, Arial, sans-serif', white: '#fdf6e3', black: '#334155', stroke: '#1e293b', shadow: true },
+      { id: 'minimal-monochrome', name: 'Minimal / Monochrome', description: 'Simple monochrome glyphs for a clean board.', font: 'Segoe UI Symbol, Arial, sans-serif', white: '#ffffff', black: '#111111', stroke: '#111111' }
+    ];
 
     let authToken   = null;
     let currentUser = null;
@@ -1047,6 +1091,13 @@
           <span id="m-version-badge" style="font-size:0.62em; color:rgba(255,255,255,0.45); font-family:monospace; letter-spacing:0.02em; white-space:nowrap;">UI ${MOBILE_UI_VERSION}&nbsp;|&nbsp;API&nbsp;…</span>
           <div class="m-header-right">
             <span class="m-header-user">${currentUser || ''}</span>
+            <div class="m-settings-menu">
+              <button class="m-header-help" onclick="toggleSettingsMenuM(event)">&#9881; Settings</button>
+              <div id="m-settings-dropdown" class="m-settings-dropdown">
+                <button type="button" class="m-settings-item" onclick="openBoardThemeM()">Board Theme</button>
+                <button type="button" class="m-settings-item" onclick="openPieceSetM()">Piece Set Theme</button>
+              </div>
+            </div>
             <button class="m-header-help" onclick="openHelpM()">? Help</button>
             <button class="m-header-logout" onclick="handleLogout()">Logout</button>
           </div>
@@ -1292,7 +1343,7 @@
         onDrop: onDropM,
         onDragStart: onDragStartM,
         onSnapEnd: onSnapEndM,
-        pieceTheme: 'img/chesspieces/wikipedia/{piece}.png',
+        pieceTheme: getPieceThemeConfigM(),
         dropOffBoard: 'snapback',
         touchMove: true  // enable touch drag on mobile
       });
@@ -2087,11 +2138,180 @@
       if (el) el.style.display = 'none';
     }
 
+    function toggleSettingsMenuM(event) {
+      if (event) event.stopPropagation();
+      const menu = document.getElementById('m-settings-dropdown');
+      if (menu) menu.classList.toggle('open');
+    }
+
+    function closeSettingsMenuM() {
+      const menu = document.getElementById('m-settings-dropdown');
+      if (menu) menu.classList.remove('open');
+    }
+
+    function openBoardThemeM() {
+      closeSettingsMenuM();
+      renderBoardThemeOptionsM();
+      const el = document.getElementById('m-board-theme-overlay');
+      if (el) el.style.display = 'flex';
+    }
+
+    function closeBoardThemeM() {
+      const el = document.getElementById('m-board-theme-overlay');
+      if (el) el.style.display = 'none';
+    }
+
+    function openPieceSetM() {
+      closeSettingsMenuM();
+      renderPieceSetOptionsM();
+      const el = document.getElementById('m-piece-set-overlay');
+      if (el) el.style.display = 'flex';
+    }
+
+    function closePieceSetM() {
+      const el = document.getElementById('m-piece-set-overlay');
+      if (el) el.style.display = 'none';
+    }
+
+    document.addEventListener('click', closeSettingsMenuM);
+
+    function getSelectedBoardThemeM() {
+      const savedThemeId = localStorage.getItem(BOARD_THEME_STORAGE_KEY) || 'classic-wood';
+      return BOARD_THEMES.find(theme => theme.id === savedThemeId) || BOARD_THEMES[0];
+    }
+
+    function applyBoardThemeM(themeId) {
+      const theme = BOARD_THEMES.find(item => item.id === themeId) || BOARD_THEMES[0];
+      document.documentElement.style.setProperty('--board-light-square', theme.light);
+      document.documentElement.style.setProperty('--board-dark-square', theme.dark);
+      localStorage.setItem(BOARD_THEME_STORAGE_KEY, theme.id);
+      renderBoardThemeOptionsM();
+    }
+
+    function renderBoardThemeOptionsM() {
+      const container = document.getElementById('m-board-theme-options');
+      if (!container) return;
+      const selectedTheme = getSelectedBoardThemeM();
+      container.innerHTML = BOARD_THEMES.map(theme => {
+        const isActive = theme.id === selectedTheme.id;
+        return `
+          <button type="button" class="m-board-theme-option${isActive ? ' active' : ''}" onclick="applyBoardThemeM('${theme.id}')" aria-pressed="${isActive}">
+            <span class="m-board-theme-swatch" aria-hidden="true">
+              <span style="background:${theme.light}"></span><span style="background:${theme.dark}"></span>
+              <span style="background:${theme.dark}"></span><span style="background:${theme.light}"></span>
+            </span>
+            <span>
+              <span class="m-board-theme-name">${theme.name}</span>
+              <span class="m-board-theme-colors">${theme.light} / ${theme.dark}</span>
+            </span>
+          </button>`;
+      }).join('');
+    }
+
+    applyBoardThemeM(getSelectedBoardThemeM().id);
+
+    function getSelectedPieceSetM() {
+      const savedPieceSetId = localStorage.getItem(PIECE_SET_STORAGE_KEY) || 'wikipedia';
+      return PIECE_SETS.find(set => set.id === savedPieceSetId) || PIECE_SETS[0];
+    }
+
+    function buildGeneratedPieceSvgM(piece, pieceSet) {
+      const isWhite = piece.charAt(0) === 'w';
+      const glyph = PIECE_GLYPHS[piece] || piece.charAt(1);
+      const fill = isWhite ? pieceSet.white : pieceSet.black;
+      const textStroke = isWhite ? pieceSet.stroke : '#050505';
+      const shadow = pieceSet.shadow ? '<filter id="s"><feDropShadow dx="2" dy="3" stdDeviation="1.5" flood-opacity="0.35"/></filter>' : '';
+      const filter = pieceSet.shadow ? ' filter="url(#s)"' : '';
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">${shadow}<rect width="80" height="80" fill="none"/><text x="40" y="58" text-anchor="middle" font-size="56" font-family="${pieceSet.font}" fill="${fill}" stroke="${textStroke}" stroke-width="1.8" paint-order="stroke"${filter}>${glyph}</text></svg>`;
+      return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+    }
+
+    function getPieceThemeConfigM() {
+      const pieceSet = getSelectedPieceSetM();
+      if (pieceSet.imagePath) return pieceSet.imagePath;
+      return piece => buildGeneratedPieceSvgM(piece, pieceSet);
+    }
+
+    function recreateBoardWithPieceSetM() {
+      if (!board || !game) return;
+      const orientation = board.orientation ? board.orientation() : 'white';
+      const fen = game.fen();
+      board.destroy();
+      board = Chessboard('board', {
+        position: fen,
+        orientation: orientation,
+        draggable: true,
+        onDrop: onDropM,
+        onDragStart: onDragStartM,
+        onSnapEnd: onSnapEndM,
+        pieceTheme: getPieceThemeConfigM(),
+        dropOffBoard: 'snapback',
+        touchMove: true
+      });
+    }
+
+    function applyPieceSetThemeM(pieceSetId) {
+      const pieceSet = PIECE_SETS.find(set => set.id === pieceSetId) || PIECE_SETS[0];
+      localStorage.setItem(PIECE_SET_STORAGE_KEY, pieceSet.id);
+      recreateBoardWithPieceSetM();
+      renderPieceSetOptionsM();
+    }
+
+    function renderPieceSetOptionsM() {
+      const container = document.getElementById('m-piece-set-options');
+      if (!container) return;
+      const selectedPieceSet = getSelectedPieceSetM();
+      container.innerHTML = PIECE_SETS.map(pieceSet => {
+        const isActive = pieceSet.id === selectedPieceSet.id;
+        const sampleSrc = pieceSet.imagePath ? pieceSet.imagePath.replace('{piece}', 'wN') : buildGeneratedPieceSvgM('wN', pieceSet);
+        return `
+          <button type="button" class="m-piece-set-option${isActive ? ' active' : ''}" onclick="applyPieceSetThemeM('${pieceSet.id}')" aria-pressed="${isActive}">
+            <span class="m-piece-set-sample" aria-hidden="true"><img src="${sampleSrc}" alt=""></span>
+            <span>
+              <span class="m-piece-set-name">${pieceSet.name}</span>
+              <span class="m-piece-set-description">${pieceSet.description}</span>
+            </span>
+          </button>`;
+      }).join('');
+    }
+
     // ────────────────────────────────────────────────────────────────────────
     // Bootstrap
     // ────────────────────────────────────────────────────────────────────────
     window.onload = checkAuthentication;
   </script>
+
+<!-- Board Theme bottom-sheet -->
+<div id="m-board-theme-overlay" style="display:none;" onclick="if(event.target===this)closeBoardThemeM()">
+  <div class="m-help-sheet">
+    <div class="m-help-sheet-header">
+      <h2>Board Theme</h2>
+      <button class="m-help-sheet-close" onclick="closeBoardThemeM()">&#x2715;</button>
+    </div>
+    <div class="m-help-body">
+      <div class="m-help-section">
+        <h3>Color Combination</h3>
+        <div id="m-board-theme-options" class="m-board-theme-options"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Piece Set Theme bottom-sheet -->
+<div id="m-piece-set-overlay" style="display:none;" onclick="if(event.target===this)closePieceSetM()">
+  <div class="m-help-sheet">
+    <div class="m-help-sheet-header">
+      <h2>Piece Set Theme</h2>
+      <button class="m-help-sheet-close" onclick="closePieceSetM()">&#x2715;</button>
+    </div>
+    <div class="m-help-body">
+      <div class="m-help-section">
+        <h3>Piece Set</h3>
+        <div id="m-piece-set-options" class="m-piece-set-options"></div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Help bottom-sheet -->
 <div id="m-help-overlay" style="display:none;" onclick="if(event.target===this)closeHelpM()">
@@ -2106,6 +2326,7 @@
         <h3>Header</h3>
         <div class="m-help-dl">
           <div class="m-help-row"><dt>[Username]</dt><dd>Your logged-in account name.</dd></div>
+          <div class="m-help-row"><dt>Settings</dt><dd>Opens app settings, including Board Theme and Piece Set Theme.</dd></div>
           <div class="m-help-row"><dt>? Help</dt><dd>Opens this help sheet.</dd></div>
           <div class="m-help-row"><dt>Logout</dt><dd>Signs you out and returns to the login screen.</dd></div>
         </div>
