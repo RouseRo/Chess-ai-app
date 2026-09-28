@@ -1,0 +1,2174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- Prevent pinch-zoom so drag-and-drop pieces work naturally on touch screens -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1a237e">
+  <title>Chess AI</title>
+  <link rel="stylesheet" href="chessboard.css">
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: #f0f0f0;
+      overflow: hidden; /* prevent outer page scroll — inner panels scroll */
+      color: #212121;
+    }
+    button { -webkit-tap-highlight-color: transparent; }
+
+    /* ── Full-screen app wrapper ──────────────────────────────────────────── */
+    #app {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       AUTH SCREEN  (shown before login)
+    ═══════════════════════════════════════════════════════════════════════ */
+    .auth-screen {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 20px;
+      background: linear-gradient(160deg, #1a237e 0%, #283593 50%, #1565c0 100%);
+    }
+    .auth-logo {
+      font-size: 3.5em;
+      margin-bottom: 6px;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+    }
+    .auth-title {
+      color: white;
+      font-size: 1.55em;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      margin: 0 0 4px;
+    }
+    .auth-subtitle {
+      color: rgba(255,255,255,0.7);
+      font-size: 0.85em;
+      margin: 0 0 28px;
+    }
+    .auth-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px 18px;
+      width: 100%;
+      max-width: 340px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    .auth-card h3 {
+      margin: 0 0 16px;
+      font-size: 1.1em;
+      color: #1a237e;
+    }
+    .auth-field {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: 1em;
+      margin-bottom: 10px;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    .auth-field:focus { border-color: #1565c0; }
+    .auth-error {
+      color: #c62828;
+      font-size: 0.85em;
+      margin: 0 0 10px;
+      display: none;
+    }
+    .auth-btn {
+      width: 100%;
+      padding: 13px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1em;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 8px;
+      transition: filter 0.15s;
+    }
+    .auth-btn:active { filter: brightness(0.9); }
+    .auth-btn-primary { background: #1565c0; color: white; }
+    .auth-btn-disabled { background: #b0bec5; color: white; cursor: not-allowed; }
+    .auth-btn-danger  { background: #c62828; color: white; }
+    .auth-already-info { color: #555; font-size: 0.9em; margin: 0 0 14px; text-align: center; }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       GAME SCREEN  (shown after login)
+    ═══════════════════════════════════════════════════════════════════════ */
+
+    /* ── Fixed header bar ─────────────────────────────────────────────────── */
+    .m-header {
+      flex-shrink: 0;
+      height: 48px;
+      background: #1a237e;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      z-index: 200;
+    }
+    .m-header-title {
+      font-size: 1.05em;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .m-header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .m-header-user {
+      font-size: 0.8em;
+      color: rgba(255,255,255,0.8);
+    }
+    .m-header-logout {
+      padding: 6px 10px;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 6px;
+      color: white;
+      font-size: 0.8em;
+      cursor: pointer;
+    }
+    .m-header-logout:active { background: rgba(255,255,255,0.3); }
+
+    /* ── Scrollable game body (between header and bottom nav) ─────────────── */
+    .m-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Board section ─────────────────────────────────────────────────────── */
+    .m-board-section {
+      flex-shrink: 0;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 6px 4px 4px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    /* Sync game-id banner */
+    .m-sync-banner {
+      display: none;
+      width: 100%;
+      text-align: center;
+      padding: 4px 8px;
+      background: #fff8e1;
+      border: 1px solid #f9a825;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+
+    /* Board wrapper — sets the size used by chessboard.js */
+    #board {
+      /* Width is set dynamically via JS; height follows automatically from chessboard.js */
+    }
+
+    /* ── Compact info strip below the board ───────────────────────────────── */
+    .m-info-strip {
+      width: 100%;
+      max-width: 412px; /* S23 Ultra max */
+      padding: 4px 8px 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .m-game-status {
+      text-align: center;
+      font-size: 0.82em;
+      font-weight: 600;
+      color: #333;
+      min-height: 18px;
+    }
+    .m-game-status.gs-check     { color: #e65100; }
+    .m-game-status.gs-checkmate { color: #c62828; }
+    .m-game-status.gs-draw      { color: #1565c0; }
+    .m-game-status.gs-stalemate { color: #6a1b9a; }
+    .m-players-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.76em;
+      color: #555;
+    }
+    .m-player-white::before { content: '♔ '; }
+    .m-player-black::before { content: '♚ '; }
+    .m-captured-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.76em;
+      color: #555;
+    }
+    .m-captured-label { font-weight: 600; }
+    .m-captured-pieces { font-size: 1.3em; letter-spacing: 1px; }
+    .m-material-adv {
+      font-size: 0.75em;
+      font-weight: 700;
+      color: #555;
+      text-align: center;
+    }
+
+    /* ── Tab navigation bar ────────────────────────────────────────────────── */
+    .m-tab-nav {
+      flex-shrink: 0;
+      display: flex;
+      background: #fff;
+      border-bottom: 2px solid #e0e0e0;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .m-tab-nav::-webkit-scrollbar { display: none; }
+    .m-tab-btn {
+      flex: 1;
+      min-width: 64px;
+      padding: 10px 6px;
+      border: none;
+      background: none;
+      font-size: 0.72em;
+      font-weight: 600;
+      color: #777;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      white-space: nowrap;
+      transition: color 0.15s;
+    }
+    .m-tab-btn.active {
+      color: #1565c0;
+      border-bottom-color: #1565c0;
+    }
+    .m-tab-btn:active { background: #f5f5f5; }
+
+    /* ── Tab content area (scrollable) ─────────────────────────────────────── */
+    .m-tab-area {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+    .m-tab-panel {
+      position: absolute;
+      inset: 0;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 12px;
+      display: none;
+      background: #fafafa;
+    }
+    .m-tab-panel.active { display: block; }
+
+    /* ── Status log (in-game feed) ─────────────────────────────────────────── */
+    .m-status-log {
+      font-family: monospace;
+      font-size: 11px;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      border-radius: 8px;
+      padding: 8px 10px;
+      max-height: 120px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      margin-bottom: 10px;
+    }
+    .m-status-log div { line-height: 1.7; }
+    .sl-success { color: #69f0ae; }
+    .sl-error   { color: #ff5252; }
+    .sl-info    { color: #82b1ff; }
+    .sl-time    { color: #757575; }
+
+    /* ── Move history list ─────────────────────────────────────────────────── */
+    .m-move-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88em;
+    }
+    .m-move-table th {
+      background: #e8eaf6;
+      padding: 6px 10px;
+      text-align: left;
+      font-size: 0.85em;
+      color: #3949ab;
+      font-weight: 700;
+    }
+    .m-move-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .m-move-table tr:last-child td { border-bottom: none; }
+    .m-move-empty { color: #999; text-align: center; padding: 20px 0; font-size: 0.88em; }
+
+    /* ── Player Setup form ──────────────────────────────────────────────────── */
+    .m-setup-section {
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .m-setup-section h4 {
+      margin: 0 0 10px;
+      font-size: 0.9em;
+      color: #1a237e;
+      border-bottom: 1px solid #e8eaf6;
+      padding-bottom: 6px;
+    }
+    .m-field-label {
+      display: block;
+      font-size: 0.8em;
+      color: #555;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .m-field-input, .m-field-select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1.5px solid #ddd;
+      border-radius: 6px;
+      font-size: 0.95em;
+      margin-bottom: 10px;
+      outline: none;
+      background: white;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .m-field-input:focus, .m-field-select:focus { border-color: #1565c0; }
+    .m-field-row {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+    .m-field-row > * { flex: 1; }
+
+    /* ── Action buttons ─────────────────────────────────────────────────────── */
+    .m-btn {
+      width: 100%;
+      padding: 13px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95em;
+      font-weight: 700;
+      cursor: pointer;
+      transition: filter 0.15s;
+      margin-bottom: 8px;
+    }
+    .m-btn:active { filter: brightness(0.88); }
+    .m-btn-primary  { background: #1565c0; color: white; }
+    .m-btn-success  { background: #2e7d32; color: white; }
+    .m-btn-danger   { background: #c62828; color: white; }
+    .m-btn-outline  { background: white; color: #1565c0; border: 2px solid #1565c0; }
+    .m-btn-sm {
+      width: auto;
+      padding: 8px 14px;
+      font-size: 0.85em;
+      margin-bottom: 0;
+    }
+
+    /* ── Expert Q&A panel ──────────────────────────────────────────────────── */
+    .m-expert-input-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .m-expert-input {
+      flex: 1;
+      padding: 10px 12px;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: 0.9em;
+      outline: none;
+    }
+    .m-expert-input:focus { border-color: #1565c0; }
+    .m-expert-send {
+      padding: 10px 16px;
+      background: #1565c0;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 0.9em;
+    }
+    .m-expert-quick-btns {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .m-expert-quick {
+      padding: 7px 12px;
+      background: #e8eaf6;
+      border: 1px solid #c5cae9;
+      border-radius: 16px;
+      font-size: 0.78em;
+      font-weight: 600;
+      color: #283593;
+      cursor: pointer;
+    }
+    .m-expert-quick:active { background: #c5cae9; }
+    .m-expert-qa {
+      background: white;
+      border: 1px solid #e8eaf6;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .m-expert-question {
+      padding: 8px 12px;
+      background: #e8eaf6;
+      color: #283593;
+      font-size: 0.85em;
+      font-weight: 600;
+    }
+    .m-expert-answer {
+      padding: 8px 12px;
+      font-size: 0.85em;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    /* ── Game tab welcome quick-buttons ────────────────────────────────────── */
+    .m-quick-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .m-quick-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 50px;
+      height: 50px;
+      border: 2px solid #e0e0e0;
+      border-radius: 12px;
+      background: white;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .m-quick-btn:active { background: #e3f2fd; border-color: #1565c0; }
+    .m-quick-btn .qb-icon { font-size: 1.5em; }
+    .m-quick-btn.qb-primary  { border-color: #2e7d32; background: #f1f8f1; }
+    .m-quick-btn.qb-continue { border-color: #e65100; background: #fff8f0; }
+
+    /* ── Icon-button tooltip ───────────────────────────────────────── */
+    .m-quick-btn {
+      position: relative; /* needed for the ::after tooltip */
+    }
+    /* Tooltip label — appears BELOW the button to avoid being clipped by the
+       scrollable tab panel above */
+    .m-quick-btn::after {
+      content: attr(data-tip);
+      position: absolute;
+      top: calc(100% + 7px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(30,30,30,0.88);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 500;
+      white-space: nowrap;
+      padding: 4px 9px;
+      border-radius: 6px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.18s;
+      z-index: 9999;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    }
+    /* small upward-pointing triangle connecting tooltip to button */
+    .m-quick-btn::before {
+      content: '';
+      position: absolute;
+      top: calc(100% + 1px);
+      left: 50%;
+      transform: translateX(-50%);
+      border: 5px solid transparent;
+      border-bottom-color: rgba(30,30,30,0.88);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.18s;
+      z-index: 9999;
+    }
+    .m-quick-btn:hover::after,
+    .m-quick-btn:hover::before,
+    .m-quick-btn.tip-show::after,
+    .m-quick-btn.tip-show::before {
+      opacity: 1;
+    }
+
+    /* ── Classic game navigation strip ─────────────────────────────────────── */
+    .m-classic-nav-row {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      margin-bottom: 8px;
+    }
+    .m-classic-step {
+      flex: 1;
+      padding: 8px 4px;
+      border: 1.5px solid #c5cae9;
+      border-radius: 8px;
+      background: #e8eaf6;
+      color: #283593;
+      font-size: 1em;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: center;
+    }
+    .m-classic-step:active { background: #c5cae9; }
+    .m-classic-comment {
+      background: #fffde7;
+      border: 1px solid #f9a825;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 0.8em;
+      line-height: 1.55;
+      margin-bottom: 8px;
+      display: none;
+    }
+    .m-classic-progress {
+      text-align: center;
+      font-size: 0.75em;
+      color: #888;
+      margin-bottom: 6px;
+    }
+
+    /* ── Board orientation button ───────────────────────────────────────────── */
+    .m-board-controls {
+      display: flex;
+      justify-content: flex-end;
+      width: 100%;
+      max-width: 412px;
+      padding: 0 0 2px;
+      gap: 6px;
+    }
+    .m-board-ctrl-btn {
+      padding: 4px 10px;
+      font-size: 0.72em;
+      background: #e8eaf6;
+      border: 1px solid #c5cae9;
+      border-radius: 5px;
+      color: #283593;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .m-board-ctrl-btn:active { background: #c5cae9; }
+
+    /* ── Toast notification ─────────────────────────────────────────────────── */
+    .m-toast {
+      position: fixed;
+      bottom: 70px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #323232;
+      color: white;
+      padding: 10px 18px;
+      border-radius: 20px;
+      font-size: 0.85em;
+      font-weight: 500;
+      opacity: 0;
+      transition: opacity 0.25s, transform 0.25s;
+      z-index: 500;
+      pointer-events: none;
+      white-space: nowrap;
+      max-width: 90vw;
+      text-align: center;
+    }
+    .m-toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Saving indicator ───────────────────────────────────────────────────── */
+    .m-saved-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.72em;
+      background: #e8f5e9;
+      color: #2e7d32;
+      border: 1px solid #a5d6a7;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════════════
+       LANDSCAPE MODE  (device held horizontally)
+       Board is placed on the left; tabs fill the right column.
+    ══════════════════════════════════════════════════════════════════════════ */
+    /* ── Help bottom-sheet ───────────────────────────────────────────────── */
+    #m-help-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 1000; display: flex; flex-direction: column; justify-content: flex-end; }
+    .m-help-sheet { background: white; border-radius: 14px 14px 0 0; max-height: 86vh; display: flex; flex-direction: column; }
+    .m-help-sheet-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px 10px; border-bottom: 1px solid #e0e0e0; flex-shrink: 0; }
+    .m-help-sheet-header h2 { margin: 0; font-size: 1.05em; color: #1a237e; }
+    .m-help-sheet-close { background: none; border: none; font-size: 1.4em; cursor: pointer; color: #666; padding: 0 4px; line-height: 1; }
+    .m-help-body { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px 16px 32px; flex: 1; }
+    .m-help-section { margin-bottom: 18px; }
+    .m-help-section h3 { margin: 0 0 8px; font-size: 0.92em; color: #283593; border-bottom: 1px solid #e8eaf6; padding-bottom: 4px; }
+    .m-help-dl { display: flex; flex-direction: column; }
+    .m-help-row { display: flex; gap: 10px; padding: 5px 0; border-bottom: 1px solid #f5f5f5; font-size: 0.85em; }
+    .m-help-row:last-child { border-bottom: none; }
+    .m-help-row dt { font-weight: 600; color: #1565c0; flex-shrink: 0; width: 38%; line-height: 1.4; }
+    .m-help-row dd { margin: 0; color: #444; line-height: 1.45; flex: 1; }
+    .m-header-help { padding: 6px 10px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; color: white; font-size: 0.8em; cursor: pointer; font-weight: 700; }
+    .m-header-help:active { background: rgba(255,255,255,0.3); }
+
+    @media (orientation: landscape) {
+
+      /* Auth screen: compress vertically so the card fits without scrolling */
+      .auth-screen {
+        padding: 8px 16px;
+        gap: 0;
+        justify-content: center;
+      }
+      .auth-logo       { font-size: 2em;  margin-bottom: 2px; }
+      .auth-title      { font-size: 1.1em; }
+      .auth-subtitle   { font-size: 0.78em; margin-bottom: 12px; }
+      .auth-card       { padding: 12px 16px; max-width: 320px; }
+      .auth-card h3    { margin-bottom: 10px; font-size: 1em; }
+      .auth-field      { padding: 8px 12px; margin-bottom: 7px; font-size: 0.9em; }
+      .auth-btn        { padding: 10px; font-size: 0.9em; margin-bottom: 6px; }
+
+      /* ── Game body: CSS Grid — board left, tab-nav+content right ── */
+      .m-body {
+        display: grid;
+        grid-template-columns: auto 1fr; /* board col auto-sizes; rest fills right */
+        grid-template-rows: auto 1fr;    /* tab-nav height on top, content below */
+        overflow: hidden;
+        flex: 1; /* still fills space inside #app flex column */
+      }
+
+      /* Board section spans both grid rows on the left column */
+      .m-board-section {
+        grid-column: 1;
+        grid-row: 1 / 3;
+        border-bottom: none;
+        border-right: 1px solid #e0e0e0;
+        padding: 4px 6px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        justify-content: flex-start;
+        align-items: center;
+      }
+
+      /* Compact info strip to save vertical space in the left column */
+      .m-info-strip    { padding: 2px 4px 4px; gap: 2px; max-width: none; }
+      .m-game-status   { font-size: 0.76em; }
+      .m-players-row   { font-size: 0.7em; }
+      .m-captured-row  { font-size: 0.7em; }
+      .m-board-controls { max-width: none; }
+
+      /* Tab nav goes to right column, first row */
+      .m-tab-nav {
+        grid-column: 2;
+        grid-row: 1;
+      }
+
+      /* Tab area goes to right column, second row */
+      .m-tab-area {
+        grid-column: 2;
+        grid-row: 2;
+        overflow: hidden;
+      }
+
+      /* Toast: keep above bottom edge in landscape (no bottom nav bar) */
+      .m-toast { bottom: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"><!-- Populated by JavaScript --></div>
+
+  <!-- Toast notification element (shared) -->
+  <div id="m-toast" class="m-toast"></div>
+
+  <!-- External libraries -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="chessboard.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+
+  <script>
+    // ────────────────────────────────────────────────────────────────────────
+    // Global State
+    // ────────────────────────────────────────────────────────────────────────
+    const MOBILE_UI_VERSION = '1.0.0';
+
+    let authToken   = null;
+    let currentUser = null;
+    let board       = null;
+    let game        = null;
+
+    let moveHistory     = [];
+    let capturedByWhite = []; // black pieces captured by White
+    let capturedByBlack = []; // white pieces captured by Black
+    let currentPlayerColor = null;   // 'white' | 'black'
+    let currentOpponent    = null;
+    let gameResultRecorded = false;
+
+    // Comm log buffer (kept even before the Comm tab renders)
+    let commMessages = [];
+
+    // Player stats stored in localStorage
+    let playerStats = JSON.parse(localStorage.getItem('chessPlayerStats') || '{}');
+
+    // ─── Piece symbol maps ───────────────────────────────────────────────────
+    const PIECE_SYMBOLS = {
+      p: { w: '♙', b: '♟' },
+      n: { w: '♘', b: '♞' },
+      b: { w: '♗', b: '♝' },
+      r: { w: '♖', b: '♜' },
+      q: { w: '♕', b: '♛' },
+      k: { w: '♔', b: '♚' }
+    };
+    const PIECE_VALUES = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Auth helpers
+    // ────────────────────────────────────────────────────────────────────────
+    function checkAuthentication() {
+      const params = new URLSearchParams(window.location.search);
+      const emailVerifyToken = params.get('verify_token');
+      if (emailVerifyToken) {
+        handleEmailVerification(emailVerifyToken);
+        return;
+      }
+
+      const token = localStorage.getItem('authToken');
+      const user  = localStorage.getItem('currentUser');
+      if (!token) { showLoginScreen(); return; }
+      authToken   = token;
+      currentUser = user;
+      verifyToken(token);
+    }
+
+        function handleEmailVerification(token) {
+          document.getElementById('app').innerHTML = `
+        <div class="auth-screen">
+          <div class="auth-logo">&#9823;</div>
+          <h1 class="auth-title">Chess AI</h1>
+          <div class="auth-card">
+            <p style="text-align:center">Verifying your email&#8230;</p>
+          </div>
+        </div>`;
+          fetch('/auth/verify-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token })
+          })
+            .then(r => r.json())
+            .then(data => {
+              document.getElementById('app').innerHTML = `
+            <div class="auth-screen">
+              <div class="auth-logo">&#9823;</div>
+              <h1 class="auth-title">Chess AI</h1>
+              <div class="auth-card">
+                <p style="text-align:center;color:${data.success ? '#4CAF50' : '#e53935'}">${data.message}</p>
+                <button class="auth-btn auth-btn-primary"
+                  onclick="history.replaceState(null,'',location.pathname);showLoginScreen()">Go to Login</button>
+              </div>
+            </div>`;
+            })
+            .catch(() => {
+              document.getElementById('app').innerHTML = `
+            <div class="auth-screen">
+              <div class="auth-logo">&#9823;</div>
+              <h1 class="auth-title">Chess AI</h1>
+              <div class="auth-card">
+                <p style="text-align:center;color:#e53935">Verification failed. Please try again.</p>
+                <button class="auth-btn auth-btn-primary"
+                  onclick="history.replaceState(null,'',location.pathname);showLoginScreen()">Go to Login</button>
+              </div>
+            </div>`;
+            });
+        }
+
+    function showLoginScreen() {
+      document.getElementById('app').innerHTML = `
+        <div class="auth-screen">
+          <div class="auth-logo">♟</div>
+          <h1 class="auth-title">Chess AI</h1>
+          <p class="auth-subtitle">Play, learn, and improve your game</p>
+          <div class="auth-card">
+            <h3>Sign In</h3>
+            <input id="login-username" class="auth-field" type="text"
+              placeholder="Username" autocomplete="username" autocapitalize="none"
+              onkeydown="if(event.key==='Enter')document.getElementById('login-password').focus()">
+            <input id="login-password" class="auth-field" type="password"
+              placeholder="Password" autocomplete="current-password"
+              onkeydown="if(event.key==='Enter')handleLogin()">
+            <div id="login-error" class="auth-error"></div>
+            <button class="auth-btn auth-btn-primary" onclick="handleLogin()">Login</button>
+            <button class="auth-btn" onclick="switchToRegister()">Register</button>
+          </div>
+        </div>`;
+              }
+
+              function switchToRegister() {
+                document.getElementById('app').innerHTML = `
+        <div class="auth-screen">
+          <div class="auth-logo">&#9823;</div>
+          <h1 class="auth-title">Chess AI</h1>
+          <p class="auth-subtitle">Create your account</p>
+          <div class="auth-card">
+            <h3>Register</h3>
+            <input id="register-username" class="auth-field" type="text"
+              placeholder="Username" autocapitalize="none" autocomplete="username">
+            <input id="register-email" class="auth-field" type="email"
+              placeholder="Email" autocomplete="email">
+            <input id="register-password" class="auth-field" type="password"
+              placeholder="Password" autocomplete="new-password">
+            <div id="register-error" class="auth-error"></div>
+            <button class="auth-btn auth-btn-primary" onclick="handleRegister()">Register</button>
+            <button class="auth-btn" onclick="showLoginScreen()">Back to Login</button>
+          </div>
+        </div>`;
+    }
+
+        function handleRegister() {
+          const username = document.getElementById('register-username').value.trim();
+          const email = document.getElementById('register-email').value.trim();
+          const password = document.getElementById('register-password').value;
+          const errEl = document.getElementById('register-error');
+          if (!username || !email || !password) {
+            errEl.textContent = 'Please fill in all fields.';
+            errEl.style.display = 'block';
+            return;
+          }
+          errEl.style.display = 'none';
+          logComm('req', 'AUTH', '/auth/register', { username, email });
+          let _st = null;
+          fetch('/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, email, password })
+          })
+            .then(r => { _st = r.status; return r.json(); })
+            .then(data => {
+              logComm('res', 'AUTH', '/auth/register', data, _st);
+              if (data.success) {
+                document.querySelector('.auth-card').innerHTML = `
+              <p style="text-align:center;color:#4CAF50">Registration successful!<br>
+              Please check your email for a verification link.</p>
+              <button class="auth-btn auth-btn-primary" onclick="showLoginScreen()">Go to Login</button>`;
+              } else {
+                errEl.textContent = data.detail || data.message || 'Registration failed.';
+                errEl.style.display = 'block';
+              }
+            })
+            .catch(e => { errEl.textContent = 'Error: ' + e.message; errEl.style.display = 'block'; });
+        }
+
+    function showAlreadyLoggedIn(username, isAdmin) {
+      const role = isAdmin ? 'Admin' : 'Player';
+      document.getElementById('app').innerHTML = `
+        <div class="auth-screen">
+          <div class="auth-logo">♟</div>
+          <h1 class="auth-title">Welcome back!</h1>
+          <div class="auth-card">
+            <p class="auth-already-info">Signed in as <strong>${username}</strong> (${role})</p>
+            ${isAdmin
+              ? `<button class="auth-btn auth-btn-primary"
+                   onclick="window.location.href='admin.html'">Admin Dashboard</button>`
+              : `<button class="auth-btn auth-btn-primary"
+                   onclick="loadGameScreen()">Continue Playing</button>`}
+            <button class="auth-btn auth-btn-danger" onclick="handleSwitchUser()">
+              Logout / Switch Account
+            </button>
+          </div>
+        </div>`;
+    }
+
+    function handleLogin() {
+      const username = document.getElementById('login-username').value.trim();
+      const password = document.getElementById('login-password').value;
+      const errEl    = document.getElementById('login-error');
+      if (!username || !password) {
+        errEl.textContent = 'Please enter username and password.';
+        errEl.style.display = 'block';
+        return;
+      }
+      errEl.style.display = 'none';
+      logComm('req', 'AUTH', '/auth/login', { username });
+      let _st = null;
+      fetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      })
+        .then(r => { _st = r.status; return r.json(); })
+        .then(data => {
+          logComm('res', 'AUTH', '/auth/login', data, _st);
+          if (data.success && data.token) {
+            _storeAuth(data.token, username, data.is_admin);
+            if (data.is_admin) { window.location.href = 'admin.html'; }
+            else { loadGameScreen(); }
+          } else if (data.use_admin_login) {
+            // Admin accounts authenticate through the secure internal endpoint
+            logComm('req', 'AUTH', '/admin-auth/login', { username });
+            let _ast = null;
+            fetch('/admin-auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username, password })
+            })
+              .then(r2 => { _ast = r2.status; return r2.json(); })
+              .then(ad => {
+                logComm('res', 'AUTH', '/admin-auth/login', ad, _ast);
+                if (ad.success && ad.token) {
+                  _storeAuth(ad.token, username, true);
+                  window.location.href = 'admin.html';
+                } else {
+                  errEl.textContent = ad.message || 'Admin login failed.';
+                  errEl.style.display = 'block';
+                }
+              })
+              .catch(e => { errEl.textContent = 'Error: ' + e.message; errEl.style.display = 'block'; });
+          } else {
+            errEl.textContent = data.detail || data.message || 'Login failed.';
+            errEl.style.display = 'block';
+          }
+        })
+        .catch(e => { errEl.textContent = 'Error: ' + e.message; errEl.style.display = 'block'; });
+    }
+
+    function _storeAuth(token, username, isAdmin) {
+      authToken   = token;
+      currentUser = username;
+      localStorage.setItem('authToken', token);
+      localStorage.setItem('currentUser', username);
+      localStorage.setItem('isAdmin', isAdmin ? 'true' : 'false');
+    }
+
+    function verifyToken(token) {
+      fetch('/auth/verify', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token }
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            currentUser = data.username;
+            localStorage.setItem('isAdmin', data.is_admin ? 'true' : 'false');
+            showAlreadyLoggedIn(data.username, data.is_admin);
+          } else {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('currentUser');
+            localStorage.removeItem('isAdmin');
+            showLoginScreen();
+          }
+        })
+        .catch(() => {
+          // If the verify call fails (e.g., offline) still try to load game
+          loadGameScreen();
+        });
+    }
+
+    function handleLogout() {
+      if (!confirm('Are you sure you want to logout?')) return;
+      fetch('/auth/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: authToken })
+      }).catch(() => {}).finally(() => {
+        authToken   = null;
+        currentUser = null;
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('currentUser');
+        localStorage.removeItem('isAdmin');
+        showLoginScreen();
+      });
+    }
+
+    function handleSwitchUser() {
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        fetch('/auth/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        }).catch(() => {}).finally(() => {
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('currentUser');
+          localStorage.removeItem('isAdmin');
+          showLoginScreen();
+        });
+      } else {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('currentUser');
+        showLoginScreen();
+      }
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Game Screen Layout
+    // ────────────────────────────────────────────────────────────────────────
+    function loadGameScreen() {
+      document.getElementById('app').innerHTML = buildGameScreenHTML();
+      initBoard();
+      fetch('/engine-health').then(r => r.json()).then(d => {
+        const badge = document.getElementById('m-version-badge');
+        if (badge && d.version) badge.textContent = `UI ${MOBILE_UI_VERSION} | API ${d.version}`;
+      }).catch(() => {});
+      updatePlayerDisplayM();
+      checkGameStatus();
+      renderCapturedPieces();
+      switchMobileTab('game');
+    }
+
+    function buildGameScreenHTML() {
+      return `
+        <!-- ── Header ──────────────────────────────────────────────────── -->
+        <header class="m-header">
+          <span class="m-header-title">&#x265F; Chess AI</span>
+          <span id="m-version-badge" style="font-size:0.62em; color:rgba(255,255,255,0.45); font-family:monospace; letter-spacing:0.02em; white-space:nowrap;">UI ${MOBILE_UI_VERSION}&nbsp;|&nbsp;API&nbsp;…</span>
+          <div class="m-header-right">
+            <span class="m-header-user">${currentUser || ''}</span>
+            <button class="m-header-help" onclick="openHelpM()">? Help</button>
+            <button class="m-header-logout" onclick="handleLogout()">Logout</button>
+          </div>
+        </header>
+
+        <!-- ── Game Body ───────────────────────────────────────────────── -->
+        <div class="m-body">
+          <!-- Board section -->
+          <div class="m-board-section">
+            <div id="m-sync-banner" class="m-sync-banner">
+              <strong>Game ID:</strong> <span id="m-sync-id"></span>
+            </div>
+
+            <!-- Board orientation controls -->
+            <div class="m-board-controls">
+              <button class="m-board-ctrl-btn" onclick="flipBoardM()" title="Flip board">⇅ Flip</button>
+            </div>
+
+            <!-- Chessboard (width set in JS) -->
+            <div id="board"></div>
+
+            <!-- Compact info strip -->
+            <div class="m-info-strip">
+              <div id="m-game-status" class="m-game-status">Ready to play</div>
+              <div class="m-players-row">
+                <span class="m-player-white" id="m-white-player-display">White: Human</span>
+                <span class="m-player-black" id="m-black-player-display">Black: Stockfish 10</span>
+              </div>
+              <div class="m-captured-row">
+                <div>
+                  <span class="m-captured-label">▲ </span>
+                  <span class="m-captured-pieces" id="m-white-captured">—</span>
+                  <span id="m-white-score" style="font-size:0.75em;color:#888;"></span>
+                </div>
+                <span class="m-material-adv" id="m-material-adv"></span>
+                <div style="text-align:right;">
+                  <span class="m-captured-label">▼ </span>
+                  <span class="m-captured-pieces" id="m-black-captured">—</span>
+                  <span id="m-black-score" style="font-size:0.75em;color:#888;"></span>
+                </div>
+              </div>
+            </div>
+          </div><!-- /m-board-section -->
+
+          <!-- Tab navigation -->
+          <nav class="m-tab-nav">
+            <button class="m-tab-btn" id="m-tab-btn-game"    onclick="switchMobileTab('game')">♟ Game</button>
+            <button class="m-tab-btn" id="m-tab-btn-setup"   onclick="switchMobileTab('setup')">⚙ Setup</button>
+            <button class="m-tab-btn" id="m-tab-btn-learn"   onclick="switchMobileTab('learn')">📚 Learn</button>
+            <button class="m-tab-btn" id="m-tab-btn-history" onclick="switchMobileTab('history')">📋 History</button>
+            <button class="m-tab-btn" id="m-tab-btn-expert"  onclick="switchMobileTab('expert')">🧠 Expert</button>
+          </nav>
+
+          <!-- Tab content area -->
+          <div class="m-tab-area">
+
+            <!-- ── GAME tab ─────────────────────────────────────────── -->
+            <div id="m-panel-game" class="m-tab-panel">
+              <div class="m-quick-grid">
+                <button class="m-quick-btn qb-primary" onclick="startNewGameM()" data-tip="New Game" title="New Game">
+                  <span class="qb-icon">♙</span>
+                </button>
+                <button class="m-quick-btn qb-continue" onclick="loadSavedGameM()" data-tip="Load Save" title="Load Save">
+                  <span class="qb-icon">📂</span>
+                </button>
+                <button class="m-quick-btn" onclick="saveGameM()" data-tip="Save Game" title="Save Game">
+                  <span class="qb-icon">💾</span>
+                </button>
+                <button class="m-quick-btn" onclick="switchMobileTab('setup')" data-tip="Player Setup" title="Player Setup">
+                  <span class="qb-icon">⚙️</span>
+                </button>
+                <button class="m-quick-btn" onclick="openClassicGamesM()" data-tip="Classic Games" title="Classic Games">
+                  <span class="qb-icon">🏛️</span>
+                </button>
+                <button class="m-quick-btn" onclick="openPracticeM()" data-tip="Practice Openings" title="Practice Openings">
+                  <span class="qb-icon">🎯</span>
+                </button>
+              </div>
+              <!-- Live status log -->
+              <div class="m-status-log" id="m-status-log">
+                <div><span class="sl-info">Welcome, ${currentUser}! Set up players and tap New Game.</span></div>
+              </div>
+            </div>
+
+            <!-- ── SETUP tab ────────────────────────────────────────── -->
+            <div id="m-panel-setup" class="m-tab-panel">
+              <div class="m-setup-section">
+                <h4>White Player</h4>
+                <label class="m-field-label">Type</label>
+                <select id="m-white-player" class="m-field-select" onchange="updatePlayerConfigM()">
+                  <option value="human">Human</option>
+                  <option value="ai">AI</option>
+                </select>
+                <div id="m-white-human-cfg">
+                  <label class="m-field-label">Name</label>
+                  <input id="m-white-name" class="m-field-input" type="text"
+                    placeholder="Your name" autocapitalize="none" oninput="updatePlayerDisplayM()">
+                </div>
+                <div id="m-white-ai-cfg" style="display:none;">
+                  <label class="m-field-label">AI Engine</label>
+                  <select id="m-white-ai-type" class="m-field-select" onchange="updatePlayerDisplayM()">
+                    <option value="stockfish" selected>Stockfish</option>
+                    <option value="openai">OpenAI GPT</option>
+                    <option value="deepseek">DeepSeek</option>
+                    <option value="claude">Claude</option>
+                  </select>
+                  <label class="m-field-label">Skill Level (1–20)</label>
+                  <input id="m-white-skill" class="m-field-input" type="number"
+                    value="10" min="1" max="20" onchange="updatePlayerDisplayM()">
+                </div>
+              </div>
+
+              <div class="m-setup-section">
+                <h4>Black Player</h4>
+                <label class="m-field-label">Type</label>
+                <select id="m-black-player" class="m-field-select" onchange="updatePlayerConfigM()">
+                  <option value="human">Human</option>
+                  <option value="ai" selected>AI</option>
+                </select>
+                <div id="m-black-human-cfg" style="display:none;">
+                  <label class="m-field-label">Name</label>
+                  <input id="m-black-name" class="m-field-input" type="text"
+                    placeholder="Opponent name" autocapitalize="none" oninput="updatePlayerDisplayM()">
+                </div>
+                <div id="m-black-ai-cfg">
+                  <label class="m-field-label">AI Engine</label>
+                  <select id="m-black-ai-type" class="m-field-select" onchange="updatePlayerDisplayM()">
+                    <option value="stockfish" selected>Stockfish</option>
+                    <option value="openai">OpenAI GPT</option>
+                    <option value="deepseek">DeepSeek</option>
+                    <option value="claude">Claude</option>
+                  </select>
+                  <label class="m-field-label">Skill Level (1–20)</label>
+                  <input id="m-black-skill" class="m-field-input" type="number"
+                    value="10" min="1" max="20" onchange="updatePlayerDisplayM()">
+                </div>
+              </div>
+
+              <button class="m-btn m-btn-success" onclick="startNewGameM()">♙ Start New Game</button>
+            </div>
+
+            <!-- ── LEARN tab (Classic Games + Practice Openings) ───── -->
+            <div id="m-panel-learn" class="m-tab-panel">
+              <div class="m-setup-section" id="m-classic-section">
+                <h4>🏛️ Classic Games</h4>
+                <label class="m-field-label">Select a Game</label>
+                <select id="m-classic-select" class="m-field-select" onchange="loadClassicGameM()">
+                  <option value="">— choose a game —</option>
+                  <option value="opera-game">The Opera Game — Morphy, 1858</option>
+                  <option value="immortal-game">The Immortal Game — Anderssen, 1851</option>
+                  <option value="evergreen-game">The Evergreen Game — Anderssen, 1852</option>
+                  <option value="game-of-century">Game of the Century — Fischer, 1956</option>
+                  <option value="fischer-spassky-g6">Fischer vs Spassky Game 6, 1972</option>
+                  <option value="kasparov-topalov">Kasparov's Immortal, 1999</option>
+                </select>
+                <div id="m-classic-nav" style="display:none;">
+                  <div class="m-classic-progress" id="m-classic-progress">Move 0</div>
+                  <div class="m-classic-nav-row">
+                    <button class="m-classic-step" onclick="stepClassicM(-9999)">⏮</button>
+                    <button class="m-classic-step" onclick="stepClassicM(-1)">◀</button>
+                    <button class="m-classic-step" onclick="stepClassicM(1)">▶</button>
+                    <button class="m-classic-step" onclick="stepClassicM(9999)">⏭</button>
+                  </div>
+                  <div class="m-classic-comment" id="m-classic-comment"></div>
+                </div>
+              </div>
+
+              <div class="m-setup-section" id="m-practice-section">
+                <h4>🎯 Practice Openings</h4>
+                <div class="m-expert-quick-btns">
+                  <button class="m-expert-quick" onclick="loadPracticeM('ruy-lopez')">Ruy López</button>
+                  <button class="m-expert-quick" onclick="loadPracticeM('sicilian')">Sicilian</button>
+                  <button class="m-expert-quick" onclick="loadPracticeM('italian')">Italian Game</button>
+                  <button class="m-expert-quick" onclick="loadPracticeM('queens-gambit')">Queen's Gambit</button>
+                  <button class="m-expert-quick" onclick="loadPracticeM('kings-indian')">King's Indian</button>
+                  <button class="m-expert-quick" onclick="loadPracticeM('french')">French Defense</button>
+                  <button class="m-expert-quick" onclick="loadPracticeM('caro-kann')">Caro-Kann</button>
+                  <button class="m-expert-quick" onclick="loadPracticeM('kings-gambit')">King's Gambit</button>
+                </div>
+                <div id="m-practice-info" style="font-size:0.8em;color:#555;margin-top:8px;line-height:1.5;"></div>
+              </div>
+            </div>
+
+            <!-- ── HISTORY tab ──────────────────────────────────────── -->
+            <div id="m-panel-history" class="m-tab-panel">
+              <div id="m-move-history-content">
+                <p class="m-move-empty">No moves yet. Start a new game!</p>
+              </div>
+            </div>
+
+            <!-- ── EXPERT tab ───────────────────────────────────────── -->
+            <div id="m-panel-expert" class="m-tab-panel">
+              <div class="m-expert-input-row">
+                <input id="m-expert-input" class="m-expert-input" type="text"
+                  placeholder="Ask the chess expert..."
+                  onkeydown="if(event.key==='Enter')sendExpertQuestion()">
+                <button class="m-expert-send" onclick="sendExpertQuestion()">Ask</button>
+              </div>
+              <div class="m-expert-quick-btns">
+                <button class="m-expert-quick" onclick="askExpertQuick('Analyse my current position')">Analyse position</button>
+                <button class="m-expert-quick" onclick="askExpertQuick('What is the best move for me?')">Best move</button>
+                <button class="m-expert-quick" onclick="askExpertQuick('Explain the opening I am playing')">Opening</button>
+                <button class="m-expert-quick" onclick="askExpertQuick('What are the key strategic ideas here?')">Strategy</button>
+              </div>
+              <div id="m-expert-answers"></div>
+            </div>
+
+          </div><!-- /m-tab-area -->
+        </div><!-- /m-body -->`;
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Board Initialization & Handlers
+    // ────────────────────────────────────────────────────────────────────────
+    function calcBoardSize() {
+      const isLandscape = window.innerWidth > window.innerHeight;
+      if (isLandscape) {
+        // Height-constrained: reserve header (48px) + info strip (~80px) + padding (12px)
+        const maxByHeight = window.innerHeight - 48 - 80 - 12;
+        // Don't use more than 48% of screen width (leaves room for tab panel)
+        const maxByWidth = Math.floor(window.innerWidth * 0.48) - 12;
+        return Math.max(120, Math.min(maxByHeight, maxByWidth));
+      }
+      // Portrait: width-constrained; cap at 404px (S23 Ultra max physical width in CSS px)
+      return Math.min(window.innerWidth - 8, 404);
+    }
+
+    function initBoard() {
+      game = new Chess();
+      moveHistory = [];
+      capturedByWhite = [];
+      capturedByBlack = [];
+
+      const sz = calcBoardSize();
+      const boardEl = document.getElementById('board');
+      if (!boardEl) return;
+      boardEl.style.width  = sz + 'px';
+      boardEl.style.height = sz + 'px';
+
+      board = Chessboard('board', {
+        position: 'start',
+        draggable: true,
+        onDrop: onDropM,
+        onDragStart: onDragStartM,
+        onSnapEnd: onSnapEndM,
+        pieceTheme: 'img/chesspieces/wikipedia/{piece}.png',
+        dropOffBoard: 'snapback',
+        touchMove: true  // enable touch drag on mobile
+      });
+    }
+
+    function onDragStartM(source, piece) {
+      if (!game || game.game_over()) return false;
+      // Prevent dragging the wrong colour
+      if (game.turn() === 'w' && piece.search(/^b/) !== -1) return false;
+      if (game.turn() === 'b' && piece.search(/^w/) !== -1) return false;
+      return true;
+    }
+
+    function onDropM(source, target) {
+      if (!game) return 'snapback';
+      const move = game.move({ from: source, to: target, promotion: 'q' });
+      if (move === null) return 'snapback';
+
+      updateMoveHistoryM(move.san, 'You');
+      updateCapturedPiecesM(move);
+      updateFenDisplayM();
+      checkGameStatus();
+      logStatus(`You played: ${move.san}`, 'info');
+
+      // Determine if AI should respond
+      const blackType = getPlayerType('black');
+      const whiteType = getPlayerType('white');
+      const needsAI =
+        (game.turn() === 'b' && blackType === 'ai') ||
+        (game.turn() === 'w' && whiteType === 'ai');
+
+      sendMoveToEngineM(source + target, game.fen(), needsAI);
+      checkGameStatus();
+      saveGameM();
+    }
+
+    function onSnapEndM() {
+      if (board && game) board.position(game.fen());
+    }
+
+    function flipBoardM() {
+      if (board) board.flip();
+    }
+
+    // Resize board when orientation changes
+    window.addEventListener('resize', () => {
+      if (!board) return;
+      const sz = calcBoardSize();
+      const boardEl = document.getElementById('board');
+      if (boardEl) {
+        boardEl.style.width  = sz + 'px';
+        boardEl.style.height = sz + 'px';
+        board.resize();
+      }
+    });
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Game Logic
+    // ────────────────────────────────────────────────────────────────────────
+    function getPlayerType(color) {
+      const el = document.getElementById(color === 'white' ? 'm-white-player' : 'm-black-player');
+      return el ? el.value : 'ai';
+    }
+    function getAiType(color) {
+      const el = document.getElementById(color === 'white' ? 'm-white-ai-type' : 'm-black-ai-type');
+      return el ? el.value : 'stockfish';
+    }
+    function getSkillLevel(color) {
+      const el = document.getElementById(color === 'white' ? 'm-white-skill' : 'm-black-skill');
+      return el ? (parseInt(el.value) || 10) : 10;
+    }
+
+    function startNewGameM() {
+      if (!game) return;
+
+      const whiteType = getPlayerType('white');
+      const blackType = getPlayerType('black');
+      currentPlayerColor = (whiteType === 'human') ? 'white' : 'black';
+      currentOpponent    = buildOpponentLabel();
+      gameResultRecorded = false;
+
+      game = new Chess();
+      moveHistory = [];
+      capturedByWhite = [];
+      capturedByBlack = [];
+
+      if (board) board.start();
+      renderCapturedPieces();
+      updateFenDisplayM();
+      checkGameStatus();
+      updatePlayerDisplayM();
+
+      const hist = document.getElementById('m-move-history-content');
+      if (hist) hist.innerHTML = '<p class="m-move-empty">No moves yet.</p>';
+      const expert = document.getElementById('m-expert-answers');
+      if (expert) expert.innerHTML = '';
+
+      logStatus(`New game started: White=${whiteType}, Black=${blackType}`, 'success');
+      switchMobileTab('game');
+      showToast('New game started!');
+      postActivityM('playing');
+
+      // If White is AI, request first move
+      if (whiteType === 'ai') {
+        setTimeout(() => sendMoveToEngineM('', game.fen(), true), 600);
+      }
+    }
+
+    function buildOpponentLabel() {
+      const blackType = getPlayerType('black');
+      if (blackType === 'ai') {
+        const aiT = getAiType('black');
+        const lvl = getSkillLevel('black');
+        return `${aiT} (Level ${lvl})`;
+      }
+      const nameEl = document.getElementById('m-black-name');
+      return (nameEl && nameEl.value.trim()) ? nameEl.value.trim() : 'Human';
+    }
+
+    function sendMoveToEngineM(move, fen, requestAiMove) {
+      const isWhiteTurn = game && game.turn() === 'w';
+      const aiColor  = isWhiteTurn ? 'white' : 'black';
+      const aiType   = getAiType(aiColor);
+      const skillLvl = getSkillLevel(aiColor);
+
+      logComm('req', 'ENGINE', '/move', { move, fen, request_ai_move: requestAiMove, ai_type: aiType, skill_level: skillLvl });
+      let _st = null;
+      fetch('/move', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + authToken
+        },
+        body: JSON.stringify({
+          move: move,
+          fen: fen,
+          request_ai_move: requestAiMove,
+          ai_type: aiType,
+          skill_level: skillLvl
+        })
+      })
+        .then(r => {
+          _st = r.status;
+          if (r.status === 401) { handleLogout(); throw new Error('Unauthorized'); }
+          return r.json();
+        })
+        .then(data => {
+          logComm('res', 'ENGINE', '/move', data, _st);
+          if (data.error) { logStatus(`Server error: ${data.error}`, 'error'); return; }
+          logStatus('Move confirmed ✓', 'success');
+
+          if (data.ai_move) {
+            const from = data.ai_move.substring(0, 2);
+            const to   = data.ai_move.substring(2, 4);
+            const prom = data.ai_move.length > 4 ? data.ai_move[4] : 'q';
+
+            const aiResult = game.move({ from, to, promotion: prom });
+            if (aiResult) {
+              board.position(game.fen());
+              updateCapturedPiecesM(aiResult);
+              const san = data.ai_move_san || aiResult.san;
+              updateMoveHistoryM(san, currentOpponent || 'AI');
+              updateFenDisplayM();
+              logStatus(`AI played: ${san} (${data.ai_type})`, 'info');
+              checkGameStatus();
+              saveGameM();
+              updateExpertContextBadgeM();
+
+              // If the next turn is also AI, keep going
+              if (!game.game_over()) {
+                const nextColor = game.turn() === 'w' ? 'white' : 'black';
+                if (getPlayerType(nextColor) === 'ai') {
+                  setTimeout(() => sendMoveToEngineM('', game.fen(), true), 900);
+                }
+              }
+            } else {
+              // Sync fallback
+              if (data.fen) { game.load(data.fen); board.position(data.fen); }
+              logStatus('Board synced with server', 'info');
+            }
+          }
+        })
+        .catch(e => {
+          if (e.message !== 'Unauthorized') logStatus(`Error: ${e.message}`, 'error');
+        });
+    }
+
+    function checkGameStatus() {
+      if (!game) return;
+      const el = document.getElementById('m-game-status');
+      let text = '';
+      let cls  = '';
+
+      if (game.in_checkmate()) {
+        text = game.turn() === 'w' ? 'Black wins — Checkmate!' : 'White wins — Checkmate!';
+        cls  = 'gs-checkmate';
+        const humanWon = (currentPlayerColor === 'white' && game.turn() === 'b') ||
+                         (currentPlayerColor === 'black' && game.turn() === 'w');
+        recordGameResult(humanWon ? 'win' : 'loss');
+      } else if (game.in_draw()) {
+        text = 'Draw!';
+        cls  = 'gs-draw';
+        recordGameResult('draw');
+      } else if (game.in_stalemate()) {
+        text = 'Stalemate — Draw!';
+        cls  = 'gs-stalemate';
+        recordGameResult('draw');
+      } else if (game.in_check()) {
+        text = game.turn() === 'w' ? '⚠ White is in check' : '⚠ Black is in check';
+        cls  = 'gs-check';
+      } else {
+        text = game.turn() === 'w' ? "White's turn" : "Black's turn";
+        cls  = '';
+      }
+
+      if (el) { el.textContent = text; el.className = 'm-game-status ' + cls; }
+    }
+
+    function recordGameResult(result) {
+      if (gameResultRecorded || !currentOpponent) return;
+      gameResultRecorded = true;
+      if (!playerStats[currentOpponent]) playerStats[currentOpponent] = { w: 0, l: 0, d: 0 };
+      if (result === 'win')  playerStats[currentOpponent].w++;
+      if (result === 'loss') playerStats[currentOpponent].l++;
+      if (result === 'draw') playerStats[currentOpponent].d++;
+      localStorage.setItem('chessPlayerStats', JSON.stringify(playerStats));
+      postActivityM('idle');
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Captured Pieces
+    // ────────────────────────────────────────────────────────────────────────
+    function updateCapturedPiecesM(move) {
+      if (!move || !move.captured) return;
+      if (move.color === 'w') capturedByWhite.push(move.captured);
+      else                    capturedByBlack.push(move.captured);
+      renderCapturedPieces();
+    }
+
+    function renderCapturedPieces() {
+      const whiteEl = document.getElementById('m-white-captured');
+      const blackEl = document.getElementById('m-black-captured');
+      const advEl   = document.getElementById('m-material-adv');
+      const wScEl   = document.getElementById('m-white-score');
+      const bScEl   = document.getElementById('m-black-score');
+      if (!whiteEl || !blackEl) return;
+
+      const sort = arr => [...arr].sort((a, b) => PIECE_VALUES[b] - PIECE_VALUES[a]);
+      whiteEl.textContent = sort(capturedByWhite).map(p => PIECE_SYMBOLS[p]['b']).join('') || '—';
+      blackEl.textContent = sort(capturedByBlack).map(p => PIECE_SYMBOLS[p]['w']).join('') || '—';
+
+      const wMat = capturedByWhite.reduce((s, p) => s + (PIECE_VALUES[p] || 0), 0);
+      const bMat = capturedByBlack.reduce((s, p) => s + (PIECE_VALUES[p] || 0), 0);
+      if (wScEl) wScEl.textContent = wMat > 0 ? `+${wMat}` : '';
+      if (bScEl) bScEl.textContent = bMat > 0 ? `+${bMat}` : '';
+
+      const diff = wMat - bMat;
+      if (advEl) {
+        if (diff > 0)      { advEl.textContent = `+${diff} W`; advEl.style.color = '#2e7d32'; }
+        else if (diff < 0) { advEl.textContent = `+${Math.abs(diff)} B`; advEl.style.color = '#1565c0'; }
+        else               { advEl.textContent = wMat > 0 ? '=' : ''; advEl.style.color = '#555'; }
+      }
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Move History
+    // ────────────────────────────────────────────────────────────────────────
+    function updateMoveHistoryM(move, playerLabel) {
+      moveHistory.push({ move, player: playerLabel });
+      renderMoveHistory();
+    }
+
+    function renderMoveHistory() {
+      const container = document.getElementById('m-move-history-content');
+      if (!container) return;
+      if (!moveHistory.length) {
+        container.innerHTML = '<p class="m-move-empty">No moves yet.</p>';
+        return;
+      }
+      let rows = '';
+      for (let i = 0; i < moveHistory.length; i += 2) {
+        const n  = Math.floor(i / 2) + 1;
+        const wm = moveHistory[i]     ? `${moveHistory[i].player}: ${moveHistory[i].move}` : '';
+        const bm = moveHistory[i + 1] ? `${moveHistory[i + 1].player}: ${moveHistory[i + 1].move}` : '';
+        rows += `<tr><td style="width:28px;color:#999;font-size:0.8em;">${n}.</td>
+                     <td>${wm}</td><td>${bm}</td></tr>`;
+      }
+      container.innerHTML = `
+        <table class="m-move-table">
+          <thead><tr><th>#</th><th>White</th><th>Black</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Player Setup UI helpers
+    // ────────────────────────────────────────────────────────────────────────
+    function updatePlayerConfigM() {
+      const wType = getPlayerType('white');
+      const bType = getPlayerType('black');
+
+      const wHuman = document.getElementById('m-white-human-cfg');
+      const wAi    = document.getElementById('m-white-ai-cfg');
+      const bHuman = document.getElementById('m-black-human-cfg');
+      const bAi    = document.getElementById('m-black-ai-cfg');
+
+      if (wHuman) wHuman.style.display = wType === 'human' ? '' : 'none';
+      if (wAi)    wAi.style.display    = wType === 'ai'    ? '' : 'none';
+      if (bHuman) bHuman.style.display = bType === 'human' ? '' : 'none';
+      if (bAi)    bAi.style.display    = bType === 'ai'    ? '' : 'none';
+
+      // Auto-fill the human player's name from the logged-in user
+      if (wType === 'human') {
+        const nameEl = document.getElementById('m-white-name');
+        if (nameEl && !nameEl.value && currentUser) nameEl.value = currentUser;
+      }
+
+      updatePlayerDisplayM();
+    }
+
+    function updatePlayerDisplayM() {
+      const wType = getPlayerType('white');
+      const bType = getPlayerType('black');
+
+      let wLabel, bLabel;
+      if (wType === 'human') {
+        const nameEl = document.getElementById('m-white-name');
+        const name = (nameEl && nameEl.value.trim()) ? nameEl.value.trim() : (currentUser || 'Player 1');
+        wLabel = `White: ${name}`;
+      } else {
+        wLabel = `White: ${getAiType('white')} Lv ${getSkillLevel('white')}`;
+      }
+      if (bType === 'human') {
+        const nameEl = document.getElementById('m-black-name');
+        const name = (nameEl && nameEl.value.trim()) ? nameEl.value.trim() : 'Player 2';
+        bLabel = `Black: ${name}`;
+      } else {
+        bLabel = `Black: ${getAiType('black')} Lv ${getSkillLevel('black')}`;
+      }
+
+      const wEl = document.getElementById('m-white-player-display');
+      const bEl = document.getElementById('m-black-player-display');
+      if (wEl) wEl.textContent = wLabel;
+      if (bEl) bEl.textContent = bLabel;
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // FEN Display
+    // ────────────────────────────────────────────────────────────────────────
+    function updateFenDisplayM() {
+      // FEN is not shown in a separate box on mobile to save space,
+      // but kept here for future use / expert context.
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Save / Load Game
+    // ────────────────────────────────────────────────────────────────────────
+    function saveGameM() {
+      if (!game) return;
+      const key    = 'mobileChessSave_' + (currentUser || 'guest');
+      const saves  = JSON.parse(localStorage.getItem(key) || '[]');
+      const record = {
+        id:       Date.now(),
+        fen:      game.fen(),
+        moves:    moveHistory.slice(),
+        white:    document.getElementById('m-white-player')?.value || 'human',
+        black:    document.getElementById('m-black-player')?.value || 'ai',
+        aiType:   getAiType('black'),
+        skillLvl: getSkillLevel('black'),
+        capturedW: capturedByWhite.slice(),
+        capturedB: capturedByBlack.slice(),
+        savedAt:  new Date().toISOString()
+      };
+      // Keep only the most recent 3 saves
+      saves.unshift(record);
+      while (saves.length > 3) saves.pop();
+      localStorage.setItem(key, JSON.stringify(saves));
+      showToast('Game saved ✓');
+      logStatus('Game saved', 'success');
+    }
+
+    function loadSavedGameM() {
+      const key   = 'mobileChessSave_' + (currentUser || 'guest');
+      const saves = JSON.parse(localStorage.getItem(key) || '[]');
+      if (!saves.length) { showToast('No saved games found'); return; }
+
+      const latest = saves[0];
+      game = new Chess();
+      game.load(latest.fen);
+      if (board) board.position(latest.fen);
+
+      moveHistory     = latest.moves || [];
+      capturedByWhite = latest.capturedW || [];
+      capturedByBlack = latest.capturedB || [];
+
+      renderMoveHistory();
+      renderCapturedPieces();
+      updateFenDisplayM();
+      checkGameStatus();
+      logStatus('Game loaded ✓', 'success');
+      showToast('Game loaded');
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Expert Q&A
+    // ────────────────────────────────────────────────────────────────────────
+    function updateExpertContextBadgeM() {
+      // Context badge not shown in mobile header to keep it clean;
+      // the expert panel fetches fresh context each time.
+    }
+
+    function askExpertQuick(question) {
+      const inp = document.getElementById('m-expert-input');
+      if (inp) inp.value = question;
+      sendExpertQuestion();
+    }
+
+    function sendExpertQuestion() {
+      const inp = document.getElementById('m-expert-input');
+      if (!inp) return;
+      const question = inp.value.trim();
+      if (!question) return;
+      inp.value = '';
+
+      const answers = document.getElementById('m-expert-answers');
+      if (!answers) return;
+
+      // Add pending entry
+      const id = 'eq-' + Date.now();
+      const entry = document.createElement('div');
+      entry.id = id;
+      entry.className = 'm-expert-qa';
+      entry.innerHTML = `
+        <div class="m-expert-question">${escapeHtml(question)}</div>
+        <div class="m-expert-answer" style="color:#999;">Thinking…</div>`;
+      answers.insertBefore(entry, answers.firstChild);
+
+      const fen = game ? game.fen() : 'start';
+      logComm('req', 'ENGINE', '/expert/question', { question });
+      let _st = null;
+      fetch('/expert/question', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + authToken
+        },
+        body: JSON.stringify({ question, fen, context: 'Mobile game' })
+      })
+        .then(r => { _st = r.status; return r.json(); })
+        .then(data => {
+          logComm('res', 'ENGINE', '/expert/question', data, _st);
+          const ansEl = document.getElementById(id)?.querySelector('.m-expert-answer');
+          if (ansEl) ansEl.textContent = data.answer || 'No answer received.';
+        })
+        .catch(e => {
+          logComm('err', 'ENGINE', '/expert/question', { message: e.message });
+          const ansEl = document.getElementById(id)?.querySelector('.m-expert-answer');
+          if (ansEl) ansEl.textContent = 'Error: ' + e.message;
+        });
+    }
+
+    function escapeHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Tab Navigation
+    // ────────────────────────────────────────────────────────────────────────
+    function switchMobileTab(name) {
+      document.querySelectorAll('.m-tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.m-tab-btn').forEach(b => b.classList.remove('active'));
+      const panel = document.getElementById('m-panel-' + name);
+      const btn   = document.getElementById('m-tab-btn-' + name);
+      if (panel) panel.classList.add('active');
+      if (btn)   btn.classList.add('active');
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Status Log
+    // ────────────────────────────────────────────────────────────────────────
+    function logStatus(message, type) {
+      const log = document.getElementById('m-status-log');
+      if (!log) return;
+      const t   = new Date().toLocaleTimeString();
+      const cls = type === 'success' ? 'sl-success'
+                : type === 'error'   ? 'sl-error'
+                : 'sl-info';
+      const entry = document.createElement('div');
+      entry.innerHTML = `<span class="sl-time">[${t}]</span> <span class="${cls}">${escapeHtml(message)}</span>`;
+      log.insertBefore(entry, log.firstChild);
+      // Keep at most 15 entries
+      while (log.children.length > 15) log.removeChild(log.lastChild);
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Toast Notification
+    // ────────────────────────────────────────────────────────────────────────
+    let _toastTimer = null;
+    function showToast(msg) {
+      const el = document.getElementById('m-toast');
+      if (!el) return;
+      el.textContent = msg;
+      el.classList.add('visible');
+      if (_toastTimer) clearTimeout(_toastTimer);
+      _toastTimer = setTimeout(() => el.classList.remove('visible'), 2200);
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Activity Status
+    // ────────────────────────────────────────────────────────────────────────
+    function postActivityM(status) {
+      if (!authToken) return;
+      fetch('/auth/activity', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + authToken
+        },
+        body: JSON.stringify({ status })
+      }).catch(() => {});
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Communication Log (buffer used by Expert tab; not shown on mobile)
+    // ────────────────────────────────────────────────────────────────────────
+    function logComm(direction, service, endpoint, data, statusCode) {
+      const sanitized = Object.assign({}, data);
+      if (sanitized.password !== undefined) sanitized.password = '***';
+      if (sanitized.token    !== undefined) sanitized.token    = '(token)';
+      commMessages.push({ ts: new Date().toLocaleTimeString(), direction, service, endpoint, data: sanitized, statusCode });
+      if (commMessages.length > 100) commMessages.shift();
+    }
+
+          // ────────────────────────────────────────────────────────────────────────
+          // Classic Games — data & navigation
+          // ────────────────────────────────────────────────────────────────────────
+          let classicMoveIndex = -1;   // -1 = start position
+          let classicMoves = [];   // parsed SAN move array
+          let classicChess = null; // chess.js replay instance
+          let classicComments = {};   // {moveIndex: comment}
+
+          const MOBILE_CLASSIC_GAMES = {
+            'opera-game': {
+              name: 'The Opera Game',
+              sub: 'Morphy vs Duke Karl & Count · Paris, 1858',
+              key: 'opera-game',
+              pgn: '1.e4 e5 2.Nf3 d6 3.d4 Bg4 4.dxe5 Bxf3 5.Qxf3 dxe5 6.Bc4 Nf6 7.Qb3 Qe7 8.Nc3 c6 9.Bg5 b5 10.Nxb5 cxb5 11.Bxb5+ Nbd7 12.O-O-O Rd8 13.Rxd7 Rxd7 14.Rd1 Qe6 15.Bxd7+ Nxd7 16.Qb8+ Nxb8 17.Rd8#',
+              comments: {
+                0: 'Morphy demolishes an undeveloped army in 17 moves. A masterpiece of rapid development, piece activity, and attack.',
+                19: '10.Nxb5!! — the sacrificial blow! Morphy tears open the queenside to expose the Black king.',
+                25: '13.Rxd7!! — a rook sacrifice! White gives the exchange to destroy Black\'s defensive structure.',
+                31: '16.Qb8+!! — the queen sacrifice! Forces 16…Nxb8, after which Rd8# is unstoppable.',
+                33: '17.Rd8# — checkmate! Morphy sacrificed a knight, rook, and queen in 17 moves.'
+              }
+            },
+            'immortal-game': {
+              name: 'The Immortal Game',
+              sub: 'Anderssen vs Kieseritzky · London, 1851',
+              key: 'immortal-game',
+              pgn: '1.e4 e5 2.f4 exf4 3.Bc4 Qh4+ 4.Kf1 b5 5.Bxb5 Nf6 6.Nf3 Qh6 7.d3 Nh5 8.Nh4 Qg5 9.Nf5 c6 10.g4 Nf6 11.Rg1 cxb5 12.h4 Qg6 13.h5 Qg5 14.Qf3 Ng8 15.Bxf4 Qf6 16.Nc3 Bc5 17.Nd5 Qxb2 18.Bd6 Bxg1 19.e5 Qxa1+ 20.Ke2 Na6 21.Nxg7+ Kd8 22.Qf6+ Nxf6 23.Be7#',
+              comments: {
+                0: 'Anderssen gives up both rooks, a bishop, and his queen for a mating attack. Kieseritzky telegraphed the moves to Paris immediately.',
+                7: '4.Kf1!! — deliberately steps into check, sacrificing the right to castle to keep the attack alive.',
+                21: '11.Rg1!! — the first rook sacrifice! Anderssen refuses to retreat a single piece.',
+                35: '18.Bd6!! — a stunning bishop sacrifice to keep the mating net intact.',
+                43: '22.Qf6+!! — the queen sacrifice! After 22…Nxf6, Be7# ends the game.',
+                45: '23.Be7# — checkmate! Two rooks, a bishop, and a queen sacrificed for this finale.'
+              }
+            },
+            'evergreen-game': {
+              name: 'The Evergreen Game',
+              sub: 'Anderssen vs Dufresne · Berlin, 1852',
+              key: 'evergreen-game',
+              pgn: '1.e4 e5 2.Nf3 Nc6 3.Bc4 Bc5 4.b4 Bxb4 5.c3 Ba5 6.d4 exd4 7.O-O d3 8.Qb3 Qf6 9.e5 Qg6 10.Re1 Nge7 11.Ba3 b5 12.Qxb5 Rb8 13.Qa4 Bb6 14.Nbd2 Bb7 15.Ne4 Qf5 16.Bxd3 Qh5 17.Nf6+ gxf6 18.exf6 Rg8 19.Rad1 Qxf3 20.Rxe7+ Nxe7 21.Qxd7+ Kxd7 22.Bf5+ Ke8 23.Bd7+ Kf8 24.Bxe7#',
+              comments: {
+                0: 'The Evergreen Game — 170+ years later still celebrated as one of the most beautiful games ever played.',
+                7: '4.b4! — the Evans Gambit! A pawn sacrificed for explosive development.',
+                33: '17.Nf6+!! — the combination begins! The knight tears open Black\'s king cover.',
+                39: '20.Rxe7+!! — rook sacrifice to expose the king.',
+                41: '21.Qxd7+!! — the queen sacrifice! Leads to a forced mate.',
+                47: '24.Bxe7# — checkmate! Steinitz called this "the most beautiful game ever played."'
+              }
+            },
+            'game-of-century': {
+              name: 'Game of the Century',
+              sub: 'Byrne vs Fischer · New York, 1956',
+              key: 'game-of-century',
+              pgn: '1.Nf3 Nf6 2.c4 g6 3.Nc3 Bg7 4.d4 O-O 5.Bf4 d5 6.Qb3 dxc4 7.Qxc4 c6 8.e4 Nbd7 9.Rd1 Nb6 10.Qc5 Bg4 11.Bg5 Na4 12.Qa3 Nxc3 13.bxc3 Nxe4 14.Bxe7 Qb6 15.Bc4 Nxc3 16.Bc5 Rfe8+ 17.Kf1 Be6 18.Bxb6 Bxc4+ 19.Kg1 Ne2+ 20.Kf1 Nxd4+ 21.Kg1 Ne2+ 22.Kf1 Nc3+ 23.Kg1 axb6 24.Qb4 Ra4 25.Qxb6 Nxd1 26.h3 Rxa2 27.Kh2 Nxf2 28.Re1 Rxe1 29.Qd8+ Bf8 30.Nxe1 Bd5 31.Nf3 Ne4 32.Qb8 b5 33.h4 h5 34.Ne5 Kg7 35.Kg1 Bc5+ 36.Kf1 Ng3+ 37.Ke1 Bb4+ 38.Kd1 Bb3+ 39.Kc1 Ne2+ 40.Kb1 Nc3+ 41.Kc1 Rc2#',
+              comments: {
+                0: 'Bobby Fischer was only 13 years old! His queen sacrifice on move 17 is one of the most celebrated combinations in history.',
+                34: '17…Be6!! — the queen sacrifice! Fischer offers his queen for a bishop and rook, then unleashes a brilliant combination.',
+                82: '41…Rc2# — checkmate! Hans Kmoch immediately dubbed it "The Game of the Century."'
+              }
+            },
+            'fischer-spassky-g6': {
+              name: 'Fischer vs Spassky, Game 6',
+              sub: 'World Championship · Reykjavik, 1972',
+              key: 'fischer-spassky-g6',
+              pgn: '1.c4 e6 2.Nf3 d5 3.d4 Nf6 4.Nc3 Be7 5.Bg5 O-O 6.e3 h6 7.Bh4 b6 8.cxd5 Nxd5 9.Bxe7 Qxe7 10.Nxd5 exd5 11.Rc1 Be6 12.Qa4 c5 13.Qa3 Rc8 14.Bb5 a6 15.dxc5 bxc5 16.O-O Ra7 17.Be2 Nd7 18.Nd4 Qf8 19.Nxe6 fxe6 20.e4 d4 21.f4 Qe7 22.e5 Rb8 23.Bc4 Kh8 24.Qh3 Nf8 25.b3 a5 26.f5 exf5 27.Rxf5 Nh7 28.Rcf1 Qd8 29.Qg3 Re7 30.h4 Rbb7 31.e6 Rbc7 32.Qe5 Qe8 33.a4 Qd8 34.R1f2 Qe8 35.R2f3 Qd8 36.Bd3 Qe8 37.Qe4 Nf6 38.Rxf6 gxf6 39.Rxf6 Kg8 40.Bc4 Kh8 41.Qf4',
+              comments: {
+                0: 'From the 1972 World Championship. A positional masterpiece — Spassky reportedly stood and applauded when he resigned.',
+                37: '19.Nxe6! — captures, leaving Black with doubled isolated e-pawns as a permanent weakness.',
+                51: '26.f5! — the kingside pawn storm begins. Every White move has a clear strategic purpose.',
+                75: '38.Rxf6!! — rook sacrifice to remove Black\'s defensive knight.',
+                81: '41.Qf4 — Spassky resigns and stands to applaud. Fischer called this his favourite game.'
+              }
+            },
+            'kasparov-topalov': {
+              name: "Kasparov's Immortal",
+              sub: 'Kasparov vs Topalov · Wijk aan Zee, 1999',
+              key: 'kasparov-topalov',
+              pgn: '1.e4 d6 2.d4 Nf6 3.Nc3 g6 4.Be3 Bg7 5.Qd2 c6 6.f3 b5 7.Nge2 Nbd7 8.Bh6 Bxh6 9.Qxh6 Bb7 10.a3 e5 11.O-O-O Qe7 12.Kb1 a6 13.Nc1 O-O-O 14.Nb3 exd4 15.Rxd4 c5 16.Rd1 Nb6 17.g3 Kb8 18.Na5 Ba8 19.Bh3 d5 20.Qf4+ Ka7 21.Rhe1 d4 22.Nd5 Nbxd5 23.exd5 Qd6 24.Rxd4 cxd4 25.Re7+ Kb6 26.Qxd4+ Kxa5 27.b4+ Ka4 28.Qc3 Qxd5 29.Ra7 Bb7 30.Rxb7 Qc4 31.Qxf6 Kxa3 32.Qxa6+ Kxb4 33.c3+ Kxc3 34.Qa1+ Kd2 35.Qb2+ Kd1 36.Bf1 Rd2 37.Rd7 Rxd7 38.Bxc4 bxc4 39.Qxh8 Rd3 40.Qa8 c3 41.Qa4+ Ke1 42.f4 f5 43.Kc1 Rd2 44.Qa7',
+              comments: {
+                0: 'Many consider this the greatest game of the computer era. Kasparov hunts Topalov\'s king across the entire board over 20 moves.',
+                47: '24.Rxd4!! — the rook sacrifice that starts the king hunt! Topalov\'s king will be chased from b8 to e1.',
+                51: '26.Qxd4+ — the king hunt begins: b6 → a5 → a4 → a3 → b4 → c3 → d2 → d1 → e1.',
+                87: '44.Qa7 — Topalov resigns. The king\'s 9-square odyssey ends in defeat.'
+              }
+            }
+          };
+
+          function parsePgn(pgn) {
+            // Strip move numbers (e.g. "1." "12.") and return SAN move array
+            return pgn.replace(/\d+\./g, ' ').trim().split(/\s+/).filter(Boolean);
+          }
+
+          function openClassicGamesM() {
+            switchMobileTab('learn');
+          }
+
+          function loadClassicGameM() {
+            const sel = document.getElementById('m-classic-select');
+            if (!sel) return;
+            const key = sel.value;
+            const nav = document.getElementById('m-classic-nav');
+            const practice = document.getElementById('m-practice-section');
+            if (!key) {
+              if (nav) nav.style.display = 'none';
+              if (practice) practice.style.display = '';
+              return;
+            }
+
+            const data = MOBILE_CLASSIC_GAMES[key];
+            if (!data) return;
+
+            classicMoves = parsePgn(data.pgn);
+            classicComments = data.comments || {};
+            classicChess = new Chess();
+            classicMoveIndex = -1;
+
+            if (nav) nav.style.display = '';
+            if (practice) practice.style.display = 'none';
+            renderClassicStep();
+            showToast(data.name + ' loaded');
+          }
+
+          function stepClassicM(dir) {
+            if (!classicMoves.length || !classicChess) return;
+
+            if (dir <= -9999) {
+              // Jump to start
+              classicChess = new Chess();
+              classicMoveIndex = -1;
+            } else if (dir >= 9999) {
+              // Jump to end
+              classicChess = new Chess();
+              classicMoveIndex = -1;
+              for (let i = 0; i < classicMoves.length; i++) {
+                const result = classicChess.move(classicMoves[i], { sloppy: true });
+                if (result) classicMoveIndex = i;
+                else break;
+              }
+            } else if (dir === 1 && classicMoveIndex < classicMoves.length - 1) {
+              const next = classicMoves[classicMoveIndex + 1];
+              const result = classicChess.move(next, { sloppy: true });
+              if (result) classicMoveIndex++;
+            } else if (dir === -1 && classicMoveIndex >= 0) {
+              // Step back: rebuild from scratch
+              const target = classicMoveIndex - 1;
+              classicChess = new Chess();
+              classicMoveIndex = -1;
+              for (let i = 0; i <= target; i++) {
+                const result = classicChess.move(classicMoves[i], { sloppy: true });
+                if (result) classicMoveIndex = i;
+                else break;
+              }
+            }
+
+            renderClassicStep();
+          }
+
+          function renderClassicStep() {
+            if (!board || !classicChess) return;
+            board.position(classicChess.fen());
+
+            // Progress label
+            const prog = document.getElementById('m-classic-progress');
+            if (prog) {
+              const total = classicMoves.length;
+              const cur = classicMoveIndex + 1;
+              const moveSan = classicMoveIndex >= 0 ? classicMoves[classicMoveIndex] : 'Start';
+              prog.textContent = classicMoveIndex < 0
+                ? `Start position · ${total} moves`
+                : `Move ${cur}/${total} — ${moveSan}`;
+            }
+
+            // Commentary
+            const commentEl = document.getElementById('m-classic-comment');
+            if (commentEl) {
+              // Keys are 1-based steps: 0 = intro, N = after the Nth halfmove
+              const comment = classicComments[classicMoveIndex + 1];
+              if (comment) {
+                commentEl.textContent = comment;
+                commentEl.style.display = 'block';
+              } else {
+                commentEl.style.display = 'none';
+              }
+            }
+          }
+
+          // ────────────────────────────────────────────────────────────────────────
+          // Practice Openings
+          // ────────────────────────────────────────────────────────────────────────
+                    function openPracticeM() {
+                      switchMobileTab('learn');
+                      requestAnimationFrame(() => {
+                        const panel = document.getElementById('m-panel-learn');
+                        const el = document.getElementById('m-practice-section');
+                        if (panel && el) panel.scrollTop = el.offsetTop;
+                      });
+                    }
+
+          const PRACTICE_OPENINGS = {
+            'ruy-lopez': { name: 'Ruy López', moves: ['e4', 'e5', 'Nf3', 'Nc6', 'Bb5'], info: 'One of the most classical openings. White pins Black\'s knight to pressure the e5 pawn.' },
+            'italian': { name: 'Italian Game', moves: ['e4', 'e5', 'Nf3', 'Nc6', 'Bc4'], info: 'Rapid development and kingside pressure. Rich strategic middlegames.' },
+            'sicilian': { name: 'Sicilian Defense', moves: ['e4', 'c5'], info: 'The most popular reply to 1.e4 — asymmetric fight for the centre.' },
+            'queens-gambit': { name: "Queen's Gambit", moves: ['d4', 'd5', 'c4'], info: 'White offers a queenside pawn for central control. One of chess\'s most respected openings.' },
+            'kings-indian': { name: "King's Indian", moves: ['d4', 'Nf6', 'c4', 'g6', 'Nc3', 'Bg7', 'e4', 'd6', 'Nf3', 'O-O'], info: 'Black allows a broad White centre, then strikes back dynamically.' },
+            'french': { name: 'French Defense', moves: ['e4', 'e6', 'd4', 'd5'], info: 'Solid pawn chain. Rich strategic battles with clear pawn structures.' },
+            'caro-kann': { name: 'Caro-Kann', moves: ['e4', 'c6', 'd4', 'd5'], info: 'Solid and resilient. Black prepares …d5 keeping the dark-squared bishop free.' },
+            'kings-gambit': { name: "King's Gambit", moves: ['e4', 'e5', 'f4'], info: 'A bold romantic-era gambit. White offers the f-pawn for rapid development and attack.' }
+          };
+
+          function loadPracticeM(key) {
+            const data = PRACTICE_OPENINGS[key];
+            if (!data || !board) return;
+
+            const g = new Chess();
+            for (const m of data.moves) {
+              const result = g.move(m, { sloppy: true });
+              if (!result) break;
+            }
+            board.position(g.fen());
+            game.load(g.fen());
+
+            const infoEl = document.getElementById('m-practice-info');
+            if (infoEl) infoEl.innerHTML = `<strong>${data.name}</strong> — ${escapeHtml(data.info)}`;
+
+            logStatus(`Practice: ${data.name}`, 'info');
+            showToast(data.name);
+          }
+
+          // ────────────────────────────────────────────────────────────────────────
+          // Icon-button tooltips — show on hover (CSS) and on tap (JS)
+          // ────────────────────────────────────────────────────────────────────────
+          (function () {
+            let _tipTimer = null;
+            document.addEventListener('touchstart', function (e) {
+              // Clear any previously visible tooltip
+              document.querySelectorAll('.m-quick-btn.tip-show').forEach(b => b.classList.remove('tip-show'));
+              clearTimeout(_tipTimer);
+
+              const btn = e.target.closest('.m-quick-btn[data-tip]');
+              if (!btn) return;
+
+              // Show tooltip immediately on touch
+              btn.classList.add('tip-show');
+              // Auto-hide after 1.4 s (action fires on touchend, so tooltip acts as label feedback)
+              _tipTimer = setTimeout(() => btn.classList.remove('tip-show'), 1400);
+            }, { passive: true });
+          }());
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Help overlay
+    // ────────────────────────────────────────────────────────────────────────
+    function openHelpM() {
+      const el = document.getElementById('m-help-overlay');
+      if (el) el.style.display = 'flex';
+    }
+    function closeHelpM() {
+      const el = document.getElementById('m-help-overlay');
+      if (el) el.style.display = 'none';
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Bootstrap
+    // ────────────────────────────────────────────────────────────────────────
+    window.onload = checkAuthentication;
+  </script>
+
+<!-- Help bottom-sheet -->
+<div id="m-help-overlay" style="display:none;" onclick="if(event.target===this)closeHelpM()">
+  <div class="m-help-sheet">
+    <div class="m-help-sheet-header">
+      <h2>♟ Help</h2>
+      <button class="m-help-sheet-close" onclick="closeHelpM()">&#x2715;</button>
+    </div>
+    <div class="m-help-body">
+
+      <div class="m-help-section">
+        <h3>Header</h3>
+        <div class="m-help-dl">
+          <div class="m-help-row"><dt>[Username]</dt><dd>Your logged-in account name.</dd></div>
+          <div class="m-help-row"><dt>? Help</dt><dd>Opens this help sheet.</dd></div>
+          <div class="m-help-row"><dt>Logout</dt><dd>Signs you out and returns to the login screen.</dd></div>
+        </div>
+      </div>
+
+      <div class="m-help-section">
+        <h3>Board Area</h3>
+        <div class="m-help-dl">
+          <div class="m-help-row"><dt>Board</dt><dd>Drag or tap pieces to make moves when it is a human player&rsquo;s turn.</dd></div>
+          <div class="m-help-row"><dt>&#x21C5; Flip</dt><dd>Rotates the board so the other colour plays from the bottom.</dd></div>
+          <div class="m-help-row"><dt>Game Status</dt><dd>Shows whose turn it is and any check, checkmate, or draw state.</dd></div>
+          <div class="m-help-row"><dt>&#x2654; White / &#x265A; Black</dt><dd>Configured player name or AI engine for each side.</dd></div>
+          <div class="m-help-row"><dt>Captured pieces</dt><dd>Pieces taken by each side, with the material advantage score.</dd></div>
+        </div>
+      </div>
+
+      <div class="m-help-section">
+        <h3>&#x265F; Game Tab</h3>
+        <div class="m-help-dl">
+          <div class="m-help-row"><dt>&#x2659; New Game</dt><dd>Resets the board and starts a fresh game with the current player configuration.</dd></div>
+          <div class="m-help-row"><dt>&#x1F4C2; Load Save</dt><dd>Restores your most recently saved game from local storage.</dd></div>
+          <div class="m-help-row"><dt>&#x1F4BE; Save Game</dt><dd>Saves the current position and move history to local storage (keeps the 3 most recent saves).</dd></div>
+          <div class="m-help-row"><dt>&#x2699;&#xFE0F; Player Setup</dt><dd>Switches to the Setup tab to change who controls each side.</dd></div>
+          <div class="m-help-row"><dt>&#x1F3DB;&#xFE0F; Classic Games</dt><dd>Switches to the Learn tab to step through a famous historic game.</dd></div>
+          <div class="m-help-row"><dt>&#x1F3AF; Practice Openings</dt><dd>Switches to the Learn tab to load a well-known opening position.</dd></div>
+          <div class="m-help-row"><dt>Status log</dt><dd>Live feed of game events, moves played, and server responses.</dd></div>
+        </div>
+      </div>
+
+      <div class="m-help-section">
+        <h3>&#x2699; Setup Tab</h3>
+        <div class="m-help-dl">
+          <div class="m-help-row"><dt>Player Type</dt><dd>Choose <em>Human</em> (enter a name) or <em>AI</em> for each side.</dd></div>
+          <div class="m-help-row"><dt>AI Engine</dt><dd>Stockfish (local), OpenAI GPT, DeepSeek, or Claude.</dd></div>
+          <div class="m-help-row"><dt>Skill Level</dt><dd>1 = easiest, 20 = strongest. Applies to Stockfish only.</dd></div>
+          <div class="m-help-row"><dt>Start New Game</dt><dd>Begins a game using the current player settings.</dd></div>
+        </div>
+      </div>
+
+      <div class="m-help-section">
+        <h3>&#x1F4DA; Learn Tab</h3>
+        <div class="m-help-dl">
+          <div class="m-help-row"><dt>Classic Games</dt><dd>Select a famous game from the dropdown to load it for step-through review.</dd></div>
+          <div class="m-help-row"><dt>&#x23EE; &#x25C4; &#x25BA; &#x23ED;</dt><dd>Step backward/forward one move at a time, or jump to the start or end of the game. Commentary appears below the controls when available.</dd></div>
+          <div class="m-help-row"><dt>Practice Openings</dt><dd>Tap an opening name to load its starting position on the board so you can continue playing from there.</dd></div>
+        </div>
+      </div>
+
+      <div class="m-help-section">
+        <h3>&#x1F4CB; History Tab</h3>
+        <div class="m-help-dl">
+          <div class="m-help-row"><dt>Move table</dt><dd>Numbered list of every move played in the current game, showing the notation for White and Black each turn.</dd></div>
+        </div>
+      </div>
+
+      <div class="m-help-section">
+        <h3>&#x1F9E0; Expert Tab</h3>
+        <div class="m-help-dl">
+          <div class="m-help-row"><dt>Quick buttons</dt><dd>Pre-written prompts &mdash; <em>Analyse position</em>, <em>Best move</em>, <em>Opening</em>, <em>Strategy</em> &mdash; sent to the AI expert with one tap.</dd></div>
+          <div class="m-help-row"><dt>Input + Ask</dt><dd>Type any chess question; the AI answers in the context of the current board position.</dd></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>

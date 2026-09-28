@@ -1,0 +1,5 @@
+# Prettier corrupts inline JS in these HTML files
+ui/admin.html
+ui/index.html
+ui/mobile.html
+admin-service/static/admin.html
