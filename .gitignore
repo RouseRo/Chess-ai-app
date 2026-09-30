@@ -16,3 +16,4 @@ data/users.db
 # Log files
 *.log
 logs/
+.copilot-azure/

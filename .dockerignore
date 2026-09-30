@@ -1,0 +1,16 @@
+.git/
+.github/
+.copilot-azure/
+venv/
+.venv/
+**/__pycache__/
+**/*.py[cod]
+*.log
+logs/
+data/
+user_data/users.json
+user_data/sessions.json
+user_data/users/
+.env
+.env.*
+!.env.example

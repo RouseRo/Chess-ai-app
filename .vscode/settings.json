@@ -5,5 +5,7 @@
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
-    "chat.sessionSync.enabled": true
+    "chat.sessionSync.enabled": true,
+    "chat.editor.preferCopilotHarness": false,
+    "chat.defaultToCopilotHarness": false
 }

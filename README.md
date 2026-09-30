@@ -221,6 +221,22 @@ docker-compose down
 
 The application can be deployed to **Azure Container Apps** using the provided PowerShell script. All four services (engine, auth, admin, UI) are built and pushed to Azure Container Registry, then deployed as Container Apps backed by Azure Files for persistent storage.
 
+### Azure Project Information (September 2026)
+
+**Purpose:** Host the chess learning and play app for a small number of personal/demo users. The UI supports human and AI games, Stockfish, community features, and an admin dashboard. The Azure plan favors a low-cost, always-available deployment in **East US**.
+
+**Existing environment:** Resource group `chess-ai-rg` contains the running `chess-ui`, `chess-engine`, `chess-auth`, and `chess-admin` Container Apps in `chess-ai-env`. The plan reuses the existing Basic container registry (`chessairegistry7646`), storage account (`chessaistorage4996`) with Azure Files shares, and Log Analytics workspace (`workspace-chessairgzT1F`). It proposes a new workspace-based Application Insights resource (`appi-chess-ai-dev-8827`) and system-assigned identities for registry access.
+
+**Service roles:** `chess-ui` serves the TypeScript site through Nginx and proxies API requests; `chess-engine` runs Python/FastAPI and Stockfish; `chess-auth` handles JWT login and registration; `chess-admin` provides the admin API. The plan keeps one minimum replica per service and uses the existing Consumption environment. Auth and admin share a persistent SQLite database on Azure Files, with one replica per database writer.
+
+**Planning estimate:** About **$34.43 USD/month**, including $29.43 for four Container Apps and $5.00 for the registry. This is a planning estimate based on East US prices checked September 29, 2026, not a bill forecast. It assumes 22 idle and 2 active hours per day, 1 million requests per month, and available free grants. Azure Files usage, monitoring beyond the grant, outbound traffic, taxes, and other workloads' use of free grants are not included. Check Azure Cost Management for actual charges.
+
+**Readiness and status:** Static readiness review found four deployable components and no remaining deployment blockers after the Nginx upstream and Docker build-context fixes. The newer declarative **Bicep onboarding plan is paused at scaffolding** because its required task dispatcher and Bicep validation tools were unavailable. Its proposed infrastructure changes and Application Insights resource have **not** been deployed by that plan. The live deployment described below predates this plan and uses the PowerShell scripts; do not treat the estimate or proposed resources as a record of completed deployment.
+
+**Before a production rollout:** Replace the seeded default passwords and hardcoded JWT secret fallback; set `APP_BASE_URL` to the deployed UI URL and configure SMTP for verification emails. LLM opponents also need `OPENAI_API_KEY` (Stockfish does not). SQLite on Azure Files limits concurrent writes and scaling; a managed database would require an application migration.
+
+The project snapshot above is drawn from the local [Azure readiness report](.copilot-azure/sessions/88271d3e-935f-4343-89a8-5f329288fbd5/readiness-report.md) and [Azure preparation plan](.copilot-azure/sessions/88271d3e-935f-4343-89a8-5f329288fbd5/prepare-plan.json). The following instructions document the existing script-based deployment.
+
 ### Prerequisites
 
 - [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) installed and logged in (`az login`)
