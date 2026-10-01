@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Chess invitation</title>
+  <style>
+    :root { color-scheme: light; font-family: Georgia, serif; color: #25382e; background: #e9eee9; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+    main { width: min(100%, 530px); background: #fff; border: 1px solid #c7d3c9; border-top: 5px solid #3e714a; padding: clamp(24px, 5vw, 42px); }
+    h1 { font-size: 1.9rem; margin: 0 0 12px; }
+    p { line-height: 1.55; }
+    fieldset { border: 0; padding: 0; margin: 28px 0 20px; }
+    legend { font-weight: bold; margin-bottom: 12px; }
+    label.option { display: flex; gap: 12px; align-items: center; padding: 12px; border: 1px solid #d2ddd4; margin: 8px 0; cursor: pointer; }
+    label.option:has(input:checked) { border-color: #3e714a; background: #f1f7f1; }
+    input[type="radio"] { accent-color: #3e714a; }
+    #move-field { display: none; margin: 16px 0; }
+    #move-field label { display: block; font-weight: bold; margin-bottom: 7px; }
+    #move { width: 100%; padding: 12px; font: inherit; border: 1px solid #9aafa0; }
+    button { width: 100%; border: 0; background: #3e714a; color: white; padding: 13px; font: bold 1rem Georgia, serif; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: default; }
+    #feedback { min-height: 24px; }
+    .error { color: #a22121; }
+    .success { color: #256531; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Friendly chess invitation</h1>
+    <p id="intro">Loading your invitation...</p>
+    <form id="response" hidden>
+      <fieldset>
+        <legend>How would you like to begin?</legend>
+        <label class="option"><input type="radio" name="choice" value="white" required> I play White and send my first move</label>
+        <label class="option"><input type="radio" name="choice" value="black"> You play White</label>
+        <label class="option"><input type="radio" name="choice" value="random"> Select the first move at random</label>
+      </fieldset>
+      <div id="move-field">
+        <label for="move">Your first move as White</label>
+        <input id="move" name="first_move" placeholder="e4" maxlength="12" autocomplete="off">
+      </div>
+      <button type="submit">Send response</button>
+    </form>
+    <p id="feedback" role="status" aria-live="polite"></p>
+  </main>
+  <script>
+    const token = new URLSearchParams(location.search).get('token');
+    const intro = document.getElementById('intro');
+    const feedback = document.getElementById('feedback');
+    const form = document.getElementById('response');
+    const move = document.getElementById('move');
+    const moveField = document.getElementById('move-field');
+    if (token) {
+      fetch('/community/email-invite?token=' + encodeURIComponent(token), { cache: 'no-store' })
+        .then(response => response.json())
+        .then(data => {
+          if (!data.success) throw new Error(data.message);
+          intro.textContent = data.sender + ' has invited you to play a friendly game of chess. Your response will be sent to them by email.';
+          form.hidden = false;
+        })
+        .catch(error => { intro.textContent = error.message || 'Unable to load this invitation.'; });
+    } else {
+      intro.textContent = 'This invitation link is incomplete.';
+    }
+    form.addEventListener('change', () => {
+      const isWhite = form.elements.choice.value === 'white';
+      moveField.style.display = isWhite ? 'block' : 'none';
+      move.required = isWhite;
+      if (!isWhite) move.value = '';
+    });
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const button = form.querySelector('button');
+      button.disabled = true;
+      feedback.textContent = '';
+      try {
+        const response = await fetch('/community/email-invite/respond', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, choice: form.elements.choice.value, first_move: move.value })
+        });
+        const data = await response.json();
+        if (!data.success) throw new Error(data.message);
+        form.hidden = true;
+        intro.textContent = 'Your response has been sent.';
+        feedback.className = 'success';
+        feedback.textContent = data.first_move ? 'Your opening move: ' + data.first_move : '';
+      } catch (error) {
+        feedback.className = 'error';
+        feedback.textContent = error.message || 'Could not send your response. Please try again.';
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

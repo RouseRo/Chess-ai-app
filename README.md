@@ -493,7 +493,9 @@ This allows switching accounts without having to first navigate to the admin pan
 | `/community/messages` | POST | Post a public chat message |
 | `/community/announcements` | POST | Post an announcement (admin only) |
 | `/community/dm` | POST | Send a direct message |
-| `/community/game-invite` | POST | Send a game invitation |
+| `/community/game-invite` | POST | Send an in-app invitation to online players or an email invitation to offline players |
+| `/community/email-invite` | GET | Load an email invitation by its single-use link token |
+| `/community/email-invite/respond` | POST | Send the invitee's White opening move, random White opening, or "You play White" response |
 | `/community/clear-activity` | POST | Clear own game activity status |
 
 ### Rewards API Endpoints
@@ -811,6 +813,8 @@ SMTP_PASSWORD=your_brevo_smtp_key
 SMTP_FROM_EMAIL=your_verified_sender@example.com
 APP_BASE_URL=https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io
 ```
+
+Offline game invitations use these SMTP settings to email a link to `invite.html`. The link stays valid for 30 days and can be answered once without logging in. Choosing White requires a legal opening move (for example `e4`); the random option chooses a legal White opening move. The inviter receives the choice and move by email and as a Community direct message. An unsent email leaves no pending invitation.
 
 > **AI model selection**: The active AI model for the chess expert and AI opponents is configured in `src/config.json` under `chess_expert_model` and `ai_models`. All models are accessed through [OpenRouter](https://openrouter.ai) using the `OPENAI_API_KEY`.
 

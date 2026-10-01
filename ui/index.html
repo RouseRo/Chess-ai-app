@@ -510,8 +510,10 @@
       padding: 0 8px 6px; margin: 0; border-bottom: 1px solid #eee; }
     .community-user-item { display: flex; align-items: center; gap: 6px; padding: 5px 8px; font-size: 0.85em; }
     .community-user-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .community-user-group { padding: 8px 8px 3px; font-size: 0.72em; color: #777; text-transform: uppercase; }
     .cu-online  { background: #4CAF50; }
     .cu-playing { background: #ff9800; }
+    .cu-offline { background: #9e9e9e; }
     .cu-me { font-weight: 700; color: #1565c0; }
     .community-chat-area { flex: 1; display: flex; flex-direction: column; min-height: 0; }
     .community-messages {
@@ -611,6 +613,14 @@
     #dm-compose .dm-compose-header { font-size: 0.82em; color: #6a1b9a; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
     #dm-compose .dm-input-row { display: flex; gap: 5px; }
     #dm-compose-input { flex: 1; padding: 5px 8px; border: 1px solid #ce93d8; border-radius: 4px; font-size: 0.9em; }
+    #game-invite-preview { display: none; background: #f1f8f1; border: 1px solid #a5d6a7; border-radius: 4px; padding: 10px; margin-top: 6px; max-height: 50%; overflow-y: auto; flex-shrink: 0; }
+    #game-invite-preview h4 { margin: 0 0 8px; font-size: 0.9em; }
+    #game-invite-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 0.85em/1.45 Georgia, serif; color: #333; margin: 8px 0; }
+    #game-invite-preview .invite-preview-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    #game-invite-preview .invite-preview-actions button { padding: 6px 12px; border-radius: 3px; cursor: pointer; }
+    #invite-preview-send { background: #2e7d32; border: 0; color: #fff; }
+    #invite-preview-cancel { background: #fff; border: 1px solid #bbb; color: #333; }
+    #invite-preview-error { color: #b71c1c; font-size: 0.85em; margin: 5px 0; }
     /* ── Rewards system ───────────────────────────────────────────────────── */
     .rewards-header { margin-bottom: 12px; }
     .rewards-progress-bar-wrap { height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; }
@@ -1304,6 +1314,50 @@
                               .catch(() => alert('Network error. Could not send message.'));
                           }
 
+                          let pendingEmailInviteRecipient = null;
+
+                          function openGameInvite(recipient, activity) {
+                            if (activity !== 'offline') {
+                              sendGameInvite(recipient);
+                              return;
+                            }
+                            if (!authToken) return;
+                            pendingEmailInviteRecipient = recipient;
+                            const preview = document.getElementById('game-invite-preview');
+                            preview.style.display = 'block';
+                            document.getElementById('invite-preview-recipient').textContent = recipient;
+                            document.getElementById('invite-preview-subject').textContent = 'Loading invitation...';
+                            document.getElementById('invite-preview-body').textContent = '';
+                            document.getElementById('invite-preview-error').textContent = '';
+                            document.getElementById('invite-preview-send').disabled = true;
+                            fetch('/community/game-invite/preview?recipient=' + encodeURIComponent(recipient), {
+                              headers: { 'Authorization': 'Bearer ' + authToken }
+                            })
+                              .then(r => r.json())
+                              .then(data => {
+                                if (pendingEmailInviteRecipient !== recipient) return;
+                                if (!data.success) throw new Error(data.message || 'Could not preview invitation.');
+                                document.getElementById('invite-preview-subject').textContent = data.subject;
+                                document.getElementById('invite-preview-body').textContent = data.body;
+                                document.getElementById('invite-preview-send').disabled = false;
+                              })
+                              .catch(error => {
+                                if (pendingEmailInviteRecipient === recipient)
+                                  document.getElementById('invite-preview-error').textContent = error.message;
+                              });
+                          }
+
+                          function closeGameInvitePreview() {
+                            pendingEmailInviteRecipient = null;
+                            document.getElementById('game-invite-preview').style.display = 'none';
+                          }
+
+                          function sendPreviewedGameInvite() {
+                            if (!pendingEmailInviteRecipient) return;
+                            document.getElementById('invite-preview-send').disabled = true;
+                            sendGameInvite(pendingEmailInviteRecipient);
+                          }
+
                           function sendGameInvite(recipient) {
                             if (!authToken) return;
                             fetch('/community/game-invite', {
@@ -1314,13 +1368,24 @@
                               .then(r => r.json())
                               .then(data => {
                                 if (data.success) {
+                                  if (pendingEmailInviteRecipient === recipient) closeGameInvitePreview();
                                   refreshCommunityMessages();
-                                  updateStatusBox('Game invitation sent to ' + recipient, 'success');
+                                  updateStatusBox(data.emailed
+                                    ? 'Email invitation sent to ' + recipient + '. Their reply will arrive by email and in Community.'
+                                    : 'Game invitation sent to ' + recipient, 'success');
                                 } else {
-                                  alert(data.message || 'Failed to send game invitation.');
+                                  if (pendingEmailInviteRecipient === recipient) {
+                                    document.getElementById('invite-preview-error').textContent = data.message || 'Failed to send game invitation.';
+                                    document.getElementById('invite-preview-send').disabled = false;
+                                  } else alert(data.message || 'Failed to send game invitation.');
                                 }
                               })
-                              .catch(() => alert('Network error. Could not send game invitation.'));
+                              .catch(() => {
+                                if (pendingEmailInviteRecipient === recipient) {
+                                  document.getElementById('invite-preview-error').textContent = 'Network error. Could not send game invitation.';
+                                  document.getElementById('invite-preview-send').disabled = false;
+                                } else alert('Network error. Could not send game invitation.');
+                              });
                           }
 
                           function acceptGameInvite(inviteId) {
@@ -1397,7 +1462,7 @@
                             const msg = communityMessages.find(m => m.id === msgId);
                             if (!msg) return;
                             const accepterUsername = msg.sender;
-                            const myColor = msg.content.includes('you will play as White') ? 'white' : 'black';
+                            const myColor = msg.content.includes('you will play as White') || msg.content.includes('You play White') ? 'white' : 'black';
 
                             const whiteEl = document.getElementById('white-player');
                             const blackEl = document.getElementById('black-player');
@@ -1698,15 +1763,20 @@
                                 const listEl = document.getElementById('community-users-list');
                                 if (!listEl) return;
                                 const users = data.users || [];
-                                // Always show Stockfish AI at the top of the online users list
+                                // Always show Stockfish AI at the top of the users list
                                 const aiEntry = `<div class="community-user-item">`
                                   + `<span class="community-user-dot cu-ai"></span>`
                                   + `<span style="color:#6a1b9a;font-size:0.84em;">🤖 Stockfish</span>`
                                   + `<span class="user-actions" style="display:flex;margin-left:auto;">`
                                   + `<button class="user-action-btn" title="Challenge AI" onclick="openAiGameSetup()" style="color:#6a1b9a;">♟</button>`
                                   + `</span></div>`;
-                                const userItems = users.map(u => {
-                                  const dotCls = u.activity === 'playing' ? 'community-user-dot cu-playing' : 'community-user-dot cu-online';
+                                const userItems = users.sort((a, b) => {
+                                  const aOffline = a.activity === 'offline';
+                                  const bOffline = b.activity === 'offline';
+                                  return Number(aOffline) - Number(bOffline) || a.username.localeCompare(b.username);
+                                }).map(u => {
+                                  const dotCls = u.activity === 'offline' ? 'community-user-dot cu-offline'
+                                    : u.activity === 'playing' ? 'community-user-dot cu-playing' : 'community-user-dot cu-online';
                                   const nameCls = u.username === currentUser ? 'cu-me' : '';
                                   const safeU = u.username.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                                   const safeUAttr = u.username.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
@@ -1714,14 +1784,19 @@
                                   const actionsHtml = u.username !== currentUser
                                     ? `<span class="user-actions">`
                                     + `<button class="user-action-btn" title="Send direct message" onclick="openDmCompose('${safeUAttr}')">✉</button>`
-                                    + `<button class="user-action-btn" title="Invite to game" onclick="sendGameInvite('${safeUAttr}')">♟</button>`
+                                    + `<button class="user-action-btn" title="Invite to game" data-recipient="${safeUAttr}" onclick="openGameInvite(this.dataset.recipient, '${u.activity === 'offline' ? 'offline' : 'online'}')">♟</button>`
                                     + `</span>`
                                     : '';
-                                  return `<div class="community-user-item"><span class="${dotCls}"></span><span class="${nameCls}">${label}</span>${actionsHtml}</div>`;
-                                }).join('');
-                                listEl.innerHTML = aiEntry + userItems;
+                                  return `<div class="community-user-item" title="${u.activity === 'offline' ? 'Offline' : u.activity === 'playing' ? 'Playing' : 'Online'}"><span class="${dotCls}"></span><span class="${nameCls}">${label}</span>${actionsHtml}</div>`;
+                                });
+                                const onlineCount = users.filter(u => u.activity !== 'offline').length;
+                                listEl.innerHTML = aiEntry
+                                  + '<div class="community-user-group">Online</div>'
+                                  + userItems.slice(0, onlineCount).join('')
+                                  + (onlineCount < users.length ? '<div class="community-user-group">Offline</div>' : '')
+                                  + userItems.slice(onlineCount).join('');
                                 const statusEl = document.getElementById('community-status-dot');
-                                if (statusEl) statusEl.textContent = users.length + ' online';
+                                if (statusEl) statusEl.textContent = onlineCount + ' online, ' + (users.length - onlineCount) + ' offline';
                               })
                               .catch(() => { });
                           }
@@ -2742,9 +2817,9 @@
                       </div>
                     </div>
                     <div class="community-layout">
-                      <!-- Online users sidebar -->
+                      <!-- Players sidebar -->
                       <div class="community-users-sidebar">
-                        <h4>Online</h4>
+                        <h4>Players</h4>
                         <div id="community-users-list">
                           <div class="comm-empty" style="padding:10px 8px;">—</div>
                         </div>
@@ -2770,6 +2845,16 @@
                               placeholder="Type a private message…"
                               onkeydown="if(event.key==='Enter') sendDm()">
                             <button class="community-send-btn" style="background:#9c27b0;" onclick="sendDm()">Send</button>
+                          </div>
+                        </div>
+                        <div id="game-invite-preview">
+                          <h4>Email invitation to <span id="invite-preview-recipient"></span></h4>
+                          <div><strong id="invite-preview-subject"></strong></div>
+                          <pre id="invite-preview-body"></pre>
+                          <div id="invite-preview-error" role="alert"></div>
+                          <div class="invite-preview-actions">
+                            <button id="invite-preview-cancel" type="button" onclick="closeGameInvitePreview()">Cancel</button>
+                            <button id="invite-preview-send" type="button" onclick="sendPreviewedGameInvite()" disabled>Send email</button>
                           </div>
                         </div>
                       </div>
