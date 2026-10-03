@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Email chess game</title>
+  <link rel="stylesheet" href="chessboard.css">
+  <style>
+    :root { color-scheme: light; font-family: Georgia, serif; color: #25382e; background: #e9eee9; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    header { background: #fff; border-bottom: 1px solid #c7d3c9; padding: 20px max(20px, calc((100% - 960px) / 2)); }
+    main { max-width: 960px; margin: auto; padding: 24px 20px; }
+    h1 { margin: 12px 0 0; font-size: 1.8rem; }
+    h2 { font-size: 1.2rem; }
+    p { line-height: 1.5; overflow-wrap: anywhere; }
+    a { color: #315d94; }
+    [hidden] { display: none !important; }
+    #login { max-width: 360px; }
+    label { display: block; margin: 14px 0 6px; }
+    input { width: 100%; padding: 12px; font: inherit; border: 1px solid #9aafa0; }
+    button { background: #3e714a; color: #fff; border: 0; padding: 12px 18px; font: bold 1rem Georgia, serif; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: default; }
+    #login button { margin-top: 16px; }
+    #feedback { min-height: 24px; color: #a22121; }
+    #game-layout { display: grid; grid-template-columns: minmax(0, 560px) minmax(180px, 1fr); gap: 28px; align-items: start; }
+    #board { width: 100%; aspect-ratio: 1; }
+    #players { font-weight: bold; }
+    #moves { padding-left: 28px; line-height: 1.7; }
+    #game-list { padding-left: 20px; line-height: 1.8; }
+    @media (max-width: 680px) { #game-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; } }
+  </style>
+</head>
+<body>
+  <header><a href="index.html">Chess home</a><h1>Email chess game</h1></header>
+  <main>
+    <form id="login" hidden>
+      <h2>Sign in</h2>
+      <label for="username">Username</label>
+      <input id="username" autocomplete="username" required>
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <button type="submit">Sign in</button>
+    </form>
+    <form id="magic-login" hidden>
+      <h2>Email sign-in link</h2>
+      <label for="email-address">Account email</label>
+      <input id="email-address" type="email" autocomplete="email" required>
+      <button type="submit">Send sign-in link</button>
+    </form>
+    <p id="feedback" role="status" aria-live="polite"></p>
+    <section id="game" hidden>
+      <p id="players"></p>
+      <p id="turn"></p>
+      <div id="game-layout">
+        <div id="board" aria-label="Saved chess position"></div>
+        <div>
+          <h2>Move history</h2>
+          <ol id="moves"></ol>
+          <button id="refresh" type="button">Refresh board</button>
+          <button id="remind" type="button" hidden>Remind on move</button>
+        </div>
+      </div>
+    </section>
+    <section id="games" hidden><h2>Your email games</h2><ul id="game-list"></ul></section>
+  </main>
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="chessboard.js"></script>
+  <script>
+    const gameId = new URLSearchParams(location.search).get('game_id');
+    const feedback = document.getElementById('feedback');
+    const login = document.getElementById('login');
+    const magicLogin = document.getElementById('magic-login');
+    let board = null;
+    let token = localStorage.getItem('authToken');
+
+    async function loadGame() {
+      feedback.textContent = '';
+      if (!token) {
+        login.hidden = false;
+        magicLogin.hidden = false;
+        return;
+      }
+      const refresh = document.getElementById('refresh');
+      refresh.disabled = true;
+      try {
+        const response = await fetch('/community/email-games' + (gameId ? '/' + encodeURIComponent(gameId) : '?limit=100'), {
+          headers: { Authorization: 'Bearer ' + token }, cache: 'no-store'
+        });
+        const data = await response.json();
+        if (response.status === 401) {
+          token = null;
+          localStorage.removeItem('authToken');
+          login.hidden = false;
+          magicLogin.hidden = false;
+          document.getElementById('game').hidden = true;
+          document.getElementById('games').hidden = true;
+          throw new Error('Please sign in to view your game.');
+        }
+        if (!response.ok || !data.success) throw new Error(data.detail || data.message || 'Unable to load game.');
+        login.hidden = true;
+        if (!gameId) {
+          const list = document.getElementById('game-list');
+          list.replaceChildren();
+          data.games.forEach(game => {
+            const item = document.createElement('li');
+            const link = document.createElement('a');
+            link.href = 'email-game.html?game_id=' + encodeURIComponent(game.id);
+            link.textContent = game.white_player + ' vs ' + game.black_player + ' (' + game.status + ')';
+            item.append(link);
+            list.append(item);
+          });
+          document.getElementById('games').hidden = false;
+          if (!data.games.length) feedback.textContent = 'No email games yet.';
+          return;
+        }
+        const game = data.game;
+        const myTurn = game.status === 'active' && game.current_player === data.username;
+        document.getElementById('players').textContent = 'White: ' + game.white_player + ' | Black: ' + game.black_player;
+        document.getElementById('turn').textContent = game.status === 'active'
+          ? (myTurn ? 'Your turn' : game.current_player + ' to move')
+          : 'Game ' + game.status;
+        document.getElementById('game').hidden = false;
+        if (typeof Chessboard !== 'function') throw new Error('The board could not load. Please refresh the page.');
+        const orientation = data.username === game.white_player ? 'white' : 'black';
+        if (board) board.destroy();
+        board = Chessboard('board', {
+          position: game.fen,
+          orientation,
+          draggable: myTurn,
+          pieceTheme: 'img/chesspieces/wikipedia/{piece}.png',
+          onDrop: function (source, target, piece) {
+            let move = source + target;
+            if (piece[1] === 'P' && (target[1] === '1' || target[1] === '8')) move += 'q';
+            submitMove(move, game.version);
+            return 'snapback';
+          }
+        });
+        const remind = document.getElementById('remind');
+        const canRemind = game.status === 'active' && !myTurn;
+        const reminderSentAt = game.last_reminder_at ? Date.parse(game.last_reminder_at) : 0;
+        const reminderCoolingDown = reminderSentAt && Date.now() - reminderSentAt < 24 * 60 * 60 * 1000;
+        remind.hidden = !canRemind;
+        remind.disabled = Boolean(reminderCoolingDown);
+        remind.textContent = reminderCoolingDown ? 'Reminder sent recently' : 'Remind on move';
+        const moves = document.getElementById('moves');
+        moves.replaceChildren();
+        for (let index = 0; index < game.move_history.length; index += 2) {
+          const item = document.createElement('li');
+          item.textContent = game.move_history.slice(index, index + 2).map(move => move.san).join(' ');
+          moves.append(item);
+        }
+      } catch (error) {
+        feedback.textContent = error.message || 'Unable to load game.';
+      } finally {
+        refresh.disabled = false;
+      }
+    }
+
+    async function submitMove(move, expectedVersion) {
+      feedback.textContent = '';
+      try {
+        const response = await fetch('/community/email-games/' + encodeURIComponent(gameId) + '/moves', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+          body: JSON.stringify({ move, expected_version: expectedVersion })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.detail || data.message || 'Move could not be submitted.');
+        await loadGame();
+      } catch (error) {
+        const message = error.message || 'Move could not be submitted.';
+        await loadGame();
+        feedback.textContent = message;
+      }
+    }
+
+    async function requestReminder() {
+      const button = document.getElementById('remind');
+      button.disabled = true;
+      feedback.textContent = '';
+      try {
+        const response = await fetch('/community/email-games/' + encodeURIComponent(gameId) + '/remind', {
+          method: 'POST', headers: { Authorization: 'Bearer ' + token }
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.detail || data.message || 'Reminder could not be sent.');
+        await loadGame();
+        feedback.textContent = data.message;
+      } catch (error) {
+        feedback.textContent = error.message || 'Reminder could not be sent.';
+        button.disabled = false;
+      }
+    }
+
+    login.addEventListener('submit', async event => {
+  magicLogin.hidden = true;
+      event.preventDefault();
+      const button = login.querySelector('button');
+      button.disabled = true;
+      feedback.textContent = '';
+      try {
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password');
+        const response = await fetch('/auth/login', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password: password.value })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success || !data.token) throw new Error(data.message || 'Sign-in failed.');
+        token = data.token;
+        localStorage.setItem('authToken', token);
+        localStorage.setItem('currentUser', data.username || username);
+        localStorage.setItem('isAdmin', data.is_admin ? 'true' : 'false');
+        password.value = '';
+        await loadGame();
+      } catch (error) {
+        feedback.textContent = error.message || 'Sign-in failed.';
+      } finally {
+        button.disabled = false;
+      }
+    });
+    magicLogin.addEventListener('submit', async event => {
+      event.preventDefault();
+      const button = magicLogin.querySelector('button');
+      button.disabled = true;
+      feedback.textContent = '';
+      try {
+        const response = await fetch('/auth/email-game-link', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: document.getElementById('email-address').value.trim() })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.message || 'Unable to request a sign-in link.');
+        feedback.textContent = data.message;
+      } catch (error) {
+        feedback.textContent = error.message || 'Unable to request a sign-in link.';
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    document.getElementById('refresh').addEventListener('click', loadGame);
+    document.getElementById('remind').addEventListener('click', requestReminder);
+    window.addEventListener('resize', () => { if (board) board.resize(); });
+    async function initialize() {
+      const params = new URLSearchParams(location.search);
+      const magicToken = params.get('magic_token');
+      if (magicToken) {
+        params.delete('magic_token');
+        history.replaceState(null, '', location.pathname + (params.toString() ? '?' + params.toString() : ''));
+        try {
+          const response = await fetch('/auth/email-game-link/consume', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: magicToken }), cache: 'no-store'
+          });
+          const data = await response.json();
+          if (!response.ok || !data.success || !data.token) throw new Error(data.detail || data.message || 'Sign-in link is invalid or expired.');
+          token = data.token;
+          localStorage.setItem('authToken', token);
+          localStorage.setItem('currentUser', data.username);
+          localStorage.setItem('isAdmin', 'false');
+        } catch (error) {
+          feedback.textContent = error.message || 'Sign-in link is invalid or expired.';
+        }
+      }
+      await loadGame();
+    }
+    initialize();
+  </script>
+</body>
+</html>

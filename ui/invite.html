@@ -22,6 +22,7 @@
     #move { width: 100%; padding: 12px; font: inherit; border: 1px solid #9aafa0; }
     button { width: 100%; border: 0; background: #3e714a; color: white; padding: 13px; font: bold 1rem Georgia, serif; cursor: pointer; }
     button:disabled { opacity: .5; cursor: default; }
+    button[value="decline"] { margin-top: 10px; background: #fff; color: #25382e; border: 1px solid #9aafa0; }
     #feedback { min-height: 24px; }
     .error { color: #a22121; }
     .success { color: #256531; }
@@ -35,15 +36,17 @@
       <fieldset>
         <legend>How would you like to begin?</legend>
         <label class="option"><input type="radio" name="choice" value="white" required> I play White and send my first move</label>
-        <label class="option"><input type="radio" name="choice" value="black"> You play White</label>
+        <label class="option"><input type="radio" name="choice" value="black" checked> You play White</label>
         <label class="option"><input type="radio" name="choice" value="random"> Select the first move at random</label>
       </fieldset>
       <div id="move-field">
         <label for="move">Your first move as White</label>
         <input id="move" name="first_move" placeholder="e4" maxlength="12" autocomplete="off">
       </div>
-      <button type="submit">Send response</button>
+      <button type="submit" name="decision" value="accept">Accept invitation</button>
+      <button type="submit" name="decision" value="decline" formnovalidate>Decline invitation</button>
     </form>
+    <a id="game-link" hidden>View game board</a>
     <p id="feedback" role="status" aria-live="polite"></p>
   </main>
   <script>
@@ -58,7 +61,7 @@
         .then(response => response.json())
         .then(data => {
           if (!data.success) throw new Error(data.message);
-          intro.textContent = data.sender + ' has invited you to play a friendly game of chess. Your response will be sent to them by email.';
+          intro.textContent = data.sender + ' has invited you to play a friendly game of chess.';
           form.hidden = false;
         })
         .catch(error => { intro.textContent = error.message || 'Unable to load this invitation.'; });
@@ -73,25 +76,31 @@
     });
     form.addEventListener('submit', async event => {
       event.preventDefault();
-      const button = form.querySelector('button');
-      button.disabled = true;
+      const decision = event.submitter ? event.submitter.value : 'accept';
+      const buttons = form.querySelectorAll('button');
+      buttons.forEach(button => { button.disabled = true; });
       feedback.textContent = '';
       try {
         const response = await fetch('/community/email-invite/respond', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, choice: form.elements.choice.value, first_move: move.value })
+          body: JSON.stringify({ token, decision, choice: form.elements.choice.value, first_move: decision === 'decline' ? '' : move.value })
         });
         const data = await response.json();
         if (!data.success) throw new Error(data.message);
         form.hidden = true;
-        intro.textContent = 'Your response has been sent.';
+        intro.textContent = data.status === 'declined' ? 'You declined this invitation.' : 'You accepted this invitation.';
         feedback.className = 'success';
-        feedback.textContent = data.first_move ? 'Your opening move: ' + data.first_move : '';
+        feedback.textContent = data.emailed === false ? 'Your decision is saved, but the email notification could not be delivered.' : 'The inviting player has been notified.';
+        if (data.game_id) {
+          const gameLink = document.getElementById('game-link');
+          gameLink.href = 'email-game.html?game_id=' + encodeURIComponent(data.game_id);
+          gameLink.hidden = false;
+        }
       } catch (error) {
         feedback.className = 'error';
         feedback.textContent = error.message || 'Could not send your response. Please try again.';
-        button.disabled = false;
+        buttons.forEach(button => { button.disabled = false; });
       }
     });
   </script>

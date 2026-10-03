@@ -63,6 +63,99 @@ The application is for people that are new to the game of chess and want to lear
 - **Mobile Interface**: A dedicated mobile-optimized chess interface (`/mobile.html`) designed for smartphones (Samsung Galaxy S23 and similar); supports touch drag-and-drop, tabbed layout (Game / Setup / History / Expert), JWT auth, and 3-slot local save system
 - **Docker Support**: Complete containerization with docker-compose
 
+## Email Games: First Milestone
+
+Offline-player invitations now offer Accept and Decline. Opening a link only
+previews the invitation; an explicit submission records the decision once.
+Declines are included in invitation statistics, not game losses or ratings.
+Accepting creates a persistent, read-only game with the selected colors and any
+opening move. The accepted invitation links to `email-game.html?game_id=<id>`.
+Players sign in normally to view their board, oriented for their color. Opening
+`email-game.html` without a game ID lists the signed-in player's email games.
+
+Records are stored in the existing auth-service SQLite database. The migration
+preserves older invitation responses as accepted but does not manufacture games
+for those historical responses. New games store position, move history, version,
+whose turn it is, turn-start time, last-move time, and last-reminder time.
+
+All read endpoints require a valid Bearer token and an existing account:
+
+- `GET /community/email-games`: participant-scoped games, invitations, and invitation statistics.
+- `GET /community/email-games/{id}`: board and history, restricted to the two players.
+- `GET /community/admin/email-games`: all games and invitations, restricted to database-confirmed admins.
+
+Listings support `status`, `limit` (1-100), and `offset`. Status filters are
+`pending`, `accepted`, `declined`, `expired`, `active`, and `completed`;
+invitation and game collections are paginated separately. Invitation statistics
+remain unfiltered. Pending invitations past their expiry are reported as expired.
+Admin game records include elapsed waiting time; invitation token hashes are never
+returned. The admin listing is an API only in this milestone, not a dashboard tab.
+
+Invitation decisions and games are committed before attempting response email.
+If delivery fails, the page reports that the decision is saved but notification
+failed.
+
+## Email Games: Second Milestone
+
+Accepted email games are playable by both participants. Moves are validated against
+the stored position, restricted to the player whose turn it is, and committed with
+the updated FEN, move history, turn, and version. Stale board versions and finished
+games are rejected. Checkmate, stalemate, and other terminal positions complete the
+game.
+
+After each non-final move, the next player receives a turn email with the move and
+a link to the game. Emails are stored in a SQLite outbox and retried after 1, 2, 4,
+and 8 minutes, for up to five delivery attempts. A persistent worker resumes pending
+delivery after an auth-service restart.
+
+Players can request a sign-in link from `email-game.html`. The response does not
+reveal whether an account exists; verified non-admin accounts receive a one-use
+link that expires after 30 minutes. Admin accounts continue to use the admin login.
+Participants can remind the opponent whose turn it is, at most once per game every
+24 hours. Reminder emails use the same outbox and retry behavior.
+
+The admin dashboard's **Email Games** tab lists games and invitations, supports
+status filtering and pagination, and shows current turn, waiting time, last move,
+and last reminder. It uses the existing admin-only listing API; invitation token
+hashes are never exposed.
+
+Move submission requires a Bearer token and an expected game version:
+
+```json
+{ "move": "e2e4", "expected_version": 0 }
+```
+
+`POST /community/email-games/{id}/moves` accepts SAN or UCI. It returns `409` if
+the game version is stale or the game has ended. `POST
+/community/email-games/{id}/remind` queues a reminder for the player to move and
+returns `429` during the 24-hour cooldown. Both endpoints require a game participant.
+
+Magic-link endpoints are `POST /auth/email-game-link` with `{ "email": "..." }`
+and `POST /auth/email-game-link/consume` with `{ "token": "..." }`. The consume
+endpoint returns a normal user JWT; magic links cannot authenticate administrators.
+
+For local Docker use, rebuild and restart only the auth service:
+
+```powershell
+docker compose up -d --build auth-service
+```
+
+The UI files are served from the existing live volume at http://localhost:8080.
+Focused automated checks use temporary databases and mocked email delivery:
+
+```powershell
+python -m pytest tests/test_email_invites.py -q
+```
+
+Manual verification: accept an offline invitation, sign in as both participants,
+and play alternating legal moves. Try an illegal move, a move out of turn, and a
+stale version; each must leave the game unchanged. Complete a checkmate and confirm
+further moves are rejected. Request a magic link, use it once, and confirm replay
+fails. Send a reminder from the player not to move, then confirm the cooldown and
+the corresponding outbox email. Open the admin dashboard's Email Games tab and
+check filtering, pagination, and waiting-time details. An unrelated account must
+not read or modify the game.
+
 ## Requirements
 
 ### User Interface Requirements

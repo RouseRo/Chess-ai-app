@@ -6,11 +6,13 @@ import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
+import httpx
 
 
 spec = importlib.util.spec_from_file_location("auth_main", os.path.join(os.path.dirname(__file__), "..", "auth-service", "main.py"))
 auth = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(auth)
+verify_token = auth.verify_jwt_token
 
 
 class EmailInviteTests(unittest.TestCase):
@@ -18,17 +20,26 @@ class EmailInviteTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         database = os.path.join(self.directory.name, "users.db")
+        connections = []
+
+        def close_connections():
+            for connection in connections:
+                connection.close()
+
+        self.addCleanup(close_connections)
 
         def connect():
             conn = sqlite3.connect(database)
             conn.row_factory = sqlite3.Row
+            connections.append(conn)
             return conn
 
         self.connect = connect
         with connect() as conn:
-            conn.execute("CREATE TABLE users (username TEXT, email TEXT, is_verified INTEGER, last_activity TEXT, current_activity TEXT)")
-            conn.executemany("INSERT INTO users VALUES (?, ?, 1, NULL, 'offline')", [
-                ("inviter", "inviter@example.com"), ("smtptest", "smtptest@example.com")
+            conn.execute("CREATE TABLE users (username TEXT, email TEXT, is_verified INTEGER, last_activity TEXT, current_activity TEXT, last_login TEXT, is_admin INTEGER DEFAULT 0)")
+            conn.executemany("INSERT INTO users (username, email, is_verified, last_activity, current_activity, is_admin) VALUES (?, ?, 1, NULL, 'offline', 0)", [
+                ("inviter", "inviter@example.com"), ("smtptest", "smtptest@example.com"),
+                ("outsider", "outsider@example.com")
             ])
         db_patch = patch.object(auth, "get_db", connect)
         token_patch = patch.object(auth, "verify_jwt_token", return_value={"username": "inviter"})
@@ -110,6 +121,363 @@ class EmailInviteTests(unittest.TestCase):
         self.assertFalse(asyncio.run(auth.get_email_invite(token))["success"])
         self.assertFalse(asyncio.run(auth.respond_to_email_invite(auth.EmailInviteResponse(token=token, choice="black")))["success"])
         self.mail.assert_called_once()
+
+    def test_acceptance_creates_one_persistent_game(self):
+        self.invite()
+        token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
+        response = auth.EmailInviteResponse(token=token, choice="white", first_move="e4")
+        result = asyncio.run(auth.respond_to_email_invite(response))
+        self.assertTrue(result["success"])
+        self.assertFalse(asyncio.run(auth.respond_to_email_invite(response))["success"])
+        with self.connect() as conn:
+            game = conn.execute("SELECT * FROM email_games").fetchone()
+            self.assertEqual(game["id"], result["game_id"])
+            self.assertEqual(game["white_player"], "smtptest")
+            self.assertEqual(game["current_player"], "inviter")
+            self.assertEqual(game["version"], 1)
+            board = auth.chess.Board()
+            board.push_san("e4")
+            self.assertEqual(game["fen"], board.fen())
+            self.assertEqual(conn.execute("SELECT count(*) FROM email_games").fetchone()[0], 1)
+            self.assertEqual(conn.execute("SELECT status FROM email_game_invites").fetchone()[0], "accepted")
+
+    def test_decline_is_recorded_without_game_even_if_email_fails(self):
+        self.invite()
+        token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
+        self.mail.side_effect = RuntimeError("SMTP unavailable")
+        response = auth.EmailInviteResponse(token=token, decision="decline")
+        result = asyncio.run(auth.respond_to_email_invite(response))
+        self.assertTrue(result["success"])
+        self.assertFalse(result["emailed"])
+        self.assertIsNone(result["game_id"])
+        self.assertFalse(asyncio.run(auth.respond_to_email_invite(response))["success"])
+        with self.connect() as conn:
+            self.assertEqual(conn.execute("SELECT count(*) FROM email_games").fetchone()[0], 0)
+            row = conn.execute("SELECT status, responded_at FROM email_game_invites").fetchone()
+            self.assertEqual(row["status"], "declined")
+            self.assertIsNotNone(row["responded_at"])
+
+    def test_reading_invitation_does_not_consume_it(self):
+        self.invite()
+        token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
+        for _ in range(2):
+            self.assertTrue(asyncio.run(auth.get_email_invite(token))["success"])
+        with self.connect() as conn:
+            self.assertEqual(conn.execute("SELECT status FROM email_game_invites").fetchone()[0], "pending")
+            self.assertEqual(conn.execute("SELECT count(*) FROM email_games").fetchone()[0], 0)
+
+    def test_game_access_checks_identity_and_membership(self):
+        self.invite()
+        token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
+        game_id = asyncio.run(auth.respond_to_email_invite(auth.EmailInviteResponse(token=token)))["game_id"]
+        for username in ("inviter", "smtptest"):
+            with patch.object(auth, "verify_jwt_token", return_value={"username": username}):
+                result = asyncio.run(auth.get_email_game(game_id, "Bearer test"))
+                self.assertEqual(result["game"]["fen"], auth.chess.STARTING_FEN)
+                self.assertEqual(result["game"]["current_player"], "inviter")
+        for username in ("outsider", "deleted"):
+            with patch.object(auth, "verify_jwt_token", return_value={"username": username}):
+                with self.assertRaises(auth.HTTPException) as error:
+                    asyncio.run(auth.get_email_game(game_id, "Bearer test"))
+                self.assertEqual(error.exception.status_code, 404 if username == "outsider" else 401)
+        for authorization in (None, "not-a-bearer"):
+            with self.assertRaises(auth.HTTPException) as error:
+                asyncio.run(auth.get_email_game(game_id, authorization))
+            self.assertEqual(error.exception.status_code, 401)
+        with patch.object(auth, "verify_jwt_token", return_value=None):
+            with self.assertRaises(auth.HTTPException) as error:
+                asyncio.run(auth.get_email_game(game_id, "Bearer expired"))
+            self.assertEqual(error.exception.status_code, 401)
+
+    def test_admin_listing_counts_declines_and_filters_games(self):
+        self.invite()
+        token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
+        asyncio.run(auth.respond_to_email_invite(auth.EmailInviteResponse(token=token, decision="decline")))
+        self.invite()
+        token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
+        asyncio.run(auth.respond_to_email_invite(auth.EmailInviteResponse(token=token)))
+        self.invite()
+        with self.assertRaises(auth.HTTPException) as error:
+            asyncio.run(auth.admin_email_games("Bearer test", None, 50, 0))
+        self.assertEqual(error.exception.status_code, 403)
+        with self.connect() as conn:
+            conn.execute("UPDATE users SET is_admin = 1 WHERE username = 'inviter'")
+        result = asyncio.run(auth.admin_email_games("Bearer test", None, 50, 0))
+        self.assertEqual(result["invitation_stats"], {"pending": 1, "accepted": 1, "declined": 1, "expired": 0, "sent": 3})
+        self.assertEqual(result["game_total"], 1)
+        self.assertNotIn("token_hash", result["invitations"][0])
+        self.assertGreaterEqual(result["games"][0]["waiting_seconds"], 0)
+        filtered = asyncio.run(auth.admin_email_games("Bearer test", "declined", 1, 0))
+        self.assertEqual(filtered["invitation_total"], 1)
+        self.assertEqual(filtered["games"], [])
+        self.assertEqual(filtered["invitations"][0]["status"], "declined")
+        paged = asyncio.run(auth.admin_email_games("Bearer test", None, 1, 1))
+        self.assertEqual(len(paged["invitations"]), 1)
+        self.assertEqual(paged["invitation_total"], 3)
+        with patch.object(auth, "verify_jwt_token", return_value={"username": "outsider"}):
+            private = asyncio.run(auth.list_email_games("Bearer test", None, 50, 0))
+        self.assertEqual(private["games"], [])
+        self.assertEqual(private["invitation_stats"]["sent"], 0)
+
+    def test_legacy_invitation_migration_and_expired_statistics(self):
+        with self.connect() as conn:
+            conn.execute("CREATE TABLE email_game_invites (id INTEGER PRIMARY KEY, sender TEXT, recipient TEXT, token_hash TEXT, created_at TEXT, expires_at TEXT, responded_at TEXT, recipient_color TEXT, first_move TEXT)")
+            now = datetime.now(timezone.utc).isoformat()
+            expired = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+            conn.execute("INSERT INTO email_game_invites VALUES (1, 'inviter', 'smtptest', 'hash', ?, ?, ?, 'black', NULL)", (now, expired, now))
+            conn.execute("INSERT INTO email_game_invites VALUES (2, 'inviter', 'smtptest', 'other', ?, ?, NULL, NULL, NULL)", (now, expired))
+            auth._init_community_tables(conn)
+            auth._init_community_tables(conn)
+        result = asyncio.run(auth.list_email_games("Bearer test", None, 50, 0))
+        self.assertEqual(result["invitation_stats"]["accepted"], 1)
+        self.assertEqual(result["invitation_stats"]["expired"], 1)
+        self.assertEqual(result["invitation_stats"]["pending"], 0)
+
+    def test_http_access_with_signed_tokens_and_pagination_validation(self):
+        self.invite()
+        token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
+
+        async def exercise_routes():
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=auth.app), base_url="http://testserver") as client:
+                response = await client.post("/community/email-invite/respond", json={"token": token, "choice": "black"})
+                self.assertTrue(response.json()["success"])
+                game_id = response.json()["game_id"]
+                path = f"/community/email-games/{game_id}"
+                self.assertEqual((await client.get(path)).status_code, 401)
+                self.assertEqual((await client.get(path, headers={"Authorization": "Bearer invalid"})).status_code, 401)
+                headers = {"Authorization": "Bearer " + auth.create_token("smtptest", False)}
+                self.assertEqual((await client.get(path, headers=headers)).json()["game"]["black_player"], "smtptest")
+                self.assertEqual((await client.get("/community/email-games?limit=0", headers=headers)).status_code, 422)
+                self.assertEqual((await client.get("/community/email-games?offset=-1", headers=headers)).status_code, 422)
+                self.assertEqual((await client.get("/community/email-games?status=unknown", headers=headers)).status_code, 400)
+                forged_role = {"Authorization": "Bearer " + auth.create_token("outsider", True)}
+                self.assertEqual((await client.get(path, headers=forged_role)).status_code, 404)
+                self.assertEqual((await client.get("/community/admin/email-games", headers=forged_role)).status_code, 403)
+                with self.connect() as conn:
+                    conn.execute("UPDATE users SET is_admin = 1 WHERE username = 'inviter'")
+                admin_headers = {"Authorization": "Bearer " + auth.create_token("inviter", True)}
+                listing = await client.get("/community/admin/email-games?status=active", headers=admin_headers)
+                self.assertEqual(listing.status_code, 200)
+                self.assertEqual(listing.json()["game_total"], 1)
+
+        with patch.object(auth, "verify_jwt_token", wraps=verify_token):
+            asyncio.run(exercise_routes())
+
+    def test_http_milestone_move_reminder_and_magic_link_routes(self):
+        self.invite()
+        invite_token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
+        game_id = asyncio.run(auth.respond_to_email_invite(
+            auth.EmailInviteResponse(token=invite_token)
+        ))["game_id"]
+
+        async def exercise_routes():
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=auth.app), base_url="http://testserver") as client:
+                inviter_headers = {"Authorization": "Bearer " + auth.create_token("inviter", False)}
+                opponent_headers = {"Authorization": "Bearer " + auth.create_token("smtptest", False)}
+                move_url = f"/community/email-games/{game_id}/moves"
+                moved = await client.post(move_url, headers=inviter_headers,
+                                          json={"move": "e2e4", "expected_version": 0})
+                self.assertEqual(moved.status_code, 200)
+                self.assertEqual(moved.json()["game"]["version"], 1)
+                stale = await client.post(move_url, headers=opponent_headers,
+                                          json={"move": "e2e4", "expected_version": 0})
+                self.assertEqual(stale.status_code, 409)
+
+                reminder_url = f"/community/email-games/{game_id}/remind"
+                reminder = await client.post(reminder_url, headers=inviter_headers)
+                self.assertEqual(reminder.status_code, 200)
+                throttled = await client.post(reminder_url, headers=inviter_headers)
+                self.assertEqual(throttled.status_code, 429)
+
+                request_link = await client.post("/auth/email-game-link", json={"email": "smtptest@example.com"})
+                self.assertEqual(request_link.status_code, 200)
+                with self.connect() as conn:
+                    body = conn.execute(
+                        "SELECT body FROM email_outbox WHERE subject = 'Your Chess AI sign-in link'"
+                    ).fetchone()[0]
+                magic_token = body.split("magic_token=", 1)[1].splitlines()[0]
+                consumed = await client.post("/auth/email-game-link/consume", json={"token": magic_token})
+                self.assertEqual(consumed.status_code, 200)
+                magic_headers = {"Authorization": "Bearer " + consumed.json()["token"]}
+                game = await client.get(f"/community/email-games/{game_id}", headers=magic_headers)
+                self.assertEqual(game.status_code, 200)
+                self.assertEqual(game.json()["game"]["current_player"], "smtptest")
+
+        with patch.object(auth, "verify_jwt_token", wraps=verify_token):
+            asyncio.run(exercise_routes())
+
+    def test_acceptance_survives_notification_failure(self):
+        self.invite()
+        token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
+        self.mail.side_effect = RuntimeError("SMTP unavailable")
+        result = asyncio.run(auth.respond_to_email_invite(auth.EmailInviteResponse(token=token)))
+        self.assertTrue(result["success"])
+        self.assertFalse(result["emailed"])
+        game = asyncio.run(auth.get_email_game(result["game_id"], "Bearer test"))["game"]
+        self.assertEqual(game["current_player"], "inviter")
+        self.assertEqual(game["move_history"], [])
+
+    def test_legal_move_persists_and_advances_turn(self):
+        self.invite()
+        token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
+        game_id = asyncio.run(auth.respond_to_email_invite(auth.EmailInviteResponse(token=token)))['game_id']
+
+        result = asyncio.run(auth.submit_email_game_move(
+            game_id, auth.EmailGameMoveRequest(move="e2e4", expected_version=0), "Bearer test"
+        ))
+
+        board = auth.chess.Board()
+        board.push_san("e4")
+        self.assertEqual(result["move"], {"uci": "e2e4", "san": "e4"})
+        self.assertEqual(result["game"]["fen"], board.fen())
+        self.assertEqual(result["game"]["move_history"], [{"uci": "e2e4", "san": "e4"}])
+        self.assertEqual(result["game"]["current_player"], "smtptest")
+        self.assertEqual(result["game"]["version"], 1)
+        with self.connect() as conn:
+            notice = conn.execute("SELECT recipient, subject, body, status FROM email_outbox").fetchone()
+            self.assertEqual(notice["recipient"], "smtptest@example.com")
+            self.assertIn("Your turn", notice["subject"])
+            self.assertIn("played e4", notice["body"])
+            self.assertEqual(notice["status"], "pending")
+
+    def test_turn_email_retries_and_records_delivery(self):
+        self.invite()
+        token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
+        game_id = asyncio.run(auth.respond_to_email_invite(auth.EmailInviteResponse(token=token)))['game_id']
+        asyncio.run(auth.submit_email_game_move(
+            game_id, auth.EmailGameMoveRequest(move="e4", expected_version=0), "Bearer test"
+        ))
+        self.mail.side_effect = [RuntimeError("SMTP unavailable"), None]
+
+        self.assertTrue(auth._process_email_outbox_once())
+        with self.connect() as conn:
+            failed_attempt = conn.execute("SELECT status, attempts FROM email_outbox").fetchone()
+            self.assertEqual(tuple(failed_attempt), ("pending", 1))
+            conn.execute("UPDATE email_outbox SET next_attempt_at = ?", ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(),))
+
+        self.assertTrue(auth._process_email_outbox_once())
+        with self.connect() as conn:
+            delivered = conn.execute("SELECT status, attempts, sent_at FROM email_outbox").fetchone()
+            self.assertEqual(delivered["status"], "sent")
+            self.assertEqual(delivered["attempts"], 2)
+            self.assertIsNotNone(delivered["sent_at"])
+
+    def test_outbox_stops_after_five_attempts_and_clears_failed_body(self):
+        now = datetime.now(timezone.utc).isoformat()
+        with self.connect() as conn:
+            auth._init_community_tables(conn)
+            auth._queue_email(conn, "smtptest@example.com", "Test", "one-time-link", now)
+            conn.commit()
+        self.mail.side_effect = RuntimeError("SMTP unavailable")
+
+        for _ in range(5):
+            self.assertTrue(auth._process_email_outbox_once())
+            with self.connect() as conn:
+                conn.execute("UPDATE email_outbox SET next_attempt_at = ? WHERE status = 'pending'",
+                             ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(),))
+
+        with self.connect() as conn:
+            failed = conn.execute("SELECT status, attempts, body FROM email_outbox").fetchone()
+            self.assertEqual(failed["status"], "failed")
+            self.assertEqual(failed["attempts"], 5)
+            self.assertEqual(failed["body"], "")
+
+    def test_magic_link_is_generic_expiring_and_single_use(self):
+        response = asyncio.run(auth.request_email_game_link(auth.EmailGameLinkRequest(email="smtptest@example.com")))
+        self.assertTrue(response["success"])
+        self.assertIn("If that verified account", response["message"])
+        with self.connect() as conn:
+            queued = conn.execute("SELECT recipient, body FROM email_outbox").fetchone()
+            self.assertEqual(queued["recipient"], "smtptest@example.com")
+            token = queued["body"].split("magic_token=", 1)[1].splitlines()[0]
+            expiry = conn.execute("SELECT expires_at FROM email_game_magic_links").fetchone()[0]
+            self.assertGreater(datetime.fromisoformat(expiry) - datetime.now(timezone.utc), timedelta(minutes=29))
+
+        result = asyncio.run(auth.consume_email_game_link(auth.EmailGameLinkConsumeRequest(token=token)))
+        self.assertEqual(result["username"], "smtptest")
+        self.assertFalse(result["is_admin"])
+        self.assertEqual(verify_token(result["token"])["username"], "smtptest")
+        with self.assertRaises(auth.HTTPException) as error:
+            asyncio.run(auth.consume_email_game_link(auth.EmailGameLinkConsumeRequest(token=token)))
+        self.assertEqual(error.exception.status_code, 400)
+
+    def test_magic_link_requests_do_not_enumerate_or_queue_admin(self):
+        with self.connect() as conn:
+            conn.execute("UPDATE users SET is_admin = 1 WHERE username = 'inviter'")
+        unknown = asyncio.run(auth.request_email_game_link(auth.EmailGameLinkRequest(email="missing@example.com")))
+        admin = asyncio.run(auth.request_email_game_link(auth.EmailGameLinkRequest(email="inviter@example.com")))
+        self.assertEqual(unknown["message"], admin["message"])
+        with self.connect() as conn:
+            self.assertEqual(conn.execute("SELECT count(*) FROM email_outbox").fetchone()[0], 0)
+
+    def test_turn_reminder_requires_other_player_and_has_cooldown(self):
+        self.invite()
+        token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
+        game_id = asyncio.run(auth.respond_to_email_invite(auth.EmailInviteResponse(token=token)))['game_id']
+        with patch.object(auth, "verify_jwt_token", return_value={"username": "smtptest"}):
+            result = asyncio.run(auth.remind_email_game_player(game_id, "Bearer test"))
+            self.assertTrue(result["success"])
+            with self.assertRaises(auth.HTTPException) as error:
+                asyncio.run(auth.remind_email_game_player(game_id, "Bearer test"))
+        self.assertEqual(error.exception.status_code, 429)
+        with self.connect() as conn:
+            notice = conn.execute("SELECT recipient, subject FROM email_outbox").fetchone()
+            self.assertEqual(notice["recipient"], "inviter@example.com")
+            self.assertIn("Reminder", notice["subject"])
+            self.assertIsNotNone(conn.execute("SELECT last_reminder_at FROM email_games").fetchone()[0])
+
+        with patch.object(auth, "verify_jwt_token", return_value={"username": "inviter"}):
+            with self.assertRaises(auth.HTTPException) as error:
+                asyncio.run(auth.remind_email_game_player(game_id, "Bearer test"))
+        self.assertEqual(error.exception.status_code, 409)
+
+    def test_move_rejects_illegal_out_of_turn_and_stale_requests(self):
+        self.invite()
+        token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
+        game_id = asyncio.run(auth.respond_to_email_invite(auth.EmailInviteResponse(token=token)))['game_id']
+
+        with self.assertRaises(auth.HTTPException) as error:
+            asyncio.run(auth.submit_email_game_move(
+                game_id, auth.EmailGameMoveRequest(move="e7e5", expected_version=0), "Bearer test"
+            ))
+        self.assertEqual(error.exception.status_code, 400)
+
+        asyncio.run(auth.submit_email_game_move(
+            game_id, auth.EmailGameMoveRequest(move="e4", expected_version=0), "Bearer test"
+        ))
+        with self.assertRaises(auth.HTTPException) as error:
+            asyncio.run(auth.submit_email_game_move(
+                game_id, auth.EmailGameMoveRequest(move="e5", expected_version=1), "Bearer test"
+            ))
+        self.assertEqual(error.exception.status_code, 403)
+
+        with patch.object(auth, "verify_jwt_token", return_value={"username": "smtptest"}):
+            with self.assertRaises(auth.HTTPException) as error:
+                asyncio.run(auth.submit_email_game_move(
+                    game_id, auth.EmailGameMoveRequest(move="e7e5", expected_version=0), "Bearer test"
+                ))
+        self.assertEqual(error.exception.status_code, 409)
+
+    def test_checkmate_completes_email_game(self):
+        self.invite()
+        token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
+        game_id = asyncio.run(auth.respond_to_email_invite(auth.EmailInviteResponse(token=token)))['game_id']
+        sequence = [
+            ("inviter", "f3"), ("smtptest", "e5"), ("inviter", "g4"), ("smtptest", "Qh4#")
+        ]
+        result = None
+        for version, (username, move) in enumerate(sequence):
+            with patch.object(auth, "verify_jwt_token", return_value={"username": username}):
+                result = asyncio.run(auth.submit_email_game_move(
+                    game_id, auth.EmailGameMoveRequest(move=move, expected_version=version), "Bearer test"
+                ))
+        self.assertEqual(result["game"]["status"], "completed")
+        with patch.object(auth, "verify_jwt_token", return_value={"username": "smtptest"}):
+            with self.assertRaises(auth.HTTPException) as error:
+                asyncio.run(auth.submit_email_game_move(
+                    game_id, auth.EmailGameMoveRequest(move="e7e6", expected_version=4), "Bearer test"
+                ))
+        self.assertEqual(error.exception.status_code, 409)
 
 
 if __name__ == "__main__":

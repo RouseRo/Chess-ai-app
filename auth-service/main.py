@@ -3,10 +3,11 @@ Authentication Service for Chess AI App.
 Uses SQLite database for user storage.
 """
 
-from fastapi import FastAPI, Header
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+import asyncio
 import sqlite3
 import os
 import secrets
@@ -23,6 +24,7 @@ from collections import defaultdict
 from threading import Lock
 
 app = FastAPI(title="Chess Auth Service", version="1.0.0")
+_email_worker_task: Optional[asyncio.Task] = None
 
 # CORS middleware
 app.add_middleware(
@@ -320,17 +322,30 @@ async def admin_login(request: LoginRequest):
 # Startup
 @app.on_event("startup")
 async def startup():
+    global _email_worker_task
     print(f"[AUTH] Database path: {DATABASE_PATH}")
     init_db()
     print(f"[AUTH] Service started")
     
     # List users
     conn = get_db()
+    _init_community_tables(conn)
     cursor = conn.cursor()
     cursor.execute("SELECT username, is_admin, is_verified FROM users")
     users = cursor.fetchall()
     print(f"[AUTH] Users in database: {[dict(u) for u in users]}")
     conn.close()
+    _email_worker_task = asyncio.create_task(_email_outbox_worker())
+
+
+@app.on_event("shutdown")
+async def shutdown_email_worker():
+    if _email_worker_task:
+        _email_worker_task.cancel()
+        try:
+            await _email_worker_task
+        except asyncio.CancelledError:
+            pass
 
 
 # Endpoints
@@ -663,6 +678,54 @@ def _init_community_tables(conn: sqlite3.Connection):
             first_move TEXT
         )
     ''')
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(email_game_invites)")}
+    if "status" not in columns:
+        conn.execute("ALTER TABLE email_game_invites ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'")
+        conn.execute("UPDATE email_game_invites SET status = 'accepted' WHERE responded_at IS NOT NULL")
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS email_games (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            invitation_id INTEGER NOT NULL UNIQUE REFERENCES email_game_invites(id),
+            white_player TEXT NOT NULL,
+            black_player TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'active',
+            fen TEXT NOT NULL,
+            move_history TEXT NOT NULL DEFAULT '[]',
+            version INTEGER NOT NULL DEFAULT 0,
+            current_player TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            turn_started_at TEXT NOT NULL,
+            last_move_at TEXT,
+            last_reminder_at TEXT
+        )
+    ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS email_outbox (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            recipient TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            body TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            attempts INTEGER NOT NULL DEFAULT 0,
+            next_attempt_at TEXT NOT NULL,
+            claimed_until TEXT,
+            last_error TEXT,
+            created_at TEXT NOT NULL,
+            sent_at TEXT
+        )
+    ''')
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_email_outbox_due ON email_outbox(status, next_attempt_at)")
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS email_game_magic_links (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            token_hash TEXT UNIQUE NOT NULL,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            used_at TEXT
+        )
+    ''')
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_email_magic_username ON email_game_magic_links(username, created_at)")
     conn.commit()
 
 
@@ -855,8 +918,22 @@ class GameInviteRequest(BaseModel):
 
 class EmailInviteResponse(BaseModel):
     token: str
-    choice: str
+    choice: str = "black"
     first_move: str = ""
+    decision: str = "accept"
+
+
+class EmailGameMoveRequest(BaseModel):
+    move: str
+    expected_version: int
+
+
+class EmailGameLinkRequest(BaseModel):
+    email: str
+
+
+class EmailGameLinkConsumeRequest(BaseModel):
+    token: str
 
 
 def _send_invite_email(address: str, subject: str, body: str) -> None:
@@ -873,8 +950,85 @@ def _send_invite_email(address: str, subject: str, body: str) -> None:
         server.sendmail(SMTP_FROM_EMAIL, address, message.as_string())
 
 
+def _queue_email(conn: sqlite3.Connection, address: str, subject: str, body: str, now: str) -> None:
+    conn.execute(
+        "INSERT INTO email_outbox (recipient, subject, body, next_attempt_at, created_at) VALUES (?, ?, ?, ?, ?)",
+        (address, subject, body, now, now)
+    )
+
+
+def _process_email_outbox_once() -> bool:
+    now = datetime.now(timezone.utc)
+    now_text = now.isoformat()
+    conn = get_db()
+    try:
+        _init_community_tables(conn)
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            "SELECT * FROM email_outbox WHERE "
+            "(status = 'pending' AND next_attempt_at <= ?) OR "
+            "(status = 'processing' AND claimed_until <= ?) ORDER BY id LIMIT 1",
+            (now_text, now_text)
+        ).fetchone()
+        if not row:
+            conn.rollback()
+            return False
+        attempts = row["attempts"] + 1
+        conn.execute(
+            "UPDATE email_outbox SET status = 'processing', attempts = ?, claimed_until = ? WHERE id = ?",
+            (attempts, (now + timedelta(minutes=2)).isoformat(), row["id"])
+        )
+        conn.commit()
+        message = dict(row)
+        message["attempts"] = attempts
+    finally:
+        conn.close()
+
+    try:
+        _send_invite_email(message["recipient"], message["subject"], message["body"])
+    except Exception as exc:
+        final_attempt = message["attempts"] >= 5
+        retry_at = (now + timedelta(seconds=min(60 * (2 ** (message["attempts"] - 1)), 3600))).isoformat()
+        conn = get_db()
+        try:
+            conn.execute(
+                "UPDATE email_outbox SET status = ?, body = CASE WHEN ? = 'failed' THEN '' ELSE body END, "
+                "next_attempt_at = ?, claimed_until = NULL, last_error = ? WHERE id = ?",
+                ("failed" if final_attempt else "pending", "failed" if final_attempt else "pending",
+                 retry_at, str(exc)[:500], message["id"])
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        print(f"[EMAIL] Delivery attempt {message['attempts']} failed for outbox item {message['id']}: {exc}")
+        return True
+
+    conn = get_db()
+    try:
+        conn.execute(
+            "UPDATE email_outbox SET status = 'sent', body = '', sent_at = ?, claimed_until = NULL, last_error = NULL WHERE id = ?",
+            (datetime.now(timezone.utc).isoformat(), message["id"])
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return True
+
+
+async def _email_outbox_worker() -> None:
+    loop = asyncio.get_running_loop()
+    while True:
+        try:
+            while await loop.run_in_executor(None, _process_email_outbox_once):
+                pass
+        except Exception as exc:
+            print(f"[EMAIL] Outbox worker failed: {exc}")
+        await asyncio.sleep(5)
+
+
 def _game_invite_email(sender: str, link: str) -> str:
     return (f"{sender} invites you to play a friendly game of chess.\n\n"
+            "You can accept or decline this invitation.\n\n"
             "Would you like to play White and send your first move, play Black, or let the first move be selected at random?\n\n"
             f"Respond here within 30 days: {link}\n")
 
@@ -1049,11 +1203,15 @@ async def get_email_invite(token: str):
 
 @app.post("/community/email-invite/respond")
 async def respond_to_email_invite(request: EmailInviteResponse):
-    if request.choice not in ("white", "black", "random"):
+    if request.decision not in ("accept", "decline"):
+        return {"success": False, "message": "Choose Accept or Decline."}
+    if request.decision == "accept" and request.choice not in ("white", "black", "random"):
         return {"success": False, "message": "Choose White, Black, or random."}
     if len(request.first_move) > 12:
         return {"success": False, "message": "First move is too long."}
-    if request.choice == "white":
+    if request.decision == "decline":
+        color, first_move, reply = None, None, "I declined your game invitation."
+    elif request.choice == "white":
         try:
             first_move = _opening_move(request.first_move.strip())
         except ValueError as exc:
@@ -1085,24 +1243,331 @@ async def respond_to_email_invite(request: EmailInviteResponse):
         conn.rollback()
         conn.close()
         return {"success": False, "message": "Inviting player no longer exists."}
-    try:
-        _send_invite_email(inviter["email"], f"Chess invitation response from {invite['recipient']}",
-                           f"{invite['recipient']} accepted your friendly chess invitation.\n\n{reply}\n")
-    except (RuntimeError, smtplib.SMTPException, OSError):
-        conn.rollback()
-        conn.close()
-        return {"success": False, "message": "Could not email the inviting player. Please try again."}
     now = datetime.now(timezone.utc).isoformat()
-    conn.execute("UPDATE email_game_invites SET responded_at = ?, recipient_color = ?, first_move = ? WHERE id = ?",
-                 (now, color, first_move, invite["id"]))
+    status = "declined" if request.decision == "decline" else "accepted"
+    conn.execute("UPDATE email_game_invites SET responded_at = ?, recipient_color = ?, first_move = ?, status = ? WHERE id = ?",
+                 (now, color, first_move, status, invite["id"]))
+    game_id = None
+    if status == "accepted":
+        white_player = invite["recipient"] if color == "white" else invite["sender"]
+        black_player = invite["sender"] if color == "white" else invite["recipient"]
+        board = chess.Board()
+        history = []
+        if first_move:
+            opening = board.parse_san(first_move)
+            history.append({"uci": opening.uci(), "san": first_move})
+            board.push(opening)
+        cursor = conn.execute(
+            "INSERT INTO email_games (invitation_id, white_player, black_player, fen, move_history, version, "
+            "current_player, created_at, turn_started_at, last_move_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (invite["id"], white_player, black_player, board.fen(), _json_module.dumps(history), len(history),
+             white_player if board.turn == chess.WHITE else black_player, now, now, now if history else None)
+        )
+        game_id = cursor.lastrowid
     conn.execute(
         "INSERT INTO community_messages (sender, content, message_type, target_users, created_at) VALUES (?, ?, 'dm', ?, ?)",
-        (invite["recipient"], f"I accepted your game invitation! {reply}",
+        (invite["recipient"], f"Invitation {status}. {reply}",
          _json_module.dumps([invite["sender"], invite["recipient"]]), now)
     )
     conn.commit()
     conn.close()
-    return {"success": True, "message": "Your response has been sent.", "color": color, "first_move": first_move}
+    game_link = f"{APP_BASE_URL.rstrip('/')}/email-game.html?game_id={game_id}" if game_id else None
+    body = f"{invite['recipient']} {status} your friendly chess invitation.\n\n{reply}\n"
+    if game_link:
+        body += f"\nView the board (sign-in required): {game_link}\n"
+    emailed = True
+    try:
+        _send_invite_email(inviter["email"], f"Chess invitation response from {invite['recipient']}", body)
+    except (RuntimeError, smtplib.SMTPException, OSError):
+        emailed = False
+    return {"success": True, "message": "Your decision has been recorded.", "status": status,
+            "color": color, "first_move": first_move, "game_id": game_id, "emailed": emailed}
+
+
+def _email_game_user(authorization: Optional[str]) -> dict:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Sign-in required.")
+    payload = verify_jwt_token(authorization[7:])
+    if not payload or not payload.get("username"):
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+    conn = get_db()
+    try:
+        user = conn.execute("SELECT username, is_admin FROM users WHERE username = ?", (payload["username"],)).fetchone()
+        if not user:
+            raise HTTPException(status_code=401, detail="Account no longer exists.")
+        return dict(user)
+    finally:
+        conn.close()
+
+
+def _email_game_record(row: sqlite3.Row) -> dict:
+    game = dict(row)
+    game["move_history"] = _json_module.loads(game["move_history"])
+    game["waiting_seconds"] = max(0, int((datetime.now(timezone.utc) - datetime.fromisoformat(game["turn_started_at"])).total_seconds())) if game["status"] == "active" else 0
+    return game
+
+
+def _email_game_listing(username: Optional[str], status: Optional[str], limit: int, offset: int) -> dict:
+    if status and status not in ("pending", "accepted", "declined", "expired", "active", "completed"):
+        raise HTTPException(status_code=400, detail="Unknown status filter.")
+    conn = get_db()
+    try:
+        _init_community_tables(conn)
+        invite_scope = " WHERE sender = ? OR recipient = ?" if username else ""
+        game_scope = " WHERE white_player = ? OR black_player = ?" if username else ""
+        scope_values = [username, username] if username else []
+        now = datetime.now(timezone.utc).isoformat()
+        invite_query = (
+            "SELECT id, sender, recipient, created_at, expires_at, responded_at, recipient_color, first_move, "
+            "CASE WHEN status = 'pending' AND expires_at < ? THEN 'expired' ELSE status END AS status "
+            "FROM email_game_invites" + invite_scope
+        )
+        stats = {state: 0 for state in ("pending", "accepted", "declined", "expired")}
+        for row in conn.execute("SELECT status, count(*) AS total FROM (" + invite_query + ") GROUP BY status", [now, *scope_values]):
+            stats[row["status"]] = row["total"]
+        stats["sent"] = sum(stats.values())
+        invite_filter = " WHERE status = ?" if status else ""
+        filter_values = [status] if status else []
+        invite_rows = conn.execute(
+            "SELECT * FROM (" + invite_query + ")" + invite_filter + " ORDER BY id DESC LIMIT ? OFFSET ?",
+            [now, *scope_values, *filter_values, limit, offset]
+        ).fetchall()
+        game_query = "SELECT * FROM email_games" + game_scope
+        game_filter = " WHERE status = ?" if status else ""
+        game_total = conn.execute("SELECT count(*) FROM (" + game_query + ")" + game_filter, [*scope_values, *filter_values]).fetchone()[0]
+        game_rows = conn.execute(
+            "SELECT * FROM (" + game_query + ")" + game_filter + " ORDER BY id DESC LIMIT ? OFFSET ?",
+            [*scope_values, *filter_values, limit, offset]
+        ).fetchall()
+        invite_total = conn.execute("SELECT count(*) FROM (" + invite_query + ")" + invite_filter, [now, *scope_values, *filter_values]).fetchone()[0]
+        return {"success": True, "invitations": [dict(row) for row in invite_rows],
+                "games": [_email_game_record(row) for row in game_rows], "invitation_stats": stats,
+                "invitation_total": invite_total, "game_total": game_total, "limit": limit, "offset": offset}
+    finally:
+        conn.close()
+
+
+@app.get("/community/email-games")
+async def list_email_games(authorization: Optional[str] = Header(None), status: Optional[str] = None,
+                           limit: int = Query(50, ge=1, le=100), offset: int = Query(0, ge=0)):
+    user = _email_game_user(authorization)
+    return _email_game_listing(user["username"], status, limit, offset)
+
+
+@app.get("/community/admin/email-games")
+async def admin_email_games(authorization: Optional[str] = Header(None), status: Optional[str] = None,
+                           limit: int = Query(50, ge=1, le=100), offset: int = Query(0, ge=0)):
+    user = _email_game_user(authorization)
+    if not user["is_admin"]:
+        raise HTTPException(status_code=403, detail="Administrator access required.")
+    return _email_game_listing(None, status, limit, offset)
+
+
+@app.get("/community/email-games/{game_id}")
+async def get_email_game(game_id: int, authorization: Optional[str] = Header(None)):
+    user = _email_game_user(authorization)
+    conn = get_db()
+    try:
+        _init_community_tables(conn)
+        row = conn.execute("SELECT * FROM email_games WHERE id = ? AND (white_player = ? OR black_player = ?)",
+                           (game_id, user["username"], user["username"])).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Game not found.")
+        return {"success": True, "game": _email_game_record(row), "username": user["username"]}
+    finally:
+        conn.close()
+
+
+@app.post("/auth/email-game-link")
+async def request_email_game_link(request: EmailGameLinkRequest):
+    message = "If that verified account can sign in by email, a sign-in link will be sent."
+    address = request.email.strip()
+    if not address or len(address) > 254:
+        return {"success": True, "message": message}
+
+    conn = get_db()
+    try:
+        _init_community_tables(conn)
+        conn.execute("BEGIN IMMEDIATE")
+        user = conn.execute(
+            "SELECT username, email FROM users WHERE LOWER(email) = LOWER(?) AND is_verified = 1 AND is_admin = 0",
+            (address,)
+        ).fetchone()
+        now = datetime.now(timezone.utc)
+        if user:
+            recent = conn.execute(
+                "SELECT 1 FROM email_game_magic_links WHERE username = ? AND created_at > ? LIMIT 1",
+                (user["username"], (now - timedelta(seconds=60)).isoformat())
+            ).fetchone()
+            if not recent:
+                token = secrets.token_urlsafe(32)
+                conn.execute(
+                    "INSERT INTO email_game_magic_links (username, token_hash, created_at, expires_at) VALUES (?, ?, ?, ?)",
+                    (user["username"], hashlib.sha256(token.encode()).hexdigest(), now.isoformat(),
+                     (now + timedelta(minutes=30)).isoformat())
+                )
+                link = f"{APP_BASE_URL.rstrip('/')}/email-game.html?magic_token={token}"
+                _queue_email(
+                    conn, user["email"], "Your Chess AI sign-in link",
+                    f"Use this link to sign in to your email games. It expires in 30 minutes and can be used once.\n\n{link}\n",
+                    now.isoformat()
+                )
+        conn.commit()
+    finally:
+        conn.close()
+    return {"success": True, "message": message}
+
+
+@app.post("/auth/email-game-link/consume")
+async def consume_email_game_link(request: EmailGameLinkConsumeRequest):
+    if not request.token or len(request.token) > 256:
+        raise HTTPException(status_code=400, detail="This sign-in link is invalid or expired.")
+    now = datetime.now(timezone.utc)
+    token_hash = hashlib.sha256(request.token.encode()).hexdigest()
+    conn = get_db()
+    try:
+        _init_community_tables(conn)
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            "SELECT l.username, u.email FROM email_game_magic_links l "
+            "JOIN users u ON u.username = l.username "
+            "WHERE l.token_hash = ? AND l.used_at IS NULL AND l.expires_at > ? "
+            "AND u.is_verified = 1 AND u.is_admin = 0",
+            (token_hash, now.isoformat())
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=400, detail="This sign-in link is invalid or expired.")
+        updated = conn.execute(
+            "UPDATE email_game_magic_links SET used_at = ? WHERE token_hash = ? AND used_at IS NULL",
+            (now.isoformat(), token_hash)
+        )
+        if updated.rowcount != 1:
+            raise HTTPException(status_code=400, detail="This sign-in link is invalid or expired.")
+        conn.execute(
+            "UPDATE users SET last_login = ?, last_activity = ?, current_activity = 'online' WHERE username = ?",
+            (now.isoformat(), now.isoformat(), row["username"])
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    return {"success": True, "token": create_token(row["username"], False, row["email"]),
+            "username": row["username"], "is_admin": False}
+
+
+@app.post("/community/email-games/{game_id}/moves")
+async def submit_email_game_move(game_id: int, request: EmailGameMoveRequest,
+                                 authorization: Optional[str] = Header(None)):
+    user = _email_game_user(authorization)
+    if not request.move.strip() or len(request.move) > 12:
+        raise HTTPException(status_code=400, detail="Enter a valid chess move.")
+
+    conn = get_db()
+    try:
+        _init_community_tables(conn)
+        conn.execute("BEGIN IMMEDIATE")
+        game = conn.execute(
+            "SELECT * FROM email_games WHERE id = ? AND (white_player = ? OR black_player = ?)",
+            (game_id, user["username"], user["username"])
+        ).fetchone()
+        if not game:
+            raise HTTPException(status_code=404, detail="Game not found.")
+        if game["status"] != "active":
+            raise HTTPException(status_code=409, detail="This game is already complete.")
+        if game["current_player"] != user["username"]:
+            raise HTTPException(status_code=403, detail="It is not your turn.")
+        if request.expected_version != game["version"]:
+            raise HTTPException(status_code=409, detail="The board changed. Refresh before moving.")
+
+        board = chess.Board(game["fen"])
+        move_text = request.move.strip()
+        try:
+            move = board.parse_san(move_text)
+        except (ValueError, chess.InvalidMoveError):
+            try:
+                move = chess.Move.from_uci(move_text.lower())
+            except (ValueError, chess.InvalidMoveError):
+                raise HTTPException(status_code=400, detail="That move is not legal in this position.")
+            if move not in board.legal_moves:
+                raise HTTPException(status_code=400, detail="That move is not legal in this position.")
+
+        san = board.san(move)
+        board.push(move)
+        history = _json_module.loads(game["move_history"])
+        history.append({"uci": move.uci(), "san": san})
+        now = datetime.now(timezone.utc).isoformat()
+        status = "completed" if board.is_game_over() else "active"
+        current_player = (game["white_player"] if board.turn == chess.WHITE else game["black_player"])
+        updated = conn.execute(
+            "UPDATE email_games SET fen = ?, move_history = ?, version = version + 1, "
+            "current_player = ?, status = ?, turn_started_at = ?, last_move_at = ? "
+            "WHERE id = ? AND version = ? AND status = 'active'",
+            (board.fen(), _json_module.dumps(history), current_player, status, now, now,
+             game_id, request.expected_version)
+        )
+        if updated.rowcount != 1:
+            raise HTTPException(status_code=409, detail="The board changed. Refresh before moving.")
+        if status == "active":
+            next_player = conn.execute("SELECT email FROM users WHERE username = ?", (current_player,)).fetchone()
+            if next_player:
+                game_link = f"{APP_BASE_URL.rstrip('/')}/email-game.html?game_id={game_id}"
+                _queue_email(
+                    conn, next_player["email"], f"Your turn in a chess game with {user['username']}",
+                    f"{user['username']} played {san}. It is your turn.\n\nView the game: {game_link}\n", now
+                )
+        conn.commit()
+        result = conn.execute("SELECT * FROM email_games WHERE id = ?", (game_id,)).fetchone()
+        return {"success": True, "game": _email_game_record(result), "move": {"uci": move.uci(), "san": san}}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@app.post("/community/email-games/{game_id}/remind")
+async def remind_email_game_player(game_id: int, authorization: Optional[str] = Header(None)):
+    user = _email_game_user(authorization)
+    now = datetime.now(timezone.utc)
+    conn = get_db()
+    try:
+        _init_community_tables(conn)
+        conn.execute("BEGIN IMMEDIATE")
+        game = conn.execute(
+            "SELECT * FROM email_games WHERE id = ? AND (white_player = ? OR black_player = ?)",
+            (game_id, user["username"], user["username"])
+        ).fetchone()
+        if not game:
+            raise HTTPException(status_code=404, detail="Game not found.")
+        if game["status"] != "active":
+            raise HTTPException(status_code=409, detail="This game is already complete.")
+        if game["current_player"] == user["username"]:
+            raise HTTPException(status_code=409, detail="It is your turn; a reminder is not needed.")
+        if game["last_reminder_at"]:
+            last_reminder = datetime.fromisoformat(game["last_reminder_at"])
+            if last_reminder.tzinfo is None:
+                last_reminder = last_reminder.replace(tzinfo=timezone.utc)
+            if now - last_reminder < timedelta(hours=24):
+                raise HTTPException(status_code=429, detail="A reminder was already sent within the last 24 hours.")
+        recipient = conn.execute("SELECT email FROM users WHERE username = ?", (game["current_player"],)).fetchone()
+        if not recipient:
+            raise HTTPException(status_code=404, detail="The player to move no longer has an account.")
+        game_link = f"{APP_BASE_URL.rstrip('/')}/email-game.html?game_id={game_id}"
+        _queue_email(
+            conn, recipient["email"], "Reminder: your chess game is waiting for your move",
+            f"{user['username']} is waiting for your move.\n\nView the game: {game_link}\n", now.isoformat()
+        )
+        conn.execute("UPDATE email_games SET last_reminder_at = ? WHERE id = ?", (now.isoformat(), game_id))
+        conn.commit()
+        return {"success": True, "message": "Reminder queued for email delivery.",
+                "last_reminder_at": now.isoformat()}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 @app.post("/community/clear-activity")
