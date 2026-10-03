@@ -984,7 +984,9 @@ SMTP_FROM_EMAIL=your_verified_sender@example.com
 APP_BASE_URL=https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io
 ```
 
-Offline game invitations use these SMTP settings to email a link to `invite.html`. The link stays valid for 30 days and can be answered once without logging in. Choosing White requires a legal opening move (for example `e4`); the random option chooses a legal White opening move. The inviter receives the choice and move by email and as a Community direct message. An unsent email leaves no pending invitation.
+Offline game invitations use these SMTP settings to email a multipart message with **Accept invitation** and **Decline** buttons linking to `invite.html`. The recipient confirms the choice on that page; opening a link alone does not record a decision. The link stays valid for 30 days and can be answered once without logging in. Choosing White requires a legal opening move (for example `e4`); the random option chooses a legal White opening move. The inviter receives the choice and move by email and as a Community direct message. An unsent email leaves no pending invitation.
+
+Set `APP_BASE_URL` to a URL the recipient can reach. Its default, `http://localhost:8080`, is suitable only when opening invitations on the same computer running the local app; external recipients need the app's deployed public URL or another reachable host.
 
 > **AI model selection**: The active AI model for the chess expert and AI opponents is configured in `src/config.json` under `chess_expert_model` and `ai_models`. All models are accessed through [OpenRouter](https://openrouter.ai) using the `OPENAI_API_KEY`.
 

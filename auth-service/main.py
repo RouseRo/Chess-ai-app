@@ -20,6 +20,7 @@ import jwt
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from html import escape as html_escape
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 from threading import Lock
@@ -969,7 +970,8 @@ class EmailGameLinkConsumeRequest(BaseModel):
     token: str
 
 
-def _send_invite_email(address: str, subject: str, body: str) -> None:
+def _send_invite_email(address: str, subject: str, body: str,
+                       html_body: Optional[str] = None) -> None:
     if not all((SMTP_HOST, SMTP_USER, SMTP_PASSWORD, SMTP_FROM_EMAIL)):
         raise RuntimeError("Email is not configured.")
     message = MIMEMultipart("alternative")
@@ -977,6 +979,8 @@ def _send_invite_email(address: str, subject: str, body: str) -> None:
     message["To"] = address
     message["Subject"] = subject
     message.attach(MIMEText(body, "plain", "utf-8"))
+    if html_body:
+        message.attach(MIMEText(html_body, "html", "utf-8"))
     with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
         if SMTP_USE_STARTTLS:
             server.starttls()
@@ -1110,6 +1114,39 @@ def _game_invite_email(sender: str, link: str) -> str:
             f"Respond here within 30 days: {link}\n")
 
 
+def _game_invite_email_html(sender: str, link: str, preview: bool = False) -> str:
+    sender_name = html_escape(sender)
+    if preview:
+        accept_url = decline_url = "#"
+    else:
+        accept_url = html_escape(f"{link}&decision=accept", quote=True)
+        decline_url = html_escape(f"{link}&decision=decline", quote=True)
+    return f"""<!doctype html>
+<html lang="en">
+<body style="margin:0;padding:24px;background:#f2f5f2;color:#25382e;font-family:Georgia,serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #c7d3c9;">
+        <tr><td style="padding:28px;">
+            <h1 style="margin:0 0 16px;font-size:24px;">Chess invitation</h1>
+            <p style="line-height:1.5;">{sender_name} invites you to play a friendly game of chess.</p>
+            <p style="line-height:1.5;">Accept to choose your color and opening move. Games are played on a shared board, and you will receive an email when it is your turn.</p>
+            <table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0;">
+                <tr>
+                    <td bgcolor="#2e7d32" style="padding:12px 18px;">
+                        <a href="{accept_url}" style="color:#ffffff;text-decoration:none;font-weight:bold;">Accept invitation</a>
+                    </td>
+                    <td width="12"></td>
+                    <td bgcolor="#ffffff" style="padding:11px 17px;border:1px solid #829486;">
+                        <a href="{decline_url}" style="color:#25382e;text-decoration:none;font-weight:bold;">Decline</a>
+                    </td>
+                </tr>
+            </table>
+            <p style="font-size:13px;line-height:1.5;color:#59675e;">Invitation expires in 30 days. Opening either link will not record a decision; you will confirm it on the invitation page.</p>
+        </td></tr>
+    </table>
+</body>
+</html>"""
+
+
 def _opening_move(move: str) -> str:
     board = chess.Board()
     try:
@@ -1189,7 +1226,8 @@ async def preview_game_invite(recipient: str, authorization: Optional[str] = Hea
     sender = payload["username"]
     return {"success": True, "recipient": row["username"],
             "subject": f"Chess invitation from {sender}",
-            "body": _game_invite_email(sender, "[Personal response link included when sent]")}
+            "body": _game_invite_email(sender, "[Personal response link included when sent]"),
+            "html_body": _game_invite_email_html(sender, "#", preview=True)}
 
 
 @app.post("/community/game-invite")
@@ -1239,7 +1277,8 @@ async def send_game_invite(
         try:
             _send_invite_email(
                 recipient_row["email"], f"Chess invitation from {sender}",
-                _game_invite_email(sender, link)
+                _game_invite_email(sender, link),
+                _game_invite_email_html(sender, link)
             )
         except (RuntimeError, smtplib.SMTPException, OSError):
             conn.rollback()

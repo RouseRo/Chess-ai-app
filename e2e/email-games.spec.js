@@ -62,6 +62,39 @@ async function movePiece(page, from, to) {
   );
 }
 
+test('Community invite preview displays inert email action buttons', async ({ browser, request }) => {
+  const suffix = randomUUID().slice(0, 8);
+  const inviter = `preview_inviter_${suffix}`;
+  const recipient = `preview_recipient_${suffix}`;
+  await registerUser(request, inviter, `${inviter}@example.test`);
+  await registerUser(request, recipient, `${recipient}@example.test`);
+  const inviterToken = await loginUser(request, inviter);
+
+  const page = await browser.newPage();
+  await page.addInitScript(({ token, username }) => {
+    localStorage.setItem('authToken', token);
+    localStorage.setItem('currentUser', username);
+  }, { token: inviterToken, username: inviter });
+  await page.goto('/');
+  const goToGame = page.getByRole('button', { name: 'Go to Game' });
+  if (await goToGame.isVisible().catch(() => false)) await goToGame.click();
+  await page.getByRole('button', { name: /Community/ }).click();
+
+  const playerRow = page.locator('.community-user-item').filter({ hasText: recipient });
+  await expect(playerRow).toBeVisible();
+  await playerRow.hover();
+  const inviteButton = playerRow.locator(`button[title="Invite to game"][data-recipient="${recipient}"]`);
+  await expect(inviteButton).toBeVisible();
+  await inviteButton.click();
+
+  const emailPreview = page.frameLocator('#invite-preview-email');
+  await expect(emailPreview.getByRole('link', { name: 'Accept invitation' })).toHaveAttribute('href', '#');
+  await expect(emailPreview.getByRole('link', { name: 'Decline' })).toHaveAttribute('href', '#');
+  await expect(page.locator('#invite-preview-send')).toBeEnabled();
+  await expect(page.locator('#invite-preview-email')).toHaveAttribute('sandbox', '');
+  await page.close();
+});
+
 test('offline invitation, playable game, and completed-game review', async ({ browser, request }) => {
   const suffix = randomUUID().slice(0, 8);
   const inviter = `email_inviter_${suffix}`;
@@ -83,12 +116,24 @@ test('offline invitation, playable game, and completed-game review', async ({ br
   expect((await inviteResponse.json()).emailed).toBeTruthy();
 
   const invitation = await waitForMessage(request, recipientEmail, `Chess invitation from ${inviter}`);
-  const invitationBody = invitation.Text || invitation.HTML || '';
-  const invitationUrl = invitationBody.match(/http:\/\/localhost:18080\/invite\.html\?token=[^\s<]+/);
-  expect(invitationUrl).toBeTruthy();
+  expect(invitation.HTML).toContain('Accept invitation');
+  expect(invitation.HTML).toContain('>Decline</a>');
+  const acceptHref = invitation.HTML.match(/href="([^"]+decision=accept)"/);
+  const declineHref = invitation.HTML.match(/href="([^"]+decision=decline)"/);
+  expect(acceptHref).toBeTruthy();
+  expect(declineHref).toBeTruthy();
+  const acceptUrl = acceptHref[1].replaceAll('&amp;', '&');
+  const declineUrl = declineHref[1].replaceAll('&amp;', '&');
+
+  const declinePage = await browser.newPage();
+  await declinePage.goto(declineUrl);
+  await expect(declinePage.locator('#opening-options')).toBeHidden();
+  await expect(declinePage.locator('#accept-invitation')).toBeHidden();
+  await expect(declinePage.getByRole('button', { name: 'Confirm decline' })).toBeVisible();
+  await declinePage.close();
 
   const recipientPage = await browser.newPage();
-  await recipientPage.goto(invitationUrl[0].replace(/[).,]+$/, ''));
+  await recipientPage.goto(acceptUrl);
   await expect(recipientPage.locator('#response')).toBeVisible();
   await recipientPage.getByRole('button', { name: 'Accept invitation' }).click();
   await expect(recipientPage.locator('#intro')).toHaveText('You accepted this invitation.');

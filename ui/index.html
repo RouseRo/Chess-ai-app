@@ -615,7 +615,7 @@
     #dm-compose-input { flex: 1; padding: 5px 8px; border: 1px solid #ce93d8; border-radius: 4px; font-size: 0.9em; }
     #game-invite-preview { display: none; background: #f1f8f1; border: 1px solid #a5d6a7; border-radius: 4px; padding: 10px; margin-top: 6px; max-height: 50%; overflow-y: auto; flex-shrink: 0; }
     #game-invite-preview h4 { margin: 0 0 8px; font-size: 0.9em; }
-    #game-invite-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 0.85em/1.45 Georgia, serif; color: #333; margin: 8px 0; }
+    #invite-preview-email { display: block; width: 100%; height: 330px; margin: 8px 0; border: 1px solid #c7d3c9; background: #f2f5f2; }
     #game-invite-preview .invite-preview-actions { display: flex; gap: 8px; justify-content: flex-end; }
     #game-invite-preview .invite-preview-actions button { padding: 6px 12px; border-radius: 3px; cursor: pointer; }
     #invite-preview-send { background: #2e7d32; border: 0; color: #fff; }
@@ -1327,7 +1327,7 @@
                             preview.style.display = 'block';
                             document.getElementById('invite-preview-recipient').textContent = recipient;
                             document.getElementById('invite-preview-subject').textContent = 'Loading invitation...';
-                            document.getElementById('invite-preview-body').textContent = '';
+                            document.getElementById('invite-preview-email').srcdoc = '';
                             document.getElementById('invite-preview-error').textContent = '';
                             document.getElementById('invite-preview-send').disabled = true;
                             fetch('/community/game-invite/preview?recipient=' + encodeURIComponent(recipient), {
@@ -1338,7 +1338,7 @@
                                 if (pendingEmailInviteRecipient !== recipient) return;
                                 if (!data.success) throw new Error(data.message || 'Could not preview invitation.');
                                 document.getElementById('invite-preview-subject').textContent = data.subject;
-                                document.getElementById('invite-preview-body').textContent = data.body;
+                                document.getElementById('invite-preview-email').srcdoc = data.html_body;
                                 document.getElementById('invite-preview-send').disabled = false;
                               })
                               .catch(error => {
@@ -2850,7 +2850,7 @@
                         <div id="game-invite-preview">
                           <h4>Email invitation to <span id="invite-preview-recipient"></span></h4>
                           <div><strong id="invite-preview-subject"></strong></div>
-                          <pre id="invite-preview-body"></pre>
+                          <iframe id="invite-preview-email" title="Email invitation preview" sandbox referrerpolicy="no-referrer"></iframe>
                           <div id="invite-preview-error" role="alert"></div>
                           <div class="invite-preview-actions">
                             <button id="invite-preview-cancel" type="button" onclick="closeGameInvitePreview()">Cancel</button>

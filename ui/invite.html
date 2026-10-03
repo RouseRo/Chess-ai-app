@@ -33,7 +33,7 @@
     <h1>Friendly chess invitation</h1>
     <p id="intro">Loading your invitation...</p>
     <form id="response" hidden>
-      <fieldset>
+      <fieldset id="opening-options">
         <legend>How would you like to begin?</legend>
         <label class="option"><input type="radio" name="choice" value="white" required> I play White and send my first move</label>
         <label class="option"><input type="radio" name="choice" value="black" checked> You play White</label>
@@ -43,25 +43,35 @@
         <label for="move">Your first move as White</label>
         <input id="move" name="first_move" placeholder="e4" maxlength="12" autocomplete="off">
       </div>
-      <button type="submit" name="decision" value="accept">Accept invitation</button>
-      <button type="submit" name="decision" value="decline" formnovalidate>Decline invitation</button>
+      <button id="accept-invitation" type="submit" name="decision" value="accept">Accept invitation</button>
+      <button id="decline-invitation" type="submit" name="decision" value="decline" formnovalidate>Decline invitation</button>
     </form>
     <a id="game-link" hidden>View game board</a>
     <p id="feedback" role="status" aria-live="polite"></p>
   </main>
   <script>
-    const token = new URLSearchParams(location.search).get('token');
+    const params = new URLSearchParams(location.search);
+    const token = params.get('token');
+    const requestedDecision = params.get('decision');
     const intro = document.getElementById('intro');
     const feedback = document.getElementById('feedback');
     const form = document.getElementById('response');
     const move = document.getElementById('move');
     const moveField = document.getElementById('move-field');
+    const openingOptions = document.getElementById('opening-options');
+    const acceptButton = document.getElementById('accept-invitation');
+    const declineButton = document.getElementById('decline-invitation');
     if (token) {
       fetch('/community/email-invite?token=' + encodeURIComponent(token), { cache: 'no-store' })
         .then(response => response.json())
         .then(data => {
           if (!data.success) throw new Error(data.message);
           intro.textContent = data.sender + ' has invited you to play a friendly game of chess.';
+          if (requestedDecision === 'decline') {
+            openingOptions.hidden = true;
+            acceptButton.hidden = true;
+            declineButton.textContent = 'Confirm decline';
+          }
           form.hidden = false;
         })
         .catch(error => { intro.textContent = error.message || 'Unable to load this invitation.'; });
