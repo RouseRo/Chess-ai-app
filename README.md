@@ -18,6 +18,7 @@ The application is for people that are new to the game of chess and want to lear
 - [API Services](#api-services)
 - [Playing Chess](#playing-chess)
 - [Classic Game Rewards](#classic-game-rewards)
+- [Email Games: Fourth Milestone](#email-games-fourth-milestone-planned)
 - [Configuration](#configuration)
 - [Troubleshooting](#troubleshooting)
 - [Architecture](#architecture)
@@ -68,10 +69,12 @@ The application is for people that are new to the game of chess and want to lear
 Offline-player invitations now offer Accept and Decline. Opening a link only
 previews the invitation; an explicit submission records the decision once.
 Declines are included in invitation statistics, not game losses or ratings.
-Accepting creates a persistent, read-only game with the selected colors and any
-opening move. The accepted invitation links to `email-game.html?game_id=<id>`.
-Players sign in normally to view their board, oriented for their color. Opening
-`email-game.html` without a game ID lists the signed-in player's email games.
+Accepting creates a persistent game with the selected colors and any opening
+move. Games were read-only in this first milestone; move play was added in the
+second. The accepted invitation links to `email-game.html?game_id=<id>`. Players
+can sign in normally or use a one-time magic link, and the board is oriented for
+their color. Opening `email-game.html` without a game ID lists the signed-in
+player's email games.
 
 Records are stored in the existing auth-service SQLite database. The migration
 preserves older invitation responses as accepted but does not manufacture games
@@ -89,7 +92,8 @@ Listings support `status`, `limit` (1-100), and `offset`. Status filters are
 invitation and game collections are paginated separately. Invitation statistics
 remain unfiltered. Pending invitations past their expiry are reported as expired.
 Admin game records include elapsed waiting time; invitation token hashes are never
-returned. The admin listing is an API only in this milestone, not a dashboard tab.
+returned. The admin listing was initially API-only; the second milestone added its
+dashboard tab.
 
 Invitation decisions and games are committed before attempting response email.
 If delivery fails, the page reports that the decision is saved but notification
@@ -156,6 +160,77 @@ the corresponding outbox email. Open the admin dashboard's Email Games tab and
 check filtering, pagination, and waiting-time details. An unrelated account must
 not read or modify the game.
 
+## Email Games: Third Milestone
+
+The third milestone records why games ended and adds actions and review tools for
+finished games:
+
+- **Persisted outcomes**: Completed games record result, winner, completion reason,
+  and completion time. Checkmate, stalemate, resignation, and agreed draws are
+  represented. The additive migration leaves the outcome fields empty on older
+  completed games rather than guessing their results.
+- **Resignation and draw offers**: Participants can resign; the player to move can
+  offer a draw, which the opponent can accept or decline. Actions enforce game
+  membership and an expected game version.
+- **Terminal notifications**: Both players receive the result by email. Pending
+  turn, reminder, and draw-offer notices are canceled when they are no longer valid.
+- **Replay and PGN export**: Participants can step through completed-game positions
+  and download a PGN. The server reconstructs and validates history before returning
+  either representation.
+
+`POST /community/email-games/{id}/actions` accepts `{ "action": "resign",
+"expected_version": 0 }`; valid actions are `resign`, `offer_draw`, `accept_draw`,
+and `decline_draw`. `GET /community/email-games/{id}/replay` returns the ordered FEN
+positions for a completed game. `GET /community/email-games/{id}/pgn` downloads the
+completed game as a PGN file. These endpoints require a participant's Bearer token.
+
+Focused automated checks use `python -m pytest tests/test_email_invites.py -q`.
+Coverage includes legacy migration, result recording, action authorization and
+version conflicts, notification cancellation, replay positions, and PGN export.
+
+## Email Games: Fourth Milestone
+
+Local interface testing is available through a separate Docker Compose project
+with its own SQLite volume and Mailpit SMTP capture. It uses alternate host ports
+and never mounts or modifies the regular `data/users.db`. The auth service's
+STARTTLS and SMTP authentication defaults remain enabled outside this test setup;
+the local override disables them only for Mailpit.
+
+Prerequisites: Docker Desktop, Node.js 20 or later, and npm.
+
+Start the isolated app and mail catcher from the repository root:
+
+```powershell
+docker compose --env-file .env.email-games-test -p chess-email-test -f docker-compose.yml -f docker-compose.email-games-test.yml up -d --build
+```
+
+Open the app at http://localhost:18080 and the captured-mail inbox at
+http://localhost:18025. The browser test creates uniquely named, verified test
+accounts automatically. Run it from the `e2e` directory:
+
+```powershell
+npm ci
+npm run install:browsers
+npm test
+```
+
+The Playwright smoke test covers offline invitation delivery and acceptance,
+invalid and stale move rejection, recipient turn email, moves from both players,
+non-participant access denial, resignation, replay controls, and PGN availability.
+The existing API tests in `tests/test_email_invites.py` remain the faster
+temporary-database regression layer. Magic-link and reminder behavior can also be
+checked manually through the UI and captured messages; this browser smoke test
+does not cover those flows or the admin dashboard.
+
+Stop the test project and delete its database volume when finished:
+
+```powershell
+docker compose --env-file .env.email-games-test -p chess-email-test -f docker-compose.yml -f docker-compose.email-games-test.yml down --volumes --remove-orphans
+```
+
+Because this uses the `chess-email-test` Compose project name and a separate
+named volume, cleanup does not remove the normal app's containers or database.
+
 ## Requirements
 
 ### User Interface Requirements
@@ -207,6 +282,7 @@ Chess-ai-app/
 │   ├── index.html           # Login/Register + game interface (single-page app)
 │   ├── admin.html           # Admin dashboard
 │   ├── mobile.html          # Mobile-optimized chess interface (smartphones)
+│   ├── email-game.html      # Email-game play, sign-in, and review page
 │   ├── game-play.ts         # Chessboard drag-and-drop logic (TypeScript)
 │   ├── player-selection.ts  # Player/opening/defense selection logic (TypeScript)
 │   ├── chessboard.js        # Chessboard library
@@ -641,6 +717,7 @@ Access at **http://localhost:8080/admin.html**
 | **User Management** | Create, delete, promote/demote users; view online status and game activity |
 | **Announcements** | Send messages to all online players or selected users |
 | **Feedback** | View, resolve, and delete user-submitted bug reports, suggestions, and feature requests |
+| **Email Games** | Review invitations and games, filter records, and inspect turn waiting times |
 | **AI Models** | Configure AI model settings |
 | **Settings** | Change admin password |
 
@@ -1127,10 +1204,11 @@ CREATE TABLE community_messages (
 
 ## Future Enhancements
 
-- [ ] PGN export/import
+- [x] PGN export for completed email games
+- [ ] PGN import
 - [x] Classic games step-through review with annotated move commentary
 - [x] Classic game reward badges and Grand Scholar award
-- [ ] Full game replay from saved game history
+- [x] Full game replay from saved email-game history
 - [ ] ELO rating system
 - [x] Human vs Human multiplayer (browser-to-browser sync)
 - [x] Community chat, DMs, and game invitations

@@ -12,6 +12,9 @@ user_data/sessions.json
 user_data/users.json
 user_data/users/
 data/users.db
+/e2e/node_modules/
+/e2e/test-results/
+/e2e/playwright-report/
 
 # Log files
 *.log

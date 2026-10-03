@@ -1,0 +1,12 @@
+{
+  "name": "chess-email-games-e2e",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "install:browsers": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "jquery": "^3.7.1"
+  }
+}

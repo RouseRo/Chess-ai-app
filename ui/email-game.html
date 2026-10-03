@@ -53,6 +53,14 @@
     <section id="game" hidden>
       <p id="players"></p>
       <p id="turn"></p>
+      <p id="game-result" hidden></p>
+      <div id="game-actions" hidden>
+        <button id="resign" type="button">Resign</button>
+        <button id="offer-draw" type="button">Offer draw</button>
+        <button id="accept-draw" type="button" hidden>Accept draw</button>
+        <button id="decline-draw" type="button" hidden>Decline draw</button>
+        <span id="draw-status" aria-live="polite"></span>
+      </div>
       <div id="game-layout">
         <div id="board" aria-label="Saved chess position"></div>
         <div>
@@ -60,6 +68,12 @@
           <ol id="moves"></ol>
           <button id="refresh" type="button">Refresh board</button>
           <button id="remind" type="button" hidden>Remind on move</button>
+          <div id="replay-controls" hidden>
+            <button id="replay-prev" type="button">Previous position</button>
+            <span id="replay-position" aria-live="polite"></span>
+            <button id="replay-next" type="button">Next position</button>
+            <button id="export-pgn" type="button">Download PGN</button>
+          </div>
         </div>
       </div>
     </section>
@@ -74,6 +88,10 @@
     const magicLogin = document.getElementById('magic-login');
     let board = null;
     let token = localStorage.getItem('authToken');
+    let currentGame = null;
+    let currentUsername = null;
+    let replayPositions = [];
+    let replayIndex = 0;
 
     async function loadGame() {
       feedback.textContent = '';
@@ -116,17 +134,44 @@
           return;
         }
         const game = data.game;
+        currentGame = game;
+        currentUsername = data.username;
         const myTurn = game.status === 'active' && game.current_player === data.username;
         document.getElementById('players').textContent = 'White: ' + game.white_player + ' | Black: ' + game.black_player;
         document.getElementById('turn').textContent = game.status === 'active'
           ? (myTurn ? 'Your turn' : game.current_player + ' to move')
           : 'Game ' + game.status;
+        const result = document.getElementById('game-result');
+        result.hidden = game.status !== 'completed';
+        result.textContent = game.result
+          ? 'Result: ' + game.result + (game.winner ? ' - ' + game.winner + ' wins' : ' - draw') +
+            (game.completion_reason ? ' (' + game.completion_reason.replaceAll('_', ' ') + ')' : '')
+          : 'Result unavailable for this completed legacy game.';
+        const actions = document.getElementById('game-actions');
+        actions.hidden = game.status !== 'active';
+        const pendingOffer = game.draw_offer_by || '';
+        document.getElementById('offer-draw').hidden = !myTurn || Boolean(pendingOffer);
+        document.getElementById('accept-draw').hidden = !pendingOffer || pendingOffer === data.username || game.status !== 'active';
+        document.getElementById('decline-draw').hidden = !pendingOffer || pendingOffer === data.username || game.status !== 'active';
+        document.getElementById('draw-status').textContent = pendingOffer
+          ? (pendingOffer === data.username ? 'Your draw offer is pending.' : pendingOffer + ' offered a draw.')
+          : '';
+        replayPositions = [];
+        if (game.status === 'completed') {
+          const replayResponse = await fetch('/community/email-games/' + encodeURIComponent(gameId) + '/replay', {
+            headers: { Authorization: 'Bearer ' + token }, cache: 'no-store'
+          });
+          const replayData = await replayResponse.json();
+          if (!replayResponse.ok || !replayData.success) throw new Error(replayData.detail || 'Unable to load game replay.');
+          replayPositions = replayData.positions;
+          replayIndex = replayPositions.length - 1;
+        }
         document.getElementById('game').hidden = false;
         if (typeof Chessboard !== 'function') throw new Error('The board could not load. Please refresh the page.');
         const orientation = data.username === game.white_player ? 'white' : 'black';
         if (board) board.destroy();
         board = Chessboard('board', {
-          position: game.fen,
+          position: replayPositions.length ? replayPositions[replayIndex] : game.fen,
           orientation,
           draggable: myTurn,
           pieceTheme: 'img/chesspieces/wikipedia/{piece}.png',
@@ -144,6 +189,8 @@
         remind.hidden = !canRemind;
         remind.disabled = Boolean(reminderCoolingDown);
         remind.textContent = reminderCoolingDown ? 'Reminder sent recently' : 'Remind on move';
+        document.getElementById('replay-controls').hidden = !replayPositions.length;
+        updateReplayControls();
         const moves = document.getElementById('moves');
         moves.replaceChildren();
         for (let index = 0; index < game.move_history.length; index += 2) {
@@ -191,6 +238,68 @@
       } catch (error) {
         feedback.textContent = error.message || 'Reminder could not be sent.';
         button.disabled = false;
+      }
+    }
+
+    function updateReplayControls() {
+      const previous = document.getElementById('replay-prev');
+      const next = document.getElementById('replay-next');
+      previous.disabled = replayIndex <= 0;
+      next.disabled = replayIndex >= replayPositions.length - 1;
+      document.getElementById('replay-position').textContent = replayPositions.length
+        ? 'Position ' + (replayIndex + 1) + ' of ' + replayPositions.length
+        : '';
+    }
+
+    function stepReplay(direction) {
+      if (!board || !replayPositions.length) return;
+      replayIndex = Math.max(0, Math.min(replayPositions.length - 1, replayIndex + direction));
+      board.position(replayPositions[replayIndex]);
+      updateReplayControls();
+    }
+
+    async function submitGameAction(action) {
+      if (!currentGame) return;
+      if (action === 'resign' && !window.confirm('Resign this game?')) return;
+      const buttons = document.querySelectorAll('#game-actions button');
+      buttons.forEach(button => { button.disabled = true; });
+      feedback.textContent = '';
+      try {
+        const response = await fetch('/community/email-games/' + encodeURIComponent(gameId) + '/actions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+          body: JSON.stringify({ action, expected_version: currentGame.version })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.detail || data.message || 'Game action failed.');
+        await loadGame();
+        feedback.textContent = data.message;
+      } catch (error) {
+        feedback.textContent = error.message || 'Game action failed.';
+        buttons.forEach(button => { button.disabled = false; });
+      }
+    }
+
+    async function downloadPgn() {
+      try {
+        const response = await fetch('/community/email-games/' + encodeURIComponent(gameId) + '/pgn', {
+          headers: { Authorization: 'Bearer ' + token }, cache: 'no-store'
+        });
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.detail || 'Unable to export PGN.');
+        }
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'email-game-' + gameId + '.pgn';
+        document.body.append(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        feedback.textContent = error.message || 'Unable to export PGN.';
       }
     }
 
@@ -243,6 +352,13 @@
 
     document.getElementById('refresh').addEventListener('click', loadGame);
     document.getElementById('remind').addEventListener('click', requestReminder);
+    document.getElementById('resign').addEventListener('click', () => submitGameAction('resign'));
+    document.getElementById('offer-draw').addEventListener('click', () => submitGameAction('offer_draw'));
+    document.getElementById('accept-draw').addEventListener('click', () => submitGameAction('accept_draw'));
+    document.getElementById('decline-draw').addEventListener('click', () => submitGameAction('decline_draw'));
+    document.getElementById('replay-prev').addEventListener('click', () => stepReplay(-1));
+    document.getElementById('replay-next').addEventListener('click', () => stepReplay(1));
+    document.getElementById('export-pgn').addEventListener('click', downloadPgn);
     window.addEventListener('resize', () => { if (board) board.resize(); });
     async function initialize() {
       const params = new URLSearchParams(location.search);

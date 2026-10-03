@@ -3,7 +3,7 @@ Authentication Service for Chess AI App.
 Uses SQLite database for user storage.
 """
 
-from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -15,6 +15,7 @@ import hashlib
 import random
 import bcrypt
 import chess
+import chess.pgn
 import jwt
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -45,6 +46,8 @@ SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
 SMTP_USER = os.environ.get("SMTP_USER", "")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
 SMTP_FROM_EMAIL = os.environ.get("SMTP_FROM_EMAIL", SMTP_USER)
+SMTP_USE_STARTTLS = os.environ.get("SMTP_USE_STARTTLS", "true").lower() == "true"
+SMTP_USE_AUTH = os.environ.get("SMTP_USE_AUTH", "true").lower() == "true"
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:8080")
 
 def send_verification_email(to_email: str, username: str, token: str) -> None:
@@ -66,8 +69,10 @@ def send_verification_email(to_email: str, username: str, token: str) -> None:
     msg.attach(MIMEText(html, "html"))
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASSWORD)
+            if SMTP_USE_STARTTLS:
+                server.starttls()
+            if SMTP_USE_AUTH:
+                server.login(SMTP_USER, SMTP_PASSWORD)
             server.sendmail(SMTP_USER, to_email, msg.as_string())
     except Exception as e:
         print(f"[EMAIL] Failed to send verification email to {to_email}: {e}")
@@ -696,9 +701,25 @@ def _init_community_tables(conn: sqlite3.Connection):
             created_at TEXT NOT NULL,
             turn_started_at TEXT NOT NULL,
             last_move_at TEXT,
-            last_reminder_at TEXT
+            last_reminder_at TEXT,
+            result TEXT,
+            winner TEXT,
+            completion_reason TEXT,
+            completed_at TEXT,
+            draw_offer_by TEXT
         )
     ''')
+    game_columns = {row[1] for row in conn.execute("PRAGMA table_info(email_games)")}
+    for column in (
+        "result TEXT",
+        "winner TEXT",
+        "completion_reason TEXT",
+        "completed_at TEXT",
+        "draw_offer_by TEXT",
+    ):
+        name = column.split()[0]
+        if name not in game_columns:
+            conn.execute(f"ALTER TABLE email_games ADD COLUMN {column}")
     conn.execute('''
         CREATE TABLE IF NOT EXISTS email_outbox (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -711,9 +732,16 @@ def _init_community_tables(conn: sqlite3.Connection):
             claimed_until TEXT,
             last_error TEXT,
             created_at TEXT NOT NULL,
-            sent_at TEXT
+            sent_at TEXT,
+            game_id INTEGER,
+            notification_type TEXT
         )
     ''')
+    outbox_columns = {row[1] for row in conn.execute("PRAGMA table_info(email_outbox)")}
+    for column in ("game_id INTEGER", "notification_type TEXT"):
+        name = column.split()[0]
+        if name not in outbox_columns:
+            conn.execute(f"ALTER TABLE email_outbox ADD COLUMN {column}")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_email_outbox_due ON email_outbox(status, next_attempt_at)")
     conn.execute('''
         CREATE TABLE IF NOT EXISTS email_game_magic_links (
@@ -928,6 +956,11 @@ class EmailGameMoveRequest(BaseModel):
     expected_version: int
 
 
+class EmailGameActionRequest(BaseModel):
+    action: str
+    expected_version: int
+
+
 class EmailGameLinkRequest(BaseModel):
     email: str
 
@@ -945,16 +978,45 @@ def _send_invite_email(address: str, subject: str, body: str) -> None:
     message["Subject"] = subject
     message.attach(MIMEText(body, "plain", "utf-8"))
     with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
-        server.starttls()
-        server.login(SMTP_USER, SMTP_PASSWORD)
+        if SMTP_USE_STARTTLS:
+            server.starttls()
+        if SMTP_USE_AUTH:
+            server.login(SMTP_USER, SMTP_PASSWORD)
         server.sendmail(SMTP_FROM_EMAIL, address, message.as_string())
 
 
-def _queue_email(conn: sqlite3.Connection, address: str, subject: str, body: str, now: str) -> None:
+def _queue_email(conn: sqlite3.Connection, address: str, subject: str, body: str, now: str,
+                 game_id: Optional[int] = None, notification_type: Optional[str] = None) -> None:
     conn.execute(
-        "INSERT INTO email_outbox (recipient, subject, body, next_attempt_at, created_at) VALUES (?, ?, ?, ?, ?)",
-        (address, subject, body, now, now)
+        "INSERT INTO email_outbox (recipient, subject, body, next_attempt_at, created_at, game_id, notification_type) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (address, subject, body, now, now, game_id, notification_type)
     )
+
+
+def _cancel_pending_game_notifications(conn: sqlite3.Connection, game_id: int, now: str) -> None:
+    conn.execute(
+        "UPDATE email_outbox SET status = 'cancelled', body = '', claimed_until = NULL, "
+        "last_error = 'Game state changed before notification was sent' "
+        "WHERE game_id = ? AND notification_type IN ('turn', 'reminder', 'draw_offer') AND status = 'pending'",
+        (game_id,)
+    )
+
+
+def _queue_game_result_notifications(conn: sqlite3.Connection, game_id: int, white_player: str,
+                                     black_player: str, result: str, winner: Optional[str],
+                                     reason: str, now: str) -> None:
+    _cancel_pending_game_notifications(conn, game_id, now)
+    outcome = f"{result} ({winner} wins)" if winner else "1/2-1/2 (draw)"
+    link = f"{APP_BASE_URL.rstrip('/')}/email-game.html?game_id={game_id}"
+    for username in (white_player, black_player):
+        recipient = conn.execute("SELECT email FROM users WHERE username = ?", (username,)).fetchone()
+        if recipient:
+            _queue_email(
+                conn, recipient["email"], "Your email chess game is complete",
+                f"The game ended by {reason.replace('_', ' ')}. Result: {outcome}.\n\nReview the game: {link}\n",
+                now, game_id, "result"
+            )
 
 
 def _process_email_outbox_once() -> bool:
@@ -983,6 +1045,21 @@ def _process_email_outbox_once() -> bool:
         message["attempts"] = attempts
     finally:
         conn.close()
+
+    if message.get("game_id") and message.get("notification_type") in ("turn", "reminder", "draw_offer"):
+        conn = get_db()
+        try:
+            game = conn.execute("SELECT status FROM email_games WHERE id = ?", (message["game_id"],)).fetchone()
+            if not game or game["status"] != "active":
+                conn.execute(
+                    "UPDATE email_outbox SET status = 'cancelled', body = '', claimed_until = NULL, "
+                    "last_error = 'Game is no longer active' WHERE id = ? AND status = 'processing'",
+                    (message["id"],)
+                )
+                conn.commit()
+                return True
+        finally:
+            conn.close()
 
     try:
         _send_invite_email(message["recipient"], message["subject"], message["body"])
@@ -1028,8 +1105,8 @@ async def _email_outbox_worker() -> None:
 
 def _game_invite_email(sender: str, link: str) -> str:
     return (f"{sender} invites you to play a friendly game of chess.\n\n"
-            "You can accept or decline this invitation.\n\n"
-            "Would you like to play White and send your first move, play Black, or let the first move be selected at random?\n\n"
+            "Open the invitation to accept or decline. If you accept, choose your color and opening move.\n\n"
+            "Accepted games are played by taking turns on a shared board. You will receive an email when it is your turn.\n\n"
             f"Respond here within 30 days: {link}\n")
 
 
@@ -1378,6 +1455,89 @@ async def get_email_game(game_id: int, authorization: Optional[str] = Header(Non
         conn.close()
 
 
+def _completed_email_game(conn: sqlite3.Connection, game_id: int, username: str) -> sqlite3.Row:
+    row = conn.execute(
+        "SELECT * FROM email_games WHERE id = ? AND status = 'completed' AND (white_player = ? OR black_player = ?)",
+        (game_id, username, username)
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Completed game not found.")
+    return row
+
+
+def _email_game_pgn(row: sqlite3.Row) -> str:
+    game = chess.pgn.Game()
+    game.headers["Event"] = "Chess AI Email Game"
+    game.headers["Site"] = "Chess AI App"
+    try:
+        game.headers["Date"] = datetime.fromisoformat(row["created_at"]).strftime("%Y.%m.%d")
+    except (TypeError, ValueError):
+        game.headers["Date"] = "????.??.??"
+    game.headers["Round"] = "-"
+    game.headers["White"] = row["white_player"]
+    game.headers["Black"] = row["black_player"]
+    game.headers["Result"] = row["result"] or "*"
+
+    board = chess.Board()
+    node = game
+    for item in _json_module.loads(row["move_history"]):
+        try:
+            move = chess.Move.from_uci(item["uci"])
+        except (KeyError, ValueError, chess.InvalidMoveError) as exc:
+            raise HTTPException(status_code=409, detail="Stored move history cannot be replayed.") from exc
+        if move not in board.legal_moves:
+            raise HTTPException(status_code=409, detail="Stored move history cannot be replayed.")
+        node = node.add_variation(move)
+        board.push(move)
+    if board.fen() != row["fen"]:
+        raise HTTPException(status_code=409, detail="Stored game position does not match its move history.")
+    return game.accept(chess.pgn.StringExporter(headers=True, variations=False, comments=False))
+
+
+@app.get("/community/email-games/{game_id}/replay")
+async def replay_email_game(game_id: int, authorization: Optional[str] = Header(None)):
+    user = _email_game_user(authorization)
+    conn = get_db()
+    try:
+        _init_community_tables(conn)
+        game = _completed_email_game(conn, game_id, user["username"])
+        board = chess.Board()
+        positions = [board.fen()]
+        history = _json_module.loads(game["move_history"])
+        for item in history:
+            try:
+                move = chess.Move.from_uci(item["uci"])
+            except (KeyError, ValueError, chess.InvalidMoveError) as exc:
+                raise HTTPException(status_code=409, detail="Stored move history cannot be replayed.") from exc
+            if move not in board.legal_moves:
+                raise HTTPException(status_code=409, detail="Stored move history cannot be replayed.")
+            board.push(move)
+            positions.append(board.fen())
+        if board.fen() != game["fen"]:
+            raise HTTPException(status_code=409, detail="Stored game position does not match its move history.")
+        return {"success": True, "positions": positions, "move_history": history,
+                "result": game["result"], "completion_reason": game["completion_reason"]}
+    finally:
+        conn.close()
+
+
+@app.get("/community/email-games/{game_id}/pgn")
+async def export_email_game_pgn(game_id: int, authorization: Optional[str] = Header(None)):
+    user = _email_game_user(authorization)
+    conn = get_db()
+    try:
+        _init_community_tables(conn)
+        game = _completed_email_game(conn, game_id, user["username"])
+        content = _email_game_pgn(game)
+    finally:
+        conn.close()
+    return Response(
+        content=content,
+        media_type="application/x-chess-pgn",
+        headers={"Content-Disposition": f'attachment; filename="email-game-{game_id}.pgn"'}
+    )
+
+
 @app.post("/auth/email-game-link")
 async def request_email_game_link(request: EmailGameLinkRequest):
     message = "If that verified account can sign in by email, a sign-in link will be sent."
@@ -1498,28 +1658,144 @@ async def submit_email_game_move(game_id: int, request: EmailGameMoveRequest,
         history = _json_module.loads(game["move_history"])
         history.append({"uci": move.uci(), "san": san})
         now = datetime.now(timezone.utc).isoformat()
-        status = "completed" if board.is_game_over() else "active"
+        outcome = board.outcome()
+        status = "completed" if outcome else "active"
+        result = board.result() if outcome else None
+        winner = None
+        if outcome and outcome.winner is not None:
+            winner = game["white_player"] if outcome.winner == chess.WHITE else game["black_player"]
+        completion_reason = outcome.termination.name.lower() if outcome else None
         current_player = (game["white_player"] if board.turn == chess.WHITE else game["black_player"])
         updated = conn.execute(
             "UPDATE email_games SET fen = ?, move_history = ?, version = version + 1, "
-            "current_player = ?, status = ?, turn_started_at = ?, last_move_at = ? "
+            "current_player = ?, status = ?, turn_started_at = ?, last_move_at = ?, result = ?, "
+            "winner = ?, completion_reason = ?, completed_at = ?, draw_offer_by = NULL "
             "WHERE id = ? AND version = ? AND status = 'active'",
-            (board.fen(), _json_module.dumps(history), current_player, status, now, now,
+            (board.fen(), _json_module.dumps(history), current_player, status, now, now, result,
+             winner, completion_reason, now if outcome else None,
              game_id, request.expected_version)
         )
         if updated.rowcount != 1:
             raise HTTPException(status_code=409, detail="The board changed. Refresh before moving.")
+        _cancel_pending_game_notifications(conn, game_id, now)
         if status == "active":
             next_player = conn.execute("SELECT email FROM users WHERE username = ?", (current_player,)).fetchone()
             if next_player:
                 game_link = f"{APP_BASE_URL.rstrip('/')}/email-game.html?game_id={game_id}"
                 _queue_email(
                     conn, next_player["email"], f"Your turn in a chess game with {user['username']}",
-                    f"{user['username']} played {san}. It is your turn.\n\nView the game: {game_link}\n", now
+                    f"{user['username']} played {san}. It is your turn.\n\nView the game: {game_link}\n",
+                    now, game_id, "turn"
                 )
+        else:
+            _queue_game_result_notifications(
+                conn, game_id, game["white_player"], game["black_player"], result, winner,
+                completion_reason, now
+            )
         conn.commit()
         result = conn.execute("SELECT * FROM email_games WHERE id = ?", (game_id,)).fetchone()
         return {"success": True, "game": _email_game_record(result), "move": {"uci": move.uci(), "san": san}}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@app.post("/community/email-games/{game_id}/actions")
+async def apply_email_game_action(game_id: int, request: EmailGameActionRequest,
+                                  authorization: Optional[str] = Header(None)):
+    if request.action not in ("resign", "offer_draw", "accept_draw", "decline_draw"):
+        raise HTTPException(status_code=400, detail="Unknown game action.")
+    user = _email_game_user(authorization)
+    now = datetime.now(timezone.utc).isoformat()
+    conn = get_db()
+    try:
+        _init_community_tables(conn)
+        conn.execute("BEGIN IMMEDIATE")
+        game = conn.execute(
+            "SELECT * FROM email_games WHERE id = ? AND (white_player = ? OR black_player = ?)",
+            (game_id, user["username"], user["username"])
+        ).fetchone()
+        if not game:
+            raise HTTPException(status_code=404, detail="Game not found.")
+        if game["status"] != "active":
+            raise HTTPException(status_code=409, detail="This game is already complete.")
+        if request.expected_version != game["version"]:
+            raise HTTPException(status_code=409, detail="The board changed. Refresh before acting.")
+
+        white_player = game["white_player"]
+        black_player = game["black_player"]
+        if request.action == "resign":
+            winner = black_player if user["username"] == white_player else white_player
+            result = "0-1" if winner == black_player else "1-0"
+            reason = "resignation"
+            conn.execute(
+                "UPDATE email_games SET status = 'completed', result = ?, winner = ?, completion_reason = ?, "
+                "completed_at = ?, draw_offer_by = NULL, version = version + 1 "
+                "WHERE id = ? AND version = ? AND status = 'active'",
+                (result, winner, reason, now, game_id, request.expected_version)
+            )
+            _queue_game_result_notifications(conn, game_id, white_player, black_player, result, winner, reason, now)
+            message = "You resigned. The game is complete."
+        elif request.action == "offer_draw":
+            if game["current_player"] != user["username"]:
+                raise HTTPException(status_code=403, detail="Only the player to move can offer a draw.")
+            if game["draw_offer_by"]:
+                raise HTTPException(status_code=409, detail="A draw offer is already pending.")
+            opponent = black_player if user["username"] == white_player else white_player
+            opponent_row = conn.execute("SELECT email FROM users WHERE username = ?", (opponent,)).fetchone()
+            if not opponent_row:
+                raise HTTPException(status_code=404, detail="The other player no longer has an account.")
+            conn.execute(
+                "UPDATE email_games SET draw_offer_by = ?, version = version + 1 WHERE id = ? AND version = ? AND status = 'active'",
+                (user["username"], game_id, request.expected_version)
+            )
+            link = f"{APP_BASE_URL.rstrip('/')}/email-game.html?game_id={game_id}"
+            _queue_email(
+                conn, opponent_row["email"], "Draw offer in your email chess game",
+                f"{user['username']} offered a draw.\n\nReview and respond: {link}\n",
+                now, game_id, "draw_offer"
+            )
+            message = "Draw offer sent."
+        else:
+            if not game["draw_offer_by"] or game["draw_offer_by"] == user["username"]:
+                raise HTTPException(status_code=409, detail="There is no draw offer from the other player.")
+            offerer = game["draw_offer_by"]
+            if request.action == "accept_draw":
+                result, winner, reason = "1/2-1/2", None, "agreed_draw"
+                conn.execute(
+                    "UPDATE email_games SET status = 'completed', result = ?, winner = NULL, completion_reason = ?, "
+                    "completed_at = ?, draw_offer_by = NULL, version = version + 1 "
+                    "WHERE id = ? AND version = ? AND status = 'active'",
+                    (result, reason, now, game_id, request.expected_version)
+                )
+                _queue_game_result_notifications(conn, game_id, white_player, black_player, result, winner, reason, now)
+                message = "Draw accepted. The game is complete."
+            else:
+                offerer_row = conn.execute("SELECT email FROM users WHERE username = ?", (offerer,)).fetchone()
+                conn.execute(
+                    "UPDATE email_games SET draw_offer_by = NULL, version = version + 1 WHERE id = ? AND version = ? AND status = 'active'",
+                    (game_id, request.expected_version)
+                )
+                conn.execute(
+                    "UPDATE email_outbox SET status = 'cancelled', body = '', claimed_until = NULL, "
+                    "last_error = 'Draw offer was declined' "
+                    "WHERE game_id = ? AND notification_type = 'draw_offer' AND status = 'pending'",
+                    (game_id,)
+                )
+                if offerer_row:
+                    link = f"{APP_BASE_URL.rstrip('/')}/email-game.html?game_id={game_id}"
+                    _queue_email(
+                        conn, offerer_row["email"], "Your draw offer was declined",
+                        f"{user['username']} declined your draw offer.\n\nView the game: {link}\n",
+                        now, game_id, "draw_response"
+                    )
+                message = "Draw offer declined."
+
+        conn.commit()
+        updated = conn.execute("SELECT * FROM email_games WHERE id = ?", (game_id,)).fetchone()
+        return {"success": True, "message": message, "game": _email_game_record(updated)}
     except Exception:
         conn.rollback()
         raise
