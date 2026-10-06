@@ -137,9 +137,10 @@
         currentGame = game;
         currentUsername = data.username;
         const myTurn = game.status === 'active' && game.current_player === data.username;
+        const turnColor = game.current_player === game.white_player ? 'White' : 'Black';
         document.getElementById('players').textContent = 'White: ' + game.white_player + ' | Black: ' + game.black_player;
         document.getElementById('turn').textContent = game.status === 'active'
-          ? (myTurn ? 'Your turn' : game.current_player + ' to move')
+          ? (myTurn ? `Your turn (${turnColor})` : `${turnColor} to move (${game.current_player})`)
           : 'Game ' + game.status;
         const result = document.getElementById('game-result');
         result.hidden = game.status !== 'completed';
@@ -168,7 +169,7 @@
         }
         document.getElementById('game').hidden = false;
         if (typeof Chessboard !== 'function') throw new Error('The board could not load. Please refresh the page.');
-        const orientation = data.username === game.white_player ? 'white' : 'black';
+        const orientation = turnColor.toLowerCase();
         if (board) board.destroy();
         board = Chessboard('board', {
           position: replayPositions.length ? replayPositions[replayIndex] : game.fen,

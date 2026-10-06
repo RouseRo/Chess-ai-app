@@ -501,21 +501,32 @@
     .stats-empty { color: #999; font-size: 0.9em; text-align: center; padding: 20px 0; }
     /* Community Tab */
     #community-panel { display: flex; flex-direction: column; min-height: 0; gap: 0; }
-    .community-layout { display: flex; gap: 10px; flex: 1; min-height: 0; }
+    .community-layout { display: flex; gap: 8px; flex: 1; min-height: 0; min-width: 0; }
     .community-users-sidebar {
-      width: 130px; flex-shrink: 0; border: 1px solid #e0e0e0; border-radius: 4px;
-      background: #fafafa; overflow-y: auto; padding: 6px 0;
+      flex: 0 0 130px; min-width: 130px; border: 1px solid #e0e0e0; border-radius: 4px;
+      background: #fafafa; overflow-x: hidden; overflow-y: auto; padding: 6px 0;
     }
+    .community-sidebar-resizer {
+      flex: 0 0 10px; position: relative; cursor: col-resize; touch-action: none;
+      user-select: none; outline: none;
+    }
+    .community-sidebar-resizer::before {
+      content: ''; position: absolute; top: 0; bottom: 0; left: 4px; width: 2px;
+      border-radius: 2px; background: #c7c7c7;
+    }
+    .community-sidebar-resizer:hover::before,
+    .community-sidebar-resizer:focus-visible::before { left: 3px; width: 4px; background: #2196f3; }
     .community-users-sidebar h4 { font-size: 0.78em; color: #888; text-transform: uppercase;
       padding: 0 8px 6px; margin: 0; border-bottom: 1px solid #eee; }
-    .community-user-item { display: flex; align-items: center; gap: 6px; padding: 5px 8px; font-size: 0.85em; }
+    .community-user-item { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 5px 8px; font-size: 0.85em; }
+    .community-user-item > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .community-user-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
     .community-user-group { padding: 8px 8px 3px; font-size: 0.72em; color: #777; text-transform: uppercase; }
     .cu-online  { background: #4CAF50; }
     .cu-playing { background: #ff9800; }
     .cu-offline { background: #9e9e9e; }
     .cu-me { font-weight: 700; color: #1565c0; }
-    .community-chat-area { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .community-chat-area { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
     .community-messages {
       flex: 1; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 4px;
       padding: 8px; background: white; font-size: 0.88em; line-height: 1.5; min-height: 0;
@@ -1125,6 +1136,62 @@
                           let communityUnreadCount = 0;
                                   let communityInitialized = false;
                           let communityHideBefore = parseInt(localStorage.getItem('communityHideBefore') || '0', 10);
+
+                          function initializeCommunitySidebarResizer() {
+                            const layout = document.querySelector('.community-layout');
+                            const sidebar = document.getElementById('community-users-sidebar');
+                            const resizer = document.getElementById('community-sidebar-resizer');
+                            if (!layout || !sidebar || !resizer) return;
+
+                            const minimumSidebarWidth = 130;
+                            const minimumChatWidth = 150;
+                            const getMaximumWidth = () => Math.max(
+                              minimumSidebarWidth,
+                              layout.clientWidth - minimumChatWidth - resizer.offsetWidth - 16
+                            );
+                            const setSidebarWidth = width => {
+                              const maximumWidth = getMaximumWidth();
+                              const boundedWidth = Math.max(minimumSidebarWidth, Math.min(width, maximumWidth));
+                              sidebar.style.flexBasis = `${boundedWidth}px`;
+                              resizer.setAttribute('aria-valuemin', String(minimumSidebarWidth));
+                              resizer.setAttribute('aria-valuemax', String(Math.round(maximumWidth)));
+                              resizer.setAttribute('aria-valuenow', String(Math.round(boundedWidth)));
+                            };
+
+                            let activePointerId = null;
+                            let dragStartX = 0;
+                            let dragStartWidth = 0;
+                            resizer.addEventListener('pointerdown', event => {
+                              if (event.button !== 0) return;
+                              event.preventDefault();
+                              activePointerId = event.pointerId;
+                              dragStartX = event.clientX;
+                              dragStartWidth = sidebar.getBoundingClientRect().width;
+                              resizer.setPointerCapture(event.pointerId);
+                            });
+                            resizer.addEventListener('pointermove', event => {
+                              if (event.pointerId === activePointerId) {
+                                setSidebarWidth(dragStartWidth + event.clientX - dragStartX);
+                              }
+                            });
+                            const stopResizing = event => {
+                              if (event.pointerId === activePointerId) activePointerId = null;
+                            };
+                            resizer.addEventListener('pointerup', stopResizing);
+                            resizer.addEventListener('pointercancel', stopResizing);
+                            resizer.addEventListener('keydown', event => {
+                              const currentWidth = sidebar.getBoundingClientRect().width;
+                              if (event.key === 'ArrowRight') setSidebarWidth(currentWidth + 16);
+                              else if (event.key === 'ArrowLeft') setSidebarWidth(currentWidth - 16);
+                              else if (event.key === 'Home') setSidebarWidth(minimumSidebarWidth);
+                              else if (event.key === 'End') setSidebarWidth(getMaximumWidth());
+                              else return;
+                              event.preventDefault();
+                            });
+                            window.addEventListener('resize', () => {
+                              setSidebarWidth(sidebar.getBoundingClientRect().width);
+                            });
+                          }
 
                           function openCommunityTab() {
                             communityTabOpen = true;
@@ -2813,17 +2880,22 @@
                       <h3 style="margin:0;">Community</h3>
                       <div style="display:flex; align-items:center; gap:8px;">
                         <span id="community-status-dot" style="font-size:0.82em; color:#888;"></span>
+                        <button type="button" onclick="refreshOnlineUsers()" title="Refresh player statuses" style="padding:3px 9px; font-size:0.82em; background:#607d8b; color:white; border:none; border-radius:3px; cursor:pointer;">Refresh</button>
                         <button onclick="clearCommunityMessages()" title="Hide all messages older than now" style="padding:3px 9px; font-size:0.82em; background:#f44336; color:white; border:none; border-radius:3px; cursor:pointer;">Clear</button>
                       </div>
                     </div>
                     <div class="community-layout">
                       <!-- Players sidebar -->
-                      <div class="community-users-sidebar">
+                      <div id="community-users-sidebar" class="community-users-sidebar">
                         <h4>Players</h4>
                         <div id="community-users-list">
                           <div class="comm-empty" style="padding:10px 8px;">—</div>
                         </div>
                       </div>
+                      <div id="community-sidebar-resizer" class="community-sidebar-resizer" role="separator"
+                        aria-label="Resize player list" aria-orientation="vertical" aria-controls="community-users-sidebar"
+                        aria-valuemin="130" aria-valuemax="130" aria-valuenow="130" tabindex="0"
+                        title="Drag to resize the player list"></div>
                       <!-- Chat area -->
                       <div class="community-chat-area">
                         <div id="community-messages" class="community-messages">
@@ -2879,6 +2951,7 @@
       `;
 
       document.getElementById('app').innerHTML = chessboardHTML;
+      initializeCommunitySidebarResizer();
       initializeChessboard();
     }
 

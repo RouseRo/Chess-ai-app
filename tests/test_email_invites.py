@@ -54,6 +54,7 @@ class EmailInviteTests(unittest.TestCase):
     def invite(self):
         return asyncio.run(auth.send_game_invite(auth.GameInviteRequest(recipient="smtptest"), "Bearer test"))
 
+    # Verifies offline invitations include valid email actions and are persisted.
     def test_offline_invitation_is_emailed_and_persisted(self):
         preview = asyncio.run(auth.preview_game_invite("smtptest", "Bearer test"))
         self.assertTrue(preview["success"])
@@ -80,12 +81,14 @@ class EmailInviteTests(unittest.TestCase):
         with self.connect() as conn:
             self.assertEqual(conn.execute("SELECT count(*) FROM email_game_invites").fetchone()[0], 1)
 
+    # Verifies an invitation is not stored when its email cannot be delivered.
     def test_failed_delivery_does_not_store_invitation(self):
         self.mail.side_effect = RuntimeError("SMTP unavailable")
         self.assertFalse(self.invite()["success"])
         with self.connect() as conn:
             self.assertEqual(conn.execute("SELECT count(*) FROM email_game_invites").fetchone()[0], 0)
 
+    # Verifies online recipients receive an in-app invite instead of an email.
     def test_online_player_still_gets_in_app_invite(self):
         with self.connect() as conn:
             conn.execute("UPDATE users SET current_activity = 'online', last_activity = ? WHERE username = 'smtptest'",
@@ -95,6 +98,7 @@ class EmailInviteTests(unittest.TestCase):
         self.assertNotIn("emailed", result)
         self.mail.assert_not_called()
 
+    # Verifies choosing White records the opening move and prevents replaying a response.
     def test_white_opening_response_and_replay(self):
         self.invite()
         token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
@@ -107,6 +111,7 @@ class EmailInviteTests(unittest.TestCase):
             row = conn.execute("SELECT recipient_color, first_move FROM email_game_invites").fetchone()
             self.assertEqual(tuple(row), ("white", "e4"))
 
+    # Verifies invalid opening moves are rejected and choosing Black succeeds.
     def test_black_and_invalid_opening(self):
         self.invite()
         token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
@@ -115,6 +120,7 @@ class EmailInviteTests(unittest.TestCase):
         self.assertTrue(asyncio.run(auth.respond_to_email_invite(auth.EmailInviteResponse(token=token, choice="black")))["success"])
         self.assertIn("You play White", self.mail.call_args.args[2])
 
+    # Verifies a randomly selected legal opening move is recorded.
     def test_random_opening(self):
         self.invite()
         token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
@@ -125,6 +131,7 @@ class EmailInviteTests(unittest.TestCase):
         self.assertIsNotNone(result["first_move"])
         self.assertIn("Let the first move be chosen at random", self.mail.call_args.args[2])
 
+    # Verifies expired invitations cannot be read or accepted.
     def test_expired_invitation_is_not_accepted(self):
         self.invite()
         token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
@@ -135,6 +142,7 @@ class EmailInviteTests(unittest.TestCase):
         self.assertFalse(asyncio.run(auth.respond_to_email_invite(auth.EmailInviteResponse(token=token, choice="black")))["success"])
         self.mail.assert_called_once()
 
+    # Verifies accepting an invitation creates exactly one game with its opening state.
     def test_acceptance_creates_one_persistent_game(self):
         self.invite()
         token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
@@ -154,6 +162,7 @@ class EmailInviteTests(unittest.TestCase):
             self.assertEqual(conn.execute("SELECT count(*) FROM email_games").fetchone()[0], 1)
             self.assertEqual(conn.execute("SELECT status FROM email_game_invites").fetchone()[0], "accepted")
 
+    # Verifies declines persist without creating a game, even if notification delivery fails.
     def test_decline_is_recorded_without_game_even_if_email_fails(self):
         self.invite()
         token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
@@ -170,6 +179,7 @@ class EmailInviteTests(unittest.TestCase):
             self.assertEqual(row["status"], "declined")
             self.assertIsNotNone(row["responded_at"])
 
+    # Verifies viewing an invitation repeatedly does not consume it or create a game.
     def test_reading_invitation_does_not_consume_it(self):
         self.invite()
         token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
@@ -179,6 +189,7 @@ class EmailInviteTests(unittest.TestCase):
             self.assertEqual(conn.execute("SELECT status FROM email_game_invites").fetchone()[0], "pending")
             self.assertEqual(conn.execute("SELECT count(*) FROM email_games").fetchone()[0], 0)
 
+    # Verifies game access requires valid authentication and participant membership.
     def test_game_access_checks_identity_and_membership(self):
         self.invite()
         token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
@@ -202,6 +213,7 @@ class EmailInviteTests(unittest.TestCase):
                 asyncio.run(auth.get_email_game(game_id, "Bearer expired"))
             self.assertEqual(error.exception.status_code, 401)
 
+    # Verifies admin game listings enforce permissions, counts, filters, and pagination.
     def test_admin_listing_counts_declines_and_filters_games(self):
         self.invite()
         token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
@@ -232,6 +244,7 @@ class EmailInviteTests(unittest.TestCase):
         self.assertEqual(private["games"], [])
         self.assertEqual(private["invitation_stats"]["sent"], 0)
 
+    # Verifies legacy invitations migrate correctly and expired invites are counted.
     def test_legacy_invitation_migration_and_expired_statistics(self):
         with self.connect() as conn:
             conn.execute("CREATE TABLE email_game_invites (id INTEGER PRIMARY KEY, sender TEXT, recipient TEXT, token_hash TEXT, created_at TEXT, expires_at TEXT, responded_at TEXT, recipient_color TEXT, first_move TEXT)")
@@ -246,6 +259,7 @@ class EmailInviteTests(unittest.TestCase):
         self.assertEqual(result["invitation_stats"]["expired"], 1)
         self.assertEqual(result["invitation_stats"]["pending"], 0)
 
+    # Verifies migration leaves unknown outcomes unset for legacy completed games.
     def test_legacy_completed_games_keep_unknown_outcome_after_migration(self):
         with self.connect() as conn:
             conn.execute("""CREATE TABLE email_game_invites (
@@ -275,6 +289,7 @@ class EmailInviteTests(unittest.TestCase):
             self.assertIn("game_id", outbox_columns)
             self.assertIn("notification_type", outbox_columns)
 
+    # Verifies HTTP game access, signed-token identity, admin authorization, and pagination validation.
     def test_http_access_with_signed_tokens_and_pagination_validation(self):
         self.invite()
         token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
@@ -305,6 +320,7 @@ class EmailInviteTests(unittest.TestCase):
         with patch.object(auth, "verify_jwt_token", wraps=verify_token):
             asyncio.run(exercise_routes())
 
+    # Verifies HTTP move, reminder cooldown, and magic-link flows.
     def test_http_milestone_move_reminder_and_magic_link_routes(self):
         self.invite()
         invite_token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
@@ -348,6 +364,7 @@ class EmailInviteTests(unittest.TestCase):
         with patch.object(auth, "verify_jwt_token", wraps=verify_token):
             asyncio.run(exercise_routes())
 
+    # Verifies a game remains accepted and accessible when notification delivery fails.
     def test_acceptance_survives_notification_failure(self):
         self.invite()
         token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
@@ -359,6 +376,7 @@ class EmailInviteTests(unittest.TestCase):
         self.assertEqual(game["current_player"], "inviter")
         self.assertEqual(game["move_history"], [])
 
+    # Verifies a legal move updates the board, game version, and player to move.
     def test_legal_move_persists_and_advances_turn(self):
         self.invite()
         token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
@@ -379,9 +397,11 @@ class EmailInviteTests(unittest.TestCase):
             notice = conn.execute("SELECT recipient, subject, body, status FROM email_outbox").fetchone()
             self.assertEqual(notice["recipient"], "smtptest@example.com")
             self.assertIn("Your turn", notice["subject"])
+            self.assertIn("Next move: Black.", notice["body"])
             self.assertIn("played e4", notice["body"])
             self.assertEqual(notice["status"], "pending")
 
+    # Verifies turn-email delivery retries and records successful completion.
     def test_turn_email_retries_and_records_delivery(self):
         self.invite()
         token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
@@ -398,12 +418,17 @@ class EmailInviteTests(unittest.TestCase):
             conn.execute("UPDATE email_outbox SET next_attempt_at = ?", ((datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(),))
 
         self.assertTrue(auth._process_email_outbox_once())
+        self.assertIn("Next move: Black.", self.mail.call_args.args[2])
+        html_body = self.mail.call_args.args[3]
+        self.assertIn(">Go to game</a>", html_body)
+        self.assertIn('href="http://localhost:8080/email-game.html?game_id=1"', html_body)
         with self.connect() as conn:
             delivered = conn.execute("SELECT status, attempts, sent_at FROM email_outbox").fetchone()
             self.assertEqual(delivered["status"], "sent")
             self.assertEqual(delivered["attempts"], 2)
             self.assertIsNotNone(delivered["sent_at"])
 
+    # Verifies magic links are generic, expire, authenticate once, and cannot be reused.
     def test_magic_link_is_generic_expiring_and_single_use(self):
         response = asyncio.run(auth.request_email_game_link(auth.EmailGameLinkRequest(email="smtptest@example.com")))
         self.assertTrue(response["success"])
@@ -423,6 +448,7 @@ class EmailInviteTests(unittest.TestCase):
             asyncio.run(auth.consume_email_game_link(auth.EmailGameLinkConsumeRequest(token=token)))
         self.assertEqual(error.exception.status_code, 400)
 
+    # Verifies magic-link requests do not reveal account existence or target admins.
     def test_magic_link_requests_do_not_enumerate_or_queue_admin(self):
         with self.connect() as conn:
             conn.execute("UPDATE users SET is_admin = 1 WHERE username = 'inviter'")
@@ -432,6 +458,24 @@ class EmailInviteTests(unittest.TestCase):
         with self.connect() as conn:
             self.assertEqual(conn.execute("SELECT count(*) FROM email_outbox").fetchone()[0], 0)
 
+    def test_all_queued_notification_types_render_action_buttons(self):
+        game_link = "http://localhost:8080/email-game.html?game_id=1"
+        cases = (
+            ("turn", f"It is your turn.\n\nView the game: {game_link}\n", "Go to game", game_link),
+            ("reminder", f"Your opponent is waiting.\n\nView the game: {game_link}\n", "Go to game", game_link),
+            ("draw_offer", f"Your opponent offered a draw.\n\nReview and respond: {game_link}\n", "Review draw offer", game_link),
+            ("draw_response", f"The draw offer was declined.\n\nView the game: {game_link}\n", "View game", game_link),
+            ("result", f"The game is complete.\n\nReview the game: {game_link}\n", "Review game", game_link),
+            (None, "Use this link to sign in.\n\nhttp://localhost:8080/email-game.html?magic_token=test\n",
+             "Sign in to your games", "http://localhost:8080/email-game.html?magic_token=test"),
+        )
+        for notification_type, body, action_label, target in cases:
+            with self.subTest(notification_type=notification_type):
+                html_body = auth._notification_email_html(body, notification_type)
+                self.assertIn(f">{action_label}</a>", html_body)
+                self.assertIn(f'href="{target}"', html_body)
+
+    # Verifies reminders enforce participant, turn, and cooldown rules and include the game button.
     def test_turn_reminder_requires_other_player_and_has_cooldown(self):
         self.invite()
         token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
@@ -443,22 +487,24 @@ class EmailInviteTests(unittest.TestCase):
                 asyncio.run(auth.remind_email_game_player(game_id, "Bearer test"))
         self.assertEqual(error.exception.status_code, 429)
         with self.connect() as conn:
-            notice = conn.execute("SELECT recipient, subject FROM email_outbox").fetchone()
+            notice = conn.execute("SELECT recipient, subject, body FROM email_outbox").fetchone()
             self.assertEqual(notice["recipient"], "inviter@example.com")
             self.assertIn("Reminder", notice["subject"])
+            self.assertIn("Next move: White.", notice["body"])
             self.assertIsNotNone(conn.execute("SELECT last_reminder_at FROM email_games").fetchone()[0])
 
         self.assertTrue(auth._process_email_outbox_once())
         html_body = self.mail.call_args.args[3]
         self.assertIn('href="http://localhost:8080/email-game.html?game_id=1"', html_body)
         self.assertIn(">Go to game</a>", html_body)
-        self.assertIn("Or open the game:", html_body)
+        self.assertIn("Or use this link:", html_body)
 
         with patch.object(auth, "verify_jwt_token", return_value={"username": "inviter"}):
             with self.assertRaises(auth.HTTPException) as error:
                 asyncio.run(auth.remind_email_game_player(game_id, "Bearer test"))
         self.assertEqual(error.exception.status_code, 409)
 
+    # Verifies illegal, out-of-turn, and stale moves are rejected.
     def test_move_rejects_illegal_out_of_turn_and_stale_requests(self):
         self.invite()
         token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
@@ -486,6 +532,7 @@ class EmailInviteTests(unittest.TestCase):
                 ))
         self.assertEqual(error.exception.status_code, 409)
 
+    # Verifies checkmate records the result and enables authorized replay and PGN export.
     def test_checkmate_completes_email_game(self):
         self.invite()
         token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
@@ -526,6 +573,7 @@ class EmailInviteTests(unittest.TestCase):
                 ))
         self.assertEqual(error.exception.status_code, 409)
 
+    # Verifies only the player to move can offer a draw and acceptance records the result.
     def test_draw_offer_requires_turn_and_acceptance_records_draw(self):
         self.invite()
         token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
@@ -544,6 +592,9 @@ class EmailInviteTests(unittest.TestCase):
             ))
             self.assertEqual(offered["game"]["version"], 1)
             self.assertEqual(offered["game"]["draw_offer_by"], "inviter")
+            with self.connect() as conn:
+                offer = conn.execute("SELECT body FROM email_outbox WHERE notification_type = 'draw_offer'").fetchone()
+                self.assertIn("Next move: White.", offer["body"])
             with self.assertRaises(auth.HTTPException) as error:
                 asyncio.run(auth.apply_email_game_action(
                     game_id, auth.EmailGameActionRequest(action="accept_draw", expected_version=1), "Bearer test"
@@ -562,6 +613,7 @@ class EmailInviteTests(unittest.TestCase):
         with self.connect() as conn:
             self.assertEqual(conn.execute("SELECT count(*) FROM email_outbox WHERE notification_type = 'result'").fetchone()[0], 2)
 
+    # Verifies declining a draw clears the offer and queues a response for the offerer.
     def test_declining_draw_clears_offer_and_notifies_offerer(self):
         self.invite()
         token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
@@ -580,9 +632,12 @@ class EmailInviteTests(unittest.TestCase):
         with self.connect() as conn:
             offer = conn.execute("SELECT status FROM email_outbox WHERE notification_type = 'draw_offer'").fetchone()
             reply = conn.execute("SELECT recipient, status FROM email_outbox WHERE notification_type = 'draw_response'").fetchone()
+            reply_body = conn.execute("SELECT body FROM email_outbox WHERE notification_type = 'draw_response'").fetchone()[0]
             self.assertEqual(offer["status"], "cancelled")
             self.assertEqual(tuple(reply), ("inviter@example.com", "pending"))
+            self.assertIn("Next move: White.", reply_body)
 
+    # Verifies resignation records the winner and cancels pending turn notifications.
     def test_resignation_completes_game_and_cancels_pending_turn_email(self):
         self.invite()
         token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
@@ -605,6 +660,7 @@ class EmailInviteTests(unittest.TestCase):
             self.assertEqual(turn["status"], "cancelled")
             self.assertEqual(conn.execute("SELECT count(*) FROM email_outbox WHERE notification_type = 'result'").fetchone()[0], 2)
 
+    # Verifies a stalemating move completes the game as a draw.
     def test_stalemate_move_records_draw_result(self):
         self.invite()
         token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
@@ -623,6 +679,7 @@ class EmailInviteTests(unittest.TestCase):
         self.assertIsNone(result["game"]["winner"])
         self.assertEqual(result["game"]["completion_reason"], "stalemate")
 
+    # Verifies HTTP draw actions enforce versions and expose replay and PGN results.
     def test_http_draw_actions_replay_and_pgn_export(self):
         self.invite()
         invite_token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]

@@ -998,21 +998,33 @@ def _queue_email(conn: sqlite3.Connection, address: str, subject: str, body: str
     )
 
 
-def _game_reminder_html(body: str) -> Optional[str]:
-    message, separator, link = body.partition("\n\nView the game: ")
-    if not separator or not link.strip():
+def _notification_email_html(body: str, notification_type: Optional[str]) -> Optional[str]:
+    message, separator, link_line = body.rstrip().rpartition("\n\n")
+    link = link_line.rsplit(": ", 1)[-1].strip()
+    if not separator or not link.startswith(("http://", "https://")):
         return None
-    safe_message = html_escape(message)
-    safe_link = html_escape(link.strip(), quote=True)
+    action_labels = {
+        "turn": "Go to game",
+        "reminder": "Go to game",
+        "draw_offer": "Review draw offer",
+        "draw_response": "View game",
+        "result": "Review game",
+    }
+    action_label = "Sign in to your games" if "magic_token=" in link else action_labels.get(
+        notification_type, "Open game"
+    )
+    safe_message = html_escape(message).replace("\n", "<br>")
+    safe_link = html_escape(link, quote=True)
     return (
         '<div style="font-family:Arial,sans-serif;color:#242424;font-size:16px">'
         f'<p>{safe_message}</p>'
         '<table role="presentation" cellspacing="0" cellpadding="0"><tr><td '
         'bgcolor="#176b45" style="border-radius:4px">'
         f'<a href="{safe_link}" style="display:inline-block;padding:12px 20px;'
-        'color:#ffffff;text-decoration:none;font-weight:bold">Go to game</a>'
+        f'color:#ffffff;text-decoration:none;font-weight:bold">{html_escape(action_label)}</a>'
         '</td></tr></table>'
-        f'<p style="font-size:13px;color:#555">Or open the game: <a href="{safe_link}">{safe_link}</a></p>'
+        f'<p style="font-size:13px;color:#555">Or use this link: '
+        f'<a href="{safe_link}">{html_escape(link)}</a></p>'
         '</div>'
     )
 
@@ -1040,6 +1052,10 @@ def _queue_game_result_notifications(conn: sqlite3.Connection, game_id: int, whi
                 f"The game ended by {reason.replace('_', ' ')}. Result: {outcome}.\n\nReview the game: {link}\n",
                 now, game_id, "result"
             )
+
+
+def _email_game_turn_color(game: sqlite3.Row) -> str:
+    return "White" if game["current_player"] == game["white_player"] else "Black"
 
 
 def _process_email_outbox_once() -> bool:
@@ -1085,9 +1101,8 @@ def _process_email_outbox_once() -> bool:
             conn.close()
 
     try:
-        html_body = (
-            _game_reminder_html(message["body"])
-            if message.get("notification_type") == "reminder" else None
+        html_body = _notification_email_html(
+            message["body"], message.get("notification_type")
         )
         _send_invite_email(message["recipient"], message["subject"], message["body"], html_body)
     except Exception as exc:
@@ -1744,9 +1759,10 @@ async def submit_email_game_move(game_id: int, request: EmailGameMoveRequest,
             next_player = conn.execute("SELECT email FROM users WHERE username = ?", (current_player,)).fetchone()
             if next_player:
                 game_link = f"{APP_BASE_URL.rstrip('/')}/email-game.html?game_id={game_id}"
+                next_color = "White" if current_player == game["white_player"] else "Black"
                 _queue_email(
                     conn, next_player["email"], f"Your turn in a chess game with {user['username']}",
-                    f"{user['username']} played {san}. It is your turn.\n\nView the game: {game_link}\n",
+                    f"{user['username']} played {san}.\n\nNext move: {next_color}. It is your turn.\n\nView the game: {game_link}\n",
                     now, game_id, "turn"
                 )
         else:
@@ -1814,9 +1830,10 @@ async def apply_email_game_action(game_id: int, request: EmailGameActionRequest,
                 (user["username"], game_id, request.expected_version)
             )
             link = f"{APP_BASE_URL.rstrip('/')}/email-game.html?game_id={game_id}"
+            next_color = _email_game_turn_color(game)
             _queue_email(
                 conn, opponent_row["email"], "Draw offer in your email chess game",
-                f"{user['username']} offered a draw.\n\nReview and respond: {link}\n",
+                f"Next move: {next_color}. {user['username']} offered a draw.\n\nReview and respond: {link}\n",
                 now, game_id, "draw_offer"
             )
             message = "Draw offer sent."
@@ -1848,9 +1865,10 @@ async def apply_email_game_action(game_id: int, request: EmailGameActionRequest,
                 )
                 if offerer_row:
                     link = f"{APP_BASE_URL.rstrip('/')}/email-game.html?game_id={game_id}"
+                    next_color = _email_game_turn_color(game)
                     _queue_email(
                         conn, offerer_row["email"], "Your draw offer was declined",
-                        f"{user['username']} declined your draw offer.\n\nView the game: {link}\n",
+                        f"Next move: {next_color}. {user['username']} declined your draw offer.\n\nView the game: {link}\n",
                         now, game_id, "draw_response"
                     )
                 message = "Draw offer declined."
@@ -1893,9 +1911,10 @@ async def remind_email_game_player(game_id: int, authorization: Optional[str] = 
         if not recipient:
             raise HTTPException(status_code=404, detail="The player to move no longer has an account.")
         game_link = f"{APP_BASE_URL.rstrip('/')}/email-game.html?game_id={game_id}"
+        next_color = _email_game_turn_color(game)
         _queue_email(
             conn, recipient["email"], "Reminder: your chess game is waiting for your move",
-            f"{user['username']} is waiting for your move.\n\nView the game: {game_link}\n",
+            f"Next move: {next_color}. {user['username']} is waiting for your move.\n\nView the game: {game_link}\n",
             now.isoformat(), game_id, "reminder"
         )
         conn.execute("UPDATE email_games SET last_reminder_at = ? WHERE id = ?", (now.isoformat(), game_id))

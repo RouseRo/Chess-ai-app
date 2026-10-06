@@ -18,7 +18,7 @@ The application is for people that are new to the game of chess and want to lear
 - [API Services](#api-services)
 - [Playing Chess](#playing-chess)
 - [Classic Game Rewards](#classic-game-rewards)
-- [Email Games: Fourth Milestone](#email-games-fourth-milestone-planned)
+- [Email Games](#email-games)
 - [Configuration](#configuration)
 - [Troubleshooting](#troubleshooting)
 - [Architecture](#architecture)
@@ -31,7 +31,7 @@ The application is for people that are new to the game of chess and want to lear
 - **Interactive Web UI**: Drag-and-drop chessboard with real-time updates
 - **Human vs Human (H vs H) Sync**: Two players can play against each other from separate browser sessions with automatic board synchronization every 2 seconds
 - **Game ID Banner**: A unique sync game ID is displayed above the board during H vs H games
-- **Community Panel**: See who is online, send public chat messages, send direct messages to other players, and send/receive game invitations
+- **Community Panel**: See and refresh player presence, resize the player list, send public chat messages and direct messages, and send/receive game invitations
 - **Multiple AI Engines**: 
   - Stockfish (local, fast, strong)
   - OpenAI GPT models
@@ -64,16 +64,16 @@ The application is for people that are new to the game of chess and want to lear
 - **Mobile Interface**: A dedicated mobile-optimized chess interface (`/mobile.html`) designed for smartphones (Samsung Galaxy S23 and similar); supports touch drag-and-drop, tabbed layout (Game / Setup / History / Expert), JWT auth, and 3-slot local save system
 - **Docker Support**: Complete containerization with docker-compose
 
-## Email Games: First Milestone
+## Email Games
 
 Offline-player invitations now offer Accept and Decline. Opening a link only
 previews the invitation; an explicit submission records the decision once.
 Declines are included in invitation statistics, not game losses or ratings.
 Accepting creates a persistent game with the selected colors and any opening
-move. Games were read-only in this first milestone; move play was added in the
-second. The accepted invitation links to `email-game.html?game_id=<id>`. Players
+move. The accepted invitation links to `email-game.html?game_id=<id>`. Players
 can sign in normally or use a one-time magic link, and the board is oriented for
-their color. Opening `email-game.html` without a game ID lists the signed-in
+the side to move so that player's pieces are at the bottom. Turn status identifies
+both the color and player to move. Opening `email-game.html` without a game ID lists the signed-in
 player's email games.
 
 Records are stored in the existing auth-service SQLite database. The migration
@@ -92,14 +92,13 @@ Listings support `status`, `limit` (1-100), and `offset`. Status filters are
 invitation and game collections are paginated separately. Invitation statistics
 remain unfiltered. Pending invitations past their expiry are reported as expired.
 Admin game records include elapsed waiting time; invitation token hashes are never
-returned. The admin listing was initially API-only; the second milestone added its
-dashboard tab.
+returned.
 
 Invitation decisions and games are committed before attempting response email.
 If delivery fails, the page reports that the decision is saved but notification
 failed.
 
-## Email Games: Second Milestone
+### Playing and notifications
 
 Accepted email games are playable by both participants. Moves are validated against
 the stored position, restricted to the player whose turn it is, and committed with
@@ -107,8 +106,12 @@ the updated FEN, move history, turn, and version. Stale board versions and finis
 games are rejected. Checkmate, stalemate, and other terminal positions complete the
 game.
 
-After each non-final move, the next player receives a turn email with the move and
-a link to the game. Emails are stored in a SQLite outbox and retried after 1, 2, 4,
+After each non-final move, the next player receives a turn email with the move,
+the color to move, a **Go to game** button, and a plain-link fallback. Reminder,
+draw-offer, draw-response, result, and sign-in emails also include contextual
+action buttons and a plain-link fallback. Active-game turn and reminder notices
+identify whether White or Black is next; completed-game messages report the result.
+Emails are stored in a SQLite outbox and retried after 1, 2, 4,
 and 8 minutes, for up to five delivery attempts. A persistent worker resumes pending
 delivery after an auth-service restart.
 
@@ -160,10 +163,9 @@ the corresponding outbox email. Open the admin dashboard's Email Games tab and
 check filtering, pagination, and waiting-time details. An unrelated account must
 not read or modify the game.
 
-## Email Games: Third Milestone
+### Results and review
 
-The third milestone records why games ended and adds actions and review tools for
-finished games:
+Completed games record why they ended and provide actions and review tools:
 
 - **Persisted outcomes**: Completed games record result, winner, completion reason,
   and completion time. Checkmate, stalemate, resignation, and agreed draws are
@@ -172,8 +174,9 @@ finished games:
 - **Resignation and draw offers**: Participants can resign; the player to move can
   offer a draw, which the opponent can accept or decline. Actions enforce game
   membership and an expected game version.
-- **Terminal notifications**: Both players receive the result by email. Pending
-  turn, reminder, and draw-offer notices are canceled when they are no longer valid.
+- **Terminal notifications**: Both players receive the result by email with a
+  **Review game** action button. Pending turn, reminder, and draw-offer notices are
+  canceled when they are no longer valid.
 - **Replay and PGN export**: Participants can step through completed-game positions
   and download a PGN. The server reconstructs and validates history before returning
   either representation.
@@ -188,7 +191,7 @@ Focused automated checks use `python -m pytest tests/test_email_invites.py -q`.
 Coverage includes legacy migration, result recording, action authorization and
 version conflicts, notification cancellation, replay positions, and PGN export.
 
-## Email Games: Fourth Milestone
+### Local testing
 
 Local interface testing is available through a separate Docker Compose project
 with its own SQLite volume and Mailpit SMTP capture. It uses alternate host ports
@@ -217,6 +220,9 @@ npm test
 The Playwright smoke test covers offline invitation delivery and acceptance,
 invalid and stale move rejection, recipient turn email, moves from both players,
 non-participant access denial, resignation, replay controls, and PGN availability.
+It also checks that the player list can be resized, the Community refresh button
+updates presence, the turn email names the next color, and the board puts the side
+to move at the bottom for both players.
 The existing API tests in `tests/test_email_invites.py` remain the faster
 temporary-database regression layer. The browser smoke test does not cover
 magic-link or reminder behavior, or the admin dashboard.

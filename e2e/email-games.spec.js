@@ -62,6 +62,93 @@ async function movePiece(page, from, to) {
   );
 }
 
+async function expectTurnSideAtBottom(page, color) {
+  await expect.poll(() => page.locator('#board [data-square]').first().getAttribute('data-square'))
+    .toBe(color === 'White' ? 'a8' : 'h1');
+}
+
+test('community player list can be resized', async ({ browser, request }) => {
+  const username = `resize_user_${randomUUID().slice(0, 8)}`;
+  const targetUsername = `resize_target_${randomUUID().slice(0, 8)}`;
+  await registerUser(request, username, `${username}@example.test`);
+  await registerUser(request, targetUsername, `${targetUsername}@example.test`);
+  const token = await loginUser(request, username);
+
+  const page = await browser.newPage();
+  await page.addInitScript(({ authToken, currentUser }) => {
+    localStorage.setItem('authToken', authToken);
+    localStorage.setItem('currentUser', currentUser);
+  }, { authToken: token, currentUser: username });
+  await page.goto('/');
+  const goToGame = page.getByRole('button', { name: 'Go to Game' });
+  if (await goToGame.isVisible().catch(() => false)) await goToGame.click();
+  await page.getByRole('button', { name: /Community/ }).click();
+
+  const sidebar = page.locator('#community-users-sidebar');
+  const resizer = page.getByRole('separator', { name: 'Resize player list' });
+  const initialWidth = await sidebar.evaluate(element => element.getBoundingClientRect().width);
+  const bounds = await resizer.boundingBox();
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + 40);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + bounds.width / 2 + 80, bounds.y + 40);
+  await page.mouse.up();
+  await expect.poll(() => sidebar.evaluate(element => element.getBoundingClientRect().width))
+    .toBeGreaterThan(initialWidth);
+  await expect(page.locator('.community-chat-area')).toBeVisible();
+  const targetRow = page.locator('.community-user-item').filter({ hasText: targetUsername });
+  await targetRow.hover();
+  const directMessageButton = targetRow.locator('button[title="Send direct message"]');
+  const inviteButton = targetRow.locator('button[title="Invite to game"]');
+  await expect(directMessageButton).toBeVisible();
+  await expect(directMessageButton).toBeEnabled();
+  await expect(inviteButton).toBeVisible();
+  await expect(inviteButton).toBeEnabled();
+
+  await resizer.focus();
+  await page.keyboard.press('Home');
+  await expect(resizer).toHaveAttribute('aria-valuenow', '130');
+  await page.keyboard.press('End');
+  await expect.poll(async () => Number(await resizer.getAttribute('aria-valuenow')))
+    .toBeGreaterThan(130);
+  await page.close();
+});
+
+test('community refresh button updates player statuses', async ({ browser, request }) => {
+  const username = `refresh_user_${randomUUID().slice(0, 8)}`;
+  const targetUsername = `refresh_target_${randomUUID().slice(0, 8)}`;
+  await registerUser(request, username, `${username}@example.test`);
+  await registerUser(request, targetUsername, `${targetUsername}@example.test`);
+  const token = await loginUser(request, username);
+
+  const page = await browser.newPage();
+  await page.addInitScript(({ authToken, currentUser }) => {
+    localStorage.setItem('authToken', authToken);
+    localStorage.setItem('currentUser', currentUser);
+  }, { authToken: token, currentUser: username });
+  await page.goto('/');
+  const goToGame = page.getByRole('button', { name: 'Go to Game' });
+  if (await goToGame.isVisible().catch(() => false)) await goToGame.click();
+  await page.getByRole('button', { name: /Community/ }).click();
+
+  await page.route('**/community/online-users', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      success: true,
+      users: [{ username: targetUsername, activity: 'offline' }]
+    })
+  }));
+  const refreshResponse = page.waitForResponse(response =>
+    new URL(response.url()).pathname === '/community/online-users'
+  );
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  expect((await refreshResponse).ok()).toBeTruthy();
+  await expect(page.locator('#community-status-dot')).toHaveText('0 online, 1 offline');
+  const targetRow = page.locator('.community-user-item').filter({ hasText: targetUsername });
+  await expect(targetRow.locator('.cu-offline')).toBeVisible();
+  await page.close();
+});
+
 test('Community invite preview displays inert email action buttons', async ({ browser, request }) => {
   const suffix = randomUUID().slice(0, 8);
   const inviter = `preview_inviter_${suffix}`;
@@ -145,7 +232,8 @@ test('offline invitation, playable game, and completed-game review', async ({ br
   await recipientPage.getByLabel('Username').fill(recipient);
   await recipientPage.getByLabel('Password').fill(testPassword);
   await recipientPage.getByRole('button', { name: 'Sign in' }).click();
-  await expect(recipientPage.locator('#turn')).toHaveText(`${inviter} to move`);
+  await expect(recipientPage.locator('#turn')).toHaveText(`White to move (${inviter})`);
+  await expectTurnSideAtBottom(recipientPage, 'White');
 
   const outsiderResponse = await request.get(`${appBaseUrl}/community/email-games/${gameId}`, {
     headers: { Authorization: `Bearer ${outsiderToken}` }
@@ -153,15 +241,18 @@ test('offline invitation, playable game, and completed-game review', async ({ br
   expect(outsiderResponse.status()).toBe(404);
 
   const inviterPage = await openGamePage(browser, gameId, inviter, request);
-  await expect(inviterPage.locator('#turn')).toHaveText('Your turn');
+  await expect(inviterPage.locator('#turn')).toHaveText('Your turn (White)');
+  await expectTurnSideAtBottom(inviterPage, 'White');
 
   await movePiece(inviterPage, 'e2', 'e5');
   await expect(inviterPage.locator('#feedback')).toContainText('not legal');
-  await expect(inviterPage.locator('#turn')).toHaveText('Your turn');
+  await expect(inviterPage.locator('#turn')).toHaveText('Your turn (White)');
 
   await movePiece(inviterPage, 'e2', 'e4');
-  await expect(inviterPage.locator('#turn')).toHaveText(`${recipient} to move`);
-  await waitForMessage(request, recipientEmail, `Your turn in a chess game with ${inviter}`);
+  await expect(inviterPage.locator('#turn')).toHaveText(`Black to move (${recipient})`);
+  await expectTurnSideAtBottom(inviterPage, 'Black');
+  const turnEmail = await waitForMessage(request, recipientEmail, `Your turn in a chess game with ${inviter}`);
+  expect(turnEmail.Text).toContain('Next move: Black.');
 
   const staleMove = await request.post(`${appBaseUrl}/community/email-games/${gameId}/moves`, {
     headers: { Authorization: `Bearer ${recipientToken}` },
@@ -170,11 +261,14 @@ test('offline invitation, playable game, and completed-game review', async ({ br
   expect(staleMove.status()).toBe(409);
 
   await recipientPage.getByRole('button', { name: 'Refresh board' }).click();
-  await expect(recipientPage.locator('#turn')).toHaveText('Your turn');
+  await expect(recipientPage.locator('#turn')).toHaveText('Your turn (Black)');
+  await expectTurnSideAtBottom(recipientPage, 'Black');
   await movePiece(recipientPage, 'e7', 'e5');
-  await expect(recipientPage.locator('#turn')).toHaveText(`${inviter} to move`);
+  await expect(recipientPage.locator('#turn')).toHaveText(`White to move (${inviter})`);
+  await expectTurnSideAtBottom(recipientPage, 'White');
   await inviterPage.reload();
-  await expect(inviterPage.locator('#turn')).toHaveText('Your turn');
+  await expect(inviterPage.locator('#turn')).toHaveText('Your turn (White)');
+  await expectTurnSideAtBottom(inviterPage, 'White');
 
   inviterPage.once('dialog', dialog => dialog.accept());
   await inviterPage.getByRole('button', { name: 'Resign' }).click();
