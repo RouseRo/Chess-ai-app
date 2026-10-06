@@ -448,6 +448,12 @@ class EmailInviteTests(unittest.TestCase):
             self.assertIn("Reminder", notice["subject"])
             self.assertIsNotNone(conn.execute("SELECT last_reminder_at FROM email_games").fetchone()[0])
 
+        self.assertTrue(auth._process_email_outbox_once())
+        html_body = self.mail.call_args.args[3]
+        self.assertIn('href="http://localhost:8080/email-game.html?game_id=1"', html_body)
+        self.assertIn(">Go to game</a>", html_body)
+        self.assertIn("Or open the game:", html_body)
+
         with patch.object(auth, "verify_jwt_token", return_value={"username": "inviter"}):
             with self.assertRaises(auth.HTTPException) as error:
                 asyncio.run(auth.remind_email_game_player(game_id, "Bearer test"))

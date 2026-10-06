@@ -218,9 +218,21 @@ The Playwright smoke test covers offline invitation delivery and acceptance,
 invalid and stale move rejection, recipient turn email, moves from both players,
 non-participant access denial, resignation, replay controls, and PGN availability.
 The existing API tests in `tests/test_email_invites.py` remain the faster
-temporary-database regression layer. Magic-link and reminder behavior can also be
-checked manually through the UI and captured messages; this browser smoke test
-does not cover those flows or the admin dashboard.
+temporary-database regression layer. The browser smoke test does not cover
+magic-link or reminder behavior, or the admin dashboard.
+
+To manually test the reminder email and its **Go to game** button:
+
+1. Open the app at [http://localhost:18080](http://localhost:18080) and create a
+  game between two test accounts.
+2. After a move, sign in as the player who is not to move and select **Remind on
+  move** on the game page.
+3. Open Mailpit at [http://localhost:18025](http://localhost:18025), open the
+  reminder email, and select **Go to game**. Sign in as the player whose turn it
+  is if prompted; the link should open that game's board.
+
+A reminder can only be sent once per game every 24 hours. The button and its
+destination are also checked by `python -m pytest tests/test_email_invites.py -q`.
 
 Stop the test project and delete its database volume when finished:
 
@@ -380,6 +392,7 @@ docker-compose down
 | Service | URL | Description |
 |---------|-----|-------------|
 | **Chess UI** | http://localhost:8080 | Login & game interface |
+| **Email Games** | http://localhost:8080/email-game.html | Sign in, play, and review email games |
 | **Admin Dashboard** | http://localhost:8080/admin.html | User management |
 | **Auth API** | http://localhost:8002 | Authentication service (regular users) |
 | **Admin Auth API** | port 8003 (Docker-internal only) | Admin login — not published to host |
@@ -458,11 +471,11 @@ When the Azure infrastructure is already provisioned and you only need to rebuil
 | Service | FQDN |
 |---------|------|
 | **Chess UI (public)** | `chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
-| chess-auth (internal) | `chess-auth.internal.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
+| **Chess Auth (public)** | `chess-auth.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
 | chess-admin (internal) | `chess-admin.internal.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
 | chess-engine (internal) | `chess-engine.internal.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
 
-> **nginx routing**: `/auth/`, `/community/`, `/rewards/`, and `/feedback/` all proxy to `chess-auth`. Local Docker Compose uses `nginx.local.conf` (routes to `auth-service:8002`); the Azure image bakes `nginx.conf` (routes to the public ACA FQDN).
+> **nginx routing**: `/auth/`, `/community/`, `/rewards/`, and `/feedback/` all proxy to `chess-auth`. Local Docker Compose uses `nginx.local.conf` (routes to `auth-service:8002`); the Azure image bakes `nginx.conf` (routes to the public ACA FQDN). Email-game pages and API requests use the Chess UI URL; the APIs are served under `/auth/` and `/community/`.
 
 ### Accessing the Deployed App
 
@@ -475,10 +488,11 @@ https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io
 | Page | URL |
 |------|-----|
 | Login / Play Chess | `https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
+| Email Games | `https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io/email-game.html` |
 | Mobile Interface | `https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io/mobile.html` |
 | Admin Dashboard | `https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io/admin.html` |
 
-The three backend services (`chess-engine`, `chess-auth`, `chess-admin`) are internal-only and not reachable from the public internet — they communicate with each other over the private Container Apps Environment network.
+The engine and admin services are internal-only. The auth service has external ingress for the UI's Nginx proxy; email-game API calls should use the Chess UI URL and its `/auth/` and `/community/` routes.
 
 ### Resource Configuration
 

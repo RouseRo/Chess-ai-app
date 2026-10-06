@@ -998,6 +998,25 @@ def _queue_email(conn: sqlite3.Connection, address: str, subject: str, body: str
     )
 
 
+def _game_reminder_html(body: str) -> Optional[str]:
+    message, separator, link = body.partition("\n\nView the game: ")
+    if not separator or not link.strip():
+        return None
+    safe_message = html_escape(message)
+    safe_link = html_escape(link.strip(), quote=True)
+    return (
+        '<div style="font-family:Arial,sans-serif;color:#242424;font-size:16px">'
+        f'<p>{safe_message}</p>'
+        '<table role="presentation" cellspacing="0" cellpadding="0"><tr><td '
+        'bgcolor="#176b45" style="border-radius:4px">'
+        f'<a href="{safe_link}" style="display:inline-block;padding:12px 20px;'
+        'color:#ffffff;text-decoration:none;font-weight:bold">Go to game</a>'
+        '</td></tr></table>'
+        f'<p style="font-size:13px;color:#555">Or open the game: <a href="{safe_link}">{safe_link}</a></p>'
+        '</div>'
+    )
+
+
 def _cancel_pending_game_notifications(conn: sqlite3.Connection, game_id: int, now: str) -> None:
     conn.execute(
         "UPDATE email_outbox SET status = 'cancelled', body = '', claimed_until = NULL, "
@@ -1066,7 +1085,11 @@ def _process_email_outbox_once() -> bool:
             conn.close()
 
     try:
-        _send_invite_email(message["recipient"], message["subject"], message["body"])
+        html_body = (
+            _game_reminder_html(message["body"])
+            if message.get("notification_type") == "reminder" else None
+        )
+        _send_invite_email(message["recipient"], message["subject"], message["body"], html_body)
     except Exception as exc:
         final_attempt = message["attempts"] >= 5
         retry_at = (now + timedelta(seconds=min(60 * (2 ** (message["attempts"] - 1)), 3600))).isoformat()
@@ -1872,7 +1895,8 @@ async def remind_email_game_player(game_id: int, authorization: Optional[str] = 
         game_link = f"{APP_BASE_URL.rstrip('/')}/email-game.html?game_id={game_id}"
         _queue_email(
             conn, recipient["email"], "Reminder: your chess game is waiting for your move",
-            f"{user['username']} is waiting for your move.\n\nView the game: {game_link}\n", now.isoformat()
+            f"{user['username']} is waiting for your move.\n\nView the game: {game_link}\n",
+            now.isoformat(), game_id, "reminder"
         )
         conn.execute("UPDATE email_games SET last_reminder_at = ? WHERE id = ?", (now.isoformat(), game_id))
         conn.commit()
