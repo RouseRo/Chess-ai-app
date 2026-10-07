@@ -17,6 +17,9 @@
     label.option { display: flex; gap: 12px; align-items: center; padding: 12px; border: 1px solid #d2ddd4; margin: 8px 0; cursor: pointer; }
     label.option:has(input:checked) { border-color: #3e714a; background: #f1f7f1; }
     input[type="radio"] { accent-color: #3e714a; }
+    #registration-fields { margin: 24px 0; }
+    #registration-fields label { display: block; font-weight: bold; margin: 12px 0 6px; }
+    #registration-fields input { width: 100%; padding: 12px; font: inherit; border: 1px solid #9aafa0; }
     #move-field { display: none; margin: 16px 0; }
     #move-field label { display: block; font-weight: bold; margin-bottom: 7px; }
     #move { width: 100%; padding: 12px; font: inherit; border: 1px solid #9aafa0; }
@@ -33,6 +36,14 @@
     <h1>Friendly chess invitation</h1>
     <p id="intro">Loading your invitation...</p>
     <form id="response" hidden>
+      <section id="registration-fields" hidden>
+        <h2>Create your Community account</h2>
+        <p>This invitation confirms your email address. Choose a username and password to join the Community and accept the game.</p>
+        <label for="new-username">Username</label>
+        <input id="new-username" autocomplete="username" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" required>
+        <label for="new-password">Password</label>
+        <input id="new-password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required>
+      </section>
       <fieldset id="opening-options">
         <legend>How would you like to begin?</legend>
         <label class="option"><input type="radio" name="choice" value="white" required> I play White and send my first move</label>
@@ -58,6 +69,9 @@
     const form = document.getElementById('response');
     const move = document.getElementById('move');
     const moveField = document.getElementById('move-field');
+    const registrationFields = document.getElementById('registration-fields');
+    const newUsername = document.getElementById('new-username');
+    const newPassword = document.getElementById('new-password');
     const openingOptions = document.getElementById('opening-options');
     const acceptButton = document.getElementById('accept-invitation');
     const declineButton = document.getElementById('decline-invitation');
@@ -66,8 +80,16 @@
         .then(response => response.json())
         .then(data => {
           if (!data.success) throw new Error(data.message);
-          intro.textContent = data.sender + ' has invited you to play a friendly game of chess.';
+          intro.textContent = data.needs_registration
+            ? data.sender + ' invited ' + data.recipient_email + '. Create a Community account to accept.'
+            : data.sender + ' has invited you to play a friendly game of chess.';
+          registrationFields.hidden = !data.needs_registration;
+          newUsername.required = data.needs_registration;
+          newPassword.required = data.needs_registration;
           if (requestedDecision === 'decline') {
+            registrationFields.hidden = true;
+            newUsername.required = false;
+            newPassword.required = false;
             openingOptions.hidden = true;
             acceptButton.hidden = true;
             declineButton.textContent = 'Confirm decline';
@@ -94,14 +116,25 @@
         const response = await fetch('/community/email-invite/respond', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, decision, choice: form.elements.choice.value, first_move: decision === 'decline' ? '' : move.value })
+          body: JSON.stringify({
+            token,
+            decision,
+            choice: form.elements.choice.value,
+            first_move: decision === 'decline' ? '' : move.value,
+            username: decision === 'accept' ? newUsername.value.trim() : undefined,
+            password: decision === 'accept' ? newPassword.value : undefined
+          })
         });
         const data = await response.json();
         if (!data.success) throw new Error(data.message);
         form.hidden = true;
         intro.textContent = data.status === 'declined' ? 'You declined this invitation.' : 'You accepted this invitation.';
         feedback.className = 'success';
-        feedback.textContent = data.emailed === false ? 'Your decision is saved, but the email notification could not be delivered.' : 'The inviting player has been notified.';
+        feedback.textContent = data.username
+          ? 'Your account is ready. Sign in on the game page to play.'
+          : data.emailed === false
+            ? 'Your decision is saved, but the email notification could not be delivered.'
+            : 'The inviting player has been notified.';
         if (data.game_id) {
           const gameLink = document.getElementById('game-link');
           gameLink.href = 'email-game.html?game_id=' + encodeURIComponent(data.game_id);

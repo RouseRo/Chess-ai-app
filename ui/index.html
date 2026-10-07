@@ -1383,6 +1383,12 @@
 
                           let pendingEmailInviteRecipient = null;
 
+                          function submitEmailGameInvite(event) {
+                            event.preventDefault();
+                            const address = document.getElementById('email-invite-address').value.trim();
+                            if (address) openGameInvite(address, 'offline');
+                          }
+
                           function openGameInvite(recipient, activity) {
                             if (activity !== 'offline') {
                               sendGameInvite(recipient);
@@ -1436,6 +1442,9 @@
                               .then(data => {
                                 if (data.success) {
                                   if (pendingEmailInviteRecipient === recipient) closeGameInvitePreview();
+                                  const emailField = document.getElementById('email-invite-address');
+                                  if (emailField && emailField.value.trim().toLowerCase() === recipient.toLowerCase())
+                                    emailField.value = '';
                                   refreshCommunityMessages();
                                   updateStatusBox(data.emailed
                                     ? 'Email invitation sent to ' + recipient + '. Their reply will arrive by email and in Community.'
@@ -2888,6 +2897,12 @@
                       <!-- Players sidebar -->
                       <div id="community-users-sidebar" class="community-users-sidebar">
                         <h4>Players</h4>
+                        <form id="email-invite-form" onsubmit="submitEmailGameInvite(event)" style="padding:0 6px 8px;">
+                          <label for="email-invite-address" style="display:block; font-size:0.8em; margin-bottom:4px;">Invite by email</label>
+                          <input id="email-invite-address" type="email" required maxlength="254" autocomplete="email"
+                            placeholder="name@example.com" style="width:100%; min-width:0; padding:6px; border:1px solid #bbb; border-radius:3px;">
+                          <button type="submit" style="width:100%; margin-top:5px; padding:6px; background:#2e7d32; color:#fff; border:0; border-radius:3px; cursor:pointer;">Invite</button>
+                        </form>
                         <div id="community-users-list">
                           <div class="comm-empty" style="padding:10px 8px;">—</div>
                         </div>

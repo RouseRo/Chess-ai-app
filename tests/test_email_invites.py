@@ -36,7 +36,7 @@ class EmailInviteTests(unittest.TestCase):
 
         self.connect = connect
         with connect() as conn:
-            conn.execute("CREATE TABLE users (username TEXT, email TEXT, is_verified INTEGER, last_activity TEXT, current_activity TEXT, last_login TEXT, is_admin INTEGER DEFAULT 0)")
+            conn.execute("CREATE TABLE users (username TEXT, email TEXT, password_hash TEXT, is_verified INTEGER, verification_token TEXT, last_activity TEXT, current_activity TEXT, last_login TEXT, is_admin INTEGER DEFAULT 0)")
             conn.executemany("INSERT INTO users (username, email, is_verified, last_activity, current_activity, is_admin) VALUES (?, ?, 1, NULL, 'offline', 0)", [
                 ("inviter", "inviter@example.com"), ("smtptest", "smtptest@example.com"),
                 ("outsider", "outsider@example.com")
@@ -53,6 +53,81 @@ class EmailInviteTests(unittest.TestCase):
 
     def invite(self):
         return asyncio.run(auth.send_game_invite(auth.GameInviteRequest(recipient="smtptest"), "Bearer test"))
+
+    def invite_external_email(self):
+        return asyncio.run(auth.send_game_invite(
+            auth.GameInviteRequest(recipient="New.Player@example.com"), "Bearer test"
+        ))
+
+    def test_external_email_invite_registers_recipient_and_creates_game(self):
+        result = self.invite_external_email()
+        self.assertTrue(result["success"])
+        self.assertEqual(self.mail.call_args.args[0], "new.player@example.com")
+        token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
+        preview = asyncio.run(auth.get_email_invite(token))
+        self.assertTrue(preview["needs_registration"])
+        self.assertEqual(preview["recipient_email"], "new.player@example.com")
+
+        response = auth.EmailInviteResponse(
+            token=token, choice="black", username="newplayer", password="secure-password"
+        )
+        accepted = asyncio.run(auth.respond_to_email_invite(response))
+        self.assertTrue(accepted["success"])
+        self.assertEqual(accepted["status"], "accepted")
+        with self.connect() as conn:
+            user = conn.execute(
+                "SELECT username, email, is_verified FROM users WHERE username = 'newplayer'"
+            ).fetchone()
+            self.assertEqual(tuple(user), ("newplayer", "new.player@example.com", 1))
+            game = conn.execute("SELECT white_player, black_player FROM email_games").fetchone()
+            self.assertEqual(tuple(game), ("inviter", "newplayer"))
+            invite = conn.execute("SELECT recipient, recipient_email FROM email_game_invites").fetchone()
+            self.assertEqual(tuple(invite), ("newplayer", "new.player@example.com"))
+
+    def test_external_invite_rejects_duplicate_username_without_consuming_invite(self):
+        self.invite_external_email()
+        token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
+        response = auth.EmailInviteResponse(
+            token=token, choice="black", username="inviter", password="secure-password"
+        )
+        result = asyncio.run(auth.respond_to_email_invite(response))
+        self.assertFalse(result["success"])
+        self.assertIn("username", result["message"].lower())
+        with self.connect() as conn:
+            self.assertEqual(conn.execute("SELECT count(*) FROM email_games").fetchone()[0], 0)
+            self.assertEqual(conn.execute("SELECT status FROM email_game_invites").fetchone()[0], "pending")
+
+    def test_external_invite_reuses_existing_account_for_same_email(self):
+        result = asyncio.run(auth.send_game_invite(
+            auth.GameInviteRequest(recipient="smtptest@example.com"), "Bearer test"
+        ))
+        self.assertTrue(result["success"])
+        token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
+        accepted = asyncio.run(auth.respond_to_email_invite(auth.EmailInviteResponse(token=token)))
+        self.assertTrue(accepted["success"])
+        self.assertEqual(accepted["username"], "smtptest")
+        with self.connect() as conn:
+            self.assertEqual(conn.execute("SELECT count(*) FROM users WHERE LOWER(email) = LOWER('smtptest@example.com')").fetchone()[0], 1)
+            game = conn.execute("SELECT white_player, black_player FROM email_games").fetchone()
+            self.assertEqual(tuple(game), ("inviter", "smtptest"))
+
+    def test_external_invite_rejects_invalid_email_and_registration_credentials(self):
+        for address in ("not-an-email", "new..player@example.com", "player@example..com"):
+            invalid_email = asyncio.run(auth.send_game_invite(
+                auth.GameInviteRequest(recipient=address), "Bearer test"
+            ))
+            self.assertFalse(invalid_email["success"])
+        self.mail.assert_not_called()
+
+        self.invite_external_email()
+        token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
+        invalid_registration = asyncio.run(auth.respond_to_email_invite(auth.EmailInviteResponse(
+            token=token, choice="black", username="bad name", password="short"
+        )))
+        self.assertFalse(invalid_registration["success"])
+        with self.connect() as conn:
+            self.assertEqual(conn.execute("SELECT status FROM email_game_invites").fetchone()[0], "pending")
+            self.assertEqual(conn.execute("SELECT count(*) FROM email_games").fetchone()[0], 0)
 
     # Verifies offline invitations include valid email actions and are persisted.
     def test_offline_invitation_is_emailed_and_persisted(self):

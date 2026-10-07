@@ -13,6 +13,7 @@ import os
 import secrets
 import hashlib
 import random
+import re
 import bcrypt
 import chess
 import chess.pgn
@@ -685,6 +686,9 @@ def _init_community_tables(conn: sqlite3.Connection):
         )
     ''')
     columns = {row[1] for row in conn.execute("PRAGMA table_info(email_game_invites)")}
+    if "recipient_email" not in columns:
+        conn.execute("ALTER TABLE email_game_invites ADD COLUMN recipient_email TEXT")
+        columns.add("recipient_email")
     if "status" not in columns:
         conn.execute("ALTER TABLE email_game_invites ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'")
         conn.execute("UPDATE email_game_invites SET status = 'accepted' WHERE responded_at IS NOT NULL")
@@ -950,6 +954,8 @@ class EmailInviteResponse(BaseModel):
     choice: str = "black"
     first_move: str = ""
     decision: str = "accept"
+    username: Optional[str] = None
+    password: Optional[str] = None
 
 
 class EmailGameMoveRequest(BaseModel):
@@ -1256,16 +1262,46 @@ async def preview_game_invite(recipient: str, authorization: Optional[str] = Hea
         "SELECT username, is_verified, last_activity, current_activity FROM users WHERE LOWER(username) = LOWER(?)",
         (recipient.strip(),)
     ).fetchone()
-    conn.close()
-    if not row or not row["is_verified"] or row["username"].lower() == payload["username"].lower():
-        return {"success": False, "message": "Recipient is not available for email invitations."}
-    if _is_online(row["last_activity"], row["current_activity"]):
-        return {"success": False, "message": "This player is online. Refresh the player list to invite them in-app."}
     sender = payload["username"]
-    return {"success": True, "recipient": row["username"],
+    if row:
+        conn.close()
+        if not row["is_verified"] or row["username"].lower() == sender.lower():
+            return {"success": False, "message": "Recipient is not available for email invitations."}
+        if _is_online(row["last_activity"], row["current_activity"]):
+            return {"success": False, "message": "This player is online. Refresh the player list to invite them in-app."}
+        actual_recipient = row["username"]
+    else:
+        recipient_email = _normalize_invite_email(recipient)
+        if not recipient_email:
+            conn.close()
+            return {"success": False, "message": "Enter a valid email address or community username."}
+        sender_row = conn.execute("SELECT email FROM users WHERE LOWER(username) = LOWER(?)", (sender,)).fetchone()
+        conn.close()
+        if sender_row and sender_row["email"].lower() == recipient_email:
+            return {"success": False, "message": "Cannot invite yourself."}
+        actual_recipient = recipient_email
+    if not actual_recipient:
+        return {"success": False, "message": "Recipient is not available for email invitations."}
+    return {"success": True, "recipient": actual_recipient,
             "subject": f"Chess invitation from {sender}",
             "body": _game_invite_email(sender, "[Personal response link included when sent]"),
             "html_body": _game_invite_email_html(sender, "#", preview=True)}
+
+
+def _normalize_invite_email(value: str) -> Optional[str]:
+    address = value.strip().lower()
+    if len(address) > 254 or address.count("@") != 1:
+        return None
+    local, domain = address.split("@")
+    if (not local or len(local) > 64 or ".." in local or local.startswith(".") or local.endswith(".")
+            or not re.fullmatch(r"[A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]+", local)):
+        return None
+    labels = domain.split(".")
+    label_pattern = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+    if (len(labels) < 2 or len(domain) > 253 or len(labels[-1]) < 2
+            or any(not re.fullmatch(label_pattern, label) for label in labels)):
+        return None
+    return address
 
 
 @app.post("/community/game-invite")
@@ -1283,38 +1319,67 @@ async def send_game_invite(
     sender = payload.get("username")
     recipient = request.recipient.strip()
 
-    if sender.lower() == recipient.lower():
-        return {"success": False, "message": "Cannot invite yourself."}
-
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("SELECT username, email, is_verified, last_activity, current_activity FROM users WHERE LOWER(username) = LOWER(?)", (recipient,))
     recipient_row = cursor.fetchone()
-    if not recipient_row:
-        conn.close()
-        return {"success": False, "message": "User not found."}
-
-    actual_recipient = recipient_row["username"]
     _init_community_tables(conn)
     now = datetime.now(timezone.utc).isoformat()
-    target_json = _json_module.dumps([sender, actual_recipient])
-    content = f"{sender} has invited you to play a game of chess!"
-    if not recipient_row["is_verified"]:
-        conn.close()
-        return {"success": False, "message": "Recipient must verify their email first."}
-    if not _is_online(recipient_row["last_activity"], recipient_row["current_activity"]):
+    if not recipient_row:
+        recipient_email = _normalize_invite_email(recipient)
+        if not recipient_email:
+            conn.close()
+            return {"success": False, "message": "Enter a valid email address or community username."}
+        sender_row = conn.execute("SELECT email FROM users WHERE LOWER(username) = LOWER(?)", (sender,)).fetchone()
+        if sender_row and sender_row["email"].lower() == recipient_email:
+            conn.close()
+            return {"success": False, "message": "Cannot invite yourself."}
+        existing = conn.execute(
+            "SELECT id FROM email_game_invites WHERE recipient_email = ? AND status = 'pending' AND expires_at > ?",
+            (recipient_email, now)
+        ).fetchone()
+        if existing:
+            conn.close()
+            return {"success": False, "message": "An invitation is already pending for this email address."}
+        actual_recipient = recipient_email
+        recipient_address = recipient_email
+        is_external = True
+    else:
+        actual_recipient = recipient_row["username"]
+        if sender.lower() == actual_recipient.lower():
+            conn.close()
+            return {"success": False, "message": "Cannot invite yourself."}
+        if not recipient_row["is_verified"]:
+            conn.close()
+            return {"success": False, "message": "Recipient must verify their email first."}
+        if _is_online(recipient_row["last_activity"], recipient_row["current_activity"]):
+            target_json = _json_module.dumps([sender, actual_recipient])
+            content = f"{sender} has invited you to play a game of chess!"
+            cursor.execute(
+                "INSERT INTO community_messages (sender, content, message_type, target_users, created_at) VALUES (?, ?, 'game_invite', ?, ?)",
+                (sender, content, target_json, now)
+            )
+            conn.commit()
+            msg_id = cursor.lastrowid
+            conn.close()
+            return {"success": True, "id": msg_id, "recipient": actual_recipient}
+        recipient_address = recipient_row["email"]
+        recipient_email = None
+        is_external = False
+
+    if is_external or recipient_row:
         token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(token.encode()).hexdigest()
         expires_at = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
         link = f"{APP_BASE_URL.rstrip('/')}/invite.html?token={token}"
         cursor.execute(
-            "INSERT INTO email_game_invites (sender, recipient, token_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
-            (sender, actual_recipient, token_hash, now, expires_at)
+            "INSERT INTO email_game_invites (sender, recipient, recipient_email, token_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (sender, actual_recipient, recipient_email, token_hash, now, expires_at)
         )
         invite_id = cursor.lastrowid
         try:
             _send_invite_email(
-                recipient_row["email"], f"Chess invitation from {sender}",
+                recipient_address, f"Chess invitation from {sender}",
                 _game_invite_email(sender, link),
                 _game_invite_email_html(sender, link)
             )
@@ -1325,14 +1390,6 @@ async def send_game_invite(
         conn.commit()
         conn.close()
         return {"success": True, "id": invite_id, "recipient": actual_recipient, "emailed": True}
-    cursor.execute(
-        "INSERT INTO community_messages (sender, content, message_type, target_users, created_at) VALUES (?, ?, 'game_invite', ?, ?)",
-        (sender, content, target_json, now)
-    )
-    conn.commit()
-    msg_id = cursor.lastrowid
-    conn.close()
-    return {"success": True, "id": msg_id, "recipient": actual_recipient}
 
 
 def _find_email_invite(conn: sqlite3.Connection, token: str):
@@ -1352,7 +1409,17 @@ async def get_email_invite(token: str):
     conn.close()
     if not invite or invite["responded_at"] or datetime.fromisoformat(invite["expires_at"]) < datetime.now(timezone.utc):
         return {"success": False, "message": "This invitation is invalid, expired, or already answered."}
-    return {"success": True, "sender": invite["sender"], "recipient": invite["recipient"]}
+    needs_registration = False
+    recipient_email = invite["recipient_email"]
+    if recipient_email:
+        conn = get_db()
+        existing_user = conn.execute(
+            "SELECT username FROM users WHERE LOWER(email) = LOWER(?)", (recipient_email,)
+        ).fetchone()
+        conn.close()
+        needs_registration = existing_user is None
+    return {"success": True, "sender": invite["sender"], "recipient": invite["recipient"],
+            "recipient_email": recipient_email, "needs_registration": needs_registration}
 
 
 @app.post("/community/email-invite/respond")
@@ -1397,14 +1464,53 @@ async def respond_to_email_invite(request: EmailInviteResponse):
         conn.rollback()
         conn.close()
         return {"success": False, "message": "Inviting player no longer exists."}
+    recipient_username = invite["recipient"]
+    if request.decision == "accept" and invite["recipient_email"]:
+        existing_user = conn.execute(
+            "SELECT username FROM users WHERE LOWER(email) = LOWER(?)", (invite["recipient_email"],)
+        ).fetchone()
+        if existing_user:
+            recipient_username = existing_user["username"]
+            conn.execute(
+                "UPDATE users SET is_verified = 1, verification_token = NULL WHERE username = ?",
+                (recipient_username,)
+            )
+        else:
+            username = (request.username or "").strip()
+            password = request.password or ""
+            if not re.fullmatch(r"[A-Za-z0-9_]{3,20}", username):
+                conn.rollback()
+                conn.close()
+                return {"success": False, "message": "Username must be 3-20 characters using letters, numbers, or underscores."}
+            if len(password.encode("utf-8")) < 8 or len(password.encode("utf-8")) > 72:
+                conn.rollback()
+                conn.close()
+                return {"success": False, "message": "Password must be between 8 and 72 bytes."}
+            duplicate = conn.execute(
+                "SELECT 1 FROM users WHERE LOWER(username) = LOWER(?)", (username,)
+            ).fetchone()
+            if duplicate:
+                conn.rollback()
+                conn.close()
+                return {"success": False, "message": "That username is already taken. Choose another username."}
+            password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode()
+            recipient_username = username.lower()
+            conn.execute(
+                "INSERT INTO users (username, email, password_hash, is_verified, verification_token) VALUES (?, ?, ?, 1, NULL)",
+                (recipient_username, invite["recipient_email"], password_hash)
+            )
+        conn.execute(
+            "UPDATE email_game_invites SET recipient = ? WHERE id = ?",
+            (recipient_username, invite["id"])
+        )
     now = datetime.now(timezone.utc).isoformat()
     status = "declined" if request.decision == "decline" else "accepted"
     conn.execute("UPDATE email_game_invites SET responded_at = ?, recipient_color = ?, first_move = ?, status = ? WHERE id = ?",
                  (now, color, first_move, status, invite["id"]))
     game_id = None
     if status == "accepted":
-        white_player = invite["recipient"] if color == "white" else invite["sender"]
-        black_player = invite["sender"] if color == "white" else invite["recipient"]
+        white_player = recipient_username if color == "white" else invite["sender"]
+        black_player = invite["sender"] if color == "white" else recipient_username
         board = chess.Board()
         history = []
         if first_move:
@@ -1418,15 +1524,17 @@ async def respond_to_email_invite(request: EmailInviteResponse):
              white_player if board.turn == chess.WHITE else black_player, now, now, now if history else None)
         )
         game_id = cursor.lastrowid
-    conn.execute(
-        "INSERT INTO community_messages (sender, content, message_type, target_users, created_at) VALUES (?, ?, 'dm', ?, ?)",
-        (invite["recipient"], f"Invitation {status}. {reply}",
-         _json_module.dumps([invite["sender"], invite["recipient"]]), now)
-    )
+    if not invite["recipient_email"] or status == "accepted":
+        conn.execute(
+            "INSERT INTO community_messages (sender, content, message_type, target_users, created_at) VALUES (?, ?, 'dm', ?, ?)",
+            (recipient_username, f"Invitation {status}. {reply}",
+             _json_module.dumps([invite["sender"], recipient_username]), now)
+        )
     conn.commit()
     conn.close()
     game_link = f"{APP_BASE_URL.rstrip('/')}/email-game.html?game_id={game_id}" if game_id else None
-    body = f"{invite['recipient']} {status} your friendly chess invitation.\n\n{reply}\n"
+    recipient_label = recipient_username if status == "accepted" else invite["recipient"]
+    body = f"{recipient_label} {status} your friendly chess invitation.\n\n{reply}\n"
     if game_link:
         body += f"\nView the board (sign-in required): {game_link}\n"
     emailed = True
@@ -1435,7 +1543,8 @@ async def respond_to_email_invite(request: EmailInviteResponse):
     except (RuntimeError, smtplib.SMTPException, OSError):
         emailed = False
     return {"success": True, "message": "Your decision has been recorded.", "status": status,
-            "color": color, "first_move": first_move, "game_id": game_id, "emailed": emailed}
+            "color": color, "first_move": first_move, "game_id": game_id, "emailed": emailed,
+            "username": recipient_username if status == "accepted" else None}
 
 
 def _email_game_user(authorization: Optional[str]) -> dict:
