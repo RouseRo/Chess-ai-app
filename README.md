@@ -249,6 +249,50 @@ docker compose --env-file .env.email-games-test -p chess-email-test -f docker-co
 Because this uses the `chess-email-test` Compose project name and a separate
 named volume, cleanup does not remove the normal app's containers or database.
 
+### Mailpit for the regular local app
+
+The regular app at http://localhost:8080 can also capture outgoing email in
+Mailpit at http://localhost:8025. This inbox is separate from the isolated test
+inbox at http://localhost:18025. Mailpit captures messages sent to its SMTP
+server regardless of recipient; it does not intercept email from other apps or
+the Azure deployment.
+
+With the regular Compose project running under its default project name, create
+a mail catcher on the app's network:
+
+```powershell
+docker run -d --name mailpit --network chess-ai-app_chess-network -p 127.0.0.1:1025:1025 -p 127.0.0.1:8025:8025 axllent/mailpit:latest
+```
+
+If the `mailpit` container already exists, use `docker start mailpit` instead.
+If it is not yet attached to the app's network, run
+`docker network connect chess-ai-app_chess-network mailpit`. Substitute your
+actual Compose network name if using a different project name.
+
+To keep capture enabled across auth-service recreations, set these values in the
+root `.env` file, retaining a nonempty `SMTP_FROM_EMAIL`:
+
+```env
+SMTP_HOST=mailpit
+SMTP_PORT=1025
+SMTP_USE_STARTTLS=false
+SMTP_USE_AUTH=false
+APP_BASE_URL=http://localhost:8080
+```
+
+Apply the settings without restarting the other app services:
+
+```powershell
+docker compose -f docker-compose.yml up -d --no-deps auth-service
+```
+
+Temporary PowerShell environment overrides also work, but recreating the auth
+service without those overrides restores the settings from `.env`. Keep TLS and
+SMTP authentication enabled for production providers such as Brevo. Development
+mode skips registration verification emails; invitations and email-game notices
+still use SMTP. Captured messages remain local and are not delivered to the
+recipients' real inboxes.
+
 ## Requirements
 
 ### User Interface Requirements
