@@ -224,6 +224,13 @@ class EmailInviteTests(unittest.TestCase):
         response = auth.EmailInviteResponse(token=token, choice="white", first_move="e4")
         result = asyncio.run(auth.respond_to_email_invite(response))
         self.assertTrue(result["success"])
+        response_email = self.mail.call_args
+        response_html = response_email.args[3]
+        game_link = f"{auth.APP_BASE_URL}/email-game.html?game_id={result['game_id']}"
+        self.assertIn("Invitation accepted", response_html)
+        self.assertIn(f'href="{game_link}"', response_html)
+        self.assertIn(">View the board</a>", response_html)
+        self.assertIn(game_link, response_email.args[2])
         self.assertFalse(asyncio.run(auth.respond_to_email_invite(response))["success"])
         with self.connect() as conn:
             game = conn.execute("SELECT * FROM email_games").fetchone()
@@ -607,6 +614,29 @@ class EmailInviteTests(unittest.TestCase):
                 ))
         self.assertEqual(error.exception.status_code, 409)
 
+    def test_email_game_exposes_captured_pieces_in_current_position(self):
+        self.invite()
+        token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
+        game_id = asyncio.run(auth.respond_to_email_invite(auth.EmailInviteResponse(token=token)))['game_id']
+        sequence = [
+            ("inviter", "e4"), ("smtptest", "a6"), ("inviter", "e5"),
+            ("smtptest", "d5"), ("inviter", "exd6")
+        ]
+        history = []
+        for version, (username, move) in enumerate(sequence):
+            with patch.object(auth, "verify_jwt_token", return_value={"username": username}):
+                result = asyncio.run(auth.submit_email_game_move(
+                    game_id, auth.EmailGameMoveRequest(move=move, expected_version=version), "Bearer test"
+                ))
+                history.append(result["move"])
+
+        with patch.object(auth, "verify_jwt_token", return_value={"username": "inviter"}):
+            game = asyncio.run(auth.get_email_game(game_id, "Bearer test"))["game"]
+        self.assertEqual(game["captured_pieces"], {"white": ["p"], "black": []})
+        capture_history = auth._email_game_capture_history(history)
+        self.assertEqual(capture_history[-2], {"white": [], "black": []})
+        self.assertEqual(capture_history[-1], {"white": ["p"], "black": []})
+
     # Verifies checkmate records the result and enables authorized replay and PGN export.
     def test_checkmate_completes_email_game(self):
         self.invite()
@@ -628,6 +658,7 @@ class EmailInviteTests(unittest.TestCase):
         self.assertIsNotNone(result["game"]["completed_at"])
         replay = asyncio.run(auth.replay_email_game(game_id, "Bearer test"))
         self.assertEqual(len(replay["positions"]), 5)
+        self.assertEqual(len(replay["captured_pieces"]), len(replay["positions"]))
         self.assertEqual(replay["positions"][-1], result["game"]["fen"])
         pgn = asyncio.run(auth.export_email_game_pgn(game_id, "Bearer test"))
         self.assertEqual(pgn.media_type, "application/x-chess-pgn")

@@ -234,6 +234,17 @@ test('offline invitation, playable game, and completed-game review', async ({ br
   await recipientPage.getByRole('button', { name: 'Sign in' }).click();
   await expect(recipientPage.locator('#turn')).toHaveText(`White to move (${inviter})`);
   await expectTurnSideAtBottom(recipientPage, 'White');
+  await recipientPage.getByRole('button', { name: `Sign in as White (${inviter})` }).click();
+  await expect(recipientPage.locator('#game')).toBeHidden();
+  await recipientPage.getByLabel('Username').fill(inviter);
+  await recipientPage.getByLabel('Password').fill(testPassword);
+  await recipientPage.getByRole('button', { name: 'Sign in' }).click();
+  await expect(recipientPage.locator('#turn')).toHaveText('Your turn (White)');
+  await recipientPage.getByRole('button', { name: 'Switch player' }).click();
+  await recipientPage.getByLabel('Username').fill(recipient);
+  await recipientPage.getByLabel('Password').fill(testPassword);
+  await recipientPage.getByRole('button', { name: 'Sign in' }).click();
+  await expect(recipientPage.locator('#turn')).toHaveText(`White to move (${inviter})`);
 
   const outsiderResponse = await request.get(`${appBaseUrl}/community/email-games/${gameId}`, {
     headers: { Authorization: `Bearer ${outsiderToken}` }

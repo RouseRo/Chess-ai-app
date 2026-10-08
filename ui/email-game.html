@@ -26,6 +26,10 @@
     #feedback { min-height: 24px; color: #a22121; }
     #game-layout { display: grid; grid-template-columns: minmax(0, 560px) minmax(180px, 1fr); gap: 28px; align-items: start; }
     #board { width: 100%; aspect-ratio: 1; }
+    #switch-player { width: 100%; margin-bottom: 8px; }
+    #captured-pieces { display: grid; gap: 4px; padding: 8px 4px; border-top: 1px solid #c7d3c9; }
+    #captured-pieces > div { display: flex; justify-content: space-between; align-items: center; min-height: 28px; }
+    #captured-pieces span:last-child { font-size: 1.35rem; }
     #players { font-weight: bold; }
     #moves { padding-left: 28px; line-height: 1.7; }
     #game-list { padding-left: 20px; line-height: 1.8; }
@@ -62,7 +66,14 @@
         <span id="draw-status" aria-live="polite"></span>
       </div>
       <div id="game-layout">
-        <div id="board" aria-label="Saved chess position"></div>
+        <div>
+          <button id="switch-player" type="button">Switch player</button>
+          <div id="board" aria-label="Saved chess position"></div>
+          <div id="captured-pieces" aria-label="Captured pieces">
+            <div><span>Captured by White</span><span id="white-captured" aria-live="polite">—</span></div>
+            <div><span>Captured by Black</span><span id="black-captured" aria-live="polite">—</span></div>
+          </div>
+        </div>
         <div>
           <h2>Move history</h2>
           <ol id="moves"></ol>
@@ -91,7 +102,13 @@
     let currentGame = null;
     let currentUsername = null;
     let replayPositions = [];
+    let replayCaptures = [];
     let replayIndex = 0;
+    const capturedPieceSymbols = {
+      p: { white: '♟', black: '♙' }, r: { white: '♜', black: '♖' },
+      n: { white: '♞', black: '♘' }, b: { white: '♝', black: '♗' },
+      q: { white: '♛', black: '♕' }, k: { white: '♚', black: '♔' }
+    };
 
     async function loadGame() {
       feedback.textContent = '';
@@ -142,6 +159,9 @@
         document.getElementById('turn').textContent = game.status === 'active'
           ? (myTurn ? `Your turn (${turnColor})` : `${turnColor} to move (${game.current_player})`)
           : 'Game ' + game.status;
+        document.getElementById('switch-player').textContent = game.status === 'active' && !myTurn
+          ? `Sign in as ${turnColor} (${game.current_player})`
+          : 'Switch player';
         const result = document.getElementById('game-result');
         result.hidden = game.status !== 'completed';
         result.textContent = game.result
@@ -158,6 +178,7 @@
           ? (pendingOffer === data.username ? 'Your draw offer is pending.' : pendingOffer + ' offered a draw.')
           : '';
         replayPositions = [];
+        replayCaptures = [];
         if (game.status === 'completed') {
           const replayResponse = await fetch('/community/email-games/' + encodeURIComponent(gameId) + '/replay', {
             headers: { Authorization: 'Bearer ' + token }, cache: 'no-store'
@@ -165,6 +186,7 @@
           const replayData = await replayResponse.json();
           if (!replayResponse.ok || !replayData.success) throw new Error(replayData.detail || 'Unable to load game replay.');
           replayPositions = replayData.positions;
+          replayCaptures = replayData.captured_pieces;
           replayIndex = replayPositions.length - 1;
         }
         document.getElementById('game').hidden = false;
@@ -183,6 +205,7 @@
             return 'snapback';
           }
         });
+        renderCapturedPieces(replayCaptures.length ? replayCaptures[replayIndex] : game.captured_pieces);
         const remind = document.getElementById('remind');
         const canRemind = game.status === 'active' && !myTurn;
         const reminderSentAt = game.last_reminder_at ? Date.parse(game.last_reminder_at) : 0;
@@ -256,7 +279,16 @@
       if (!board || !replayPositions.length) return;
       replayIndex = Math.max(0, Math.min(replayPositions.length - 1, replayIndex + direction));
       board.position(replayPositions[replayIndex]);
+      renderCapturedPieces(replayCaptures[replayIndex]);
       updateReplayControls();
+    }
+
+    function renderCapturedPieces(captures) {
+      const currentCaptures = captures || { white: [], black: [] };
+      document.getElementById('white-captured').textContent = currentCaptures.white
+        .map(piece => capturedPieceSymbols[piece]?.white || '').join('') || '—';
+      document.getElementById('black-captured').textContent = currentCaptures.black
+        .map(piece => capturedPieceSymbols[piece]?.black || '').join('') || '—';
     }
 
     async function submitGameAction(action) {
@@ -352,6 +384,25 @@
     });
 
     document.getElementById('refresh').addEventListener('click', loadGame);
+    document.getElementById('switch-player').addEventListener('click', () => {
+      token = null;
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('currentUser');
+      localStorage.removeItem('isAdmin');
+      if (board) {
+        board.destroy();
+        board = null;
+      }
+      document.getElementById('game').hidden = true;
+      login.hidden = false;
+      magicLogin.hidden = false;
+      document.getElementById('username').value = '';
+      document.getElementById('password').value = '';
+      feedback.textContent = currentGame?.status === 'active'
+        ? `Sign in as ${currentGame.current_player} to continue the game.`
+        : 'Sign in with the other player account.';
+      document.getElementById('username').focus();
+    });
     document.getElementById('remind').addEventListener('click', requestReminder);
     document.getElementById('resign').addEventListener('click', () => submitGameAction('resign'));
     document.getElementById('offer-draw').addEventListener('click', () => submitGameAction('offer_draw'));

@@ -1191,6 +1191,37 @@ def _game_invite_email_html(sender: str, link: str, preview: bool = False) -> st
 </html>"""
 
 
+def _game_invite_response_email_html(recipient: str, status: str, reply: str,
+                                    game_link: Optional[str]) -> str:
+    recipient_name = html_escape(recipient)
+    heading = "Invitation accepted" if status == "accepted" else "Invitation declined"
+    safe_reply = html_escape(reply).replace("\n", "<br>")
+    action = ""
+    if game_link:
+        safe_link = html_escape(game_link, quote=True)
+        action = (
+            '<table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0;">'
+            '<tr><td bgcolor="#2e7d32" style="padding:12px 18px;">'
+            f'<a href="{safe_link}" style="color:#ffffff;text-decoration:none;font-weight:bold;">View the board</a>'
+            '</td></tr></table>'
+            f'<p style="font-size:13px;line-height:1.5;color:#59675e;">Sign-in is required. Or use this link: '
+            f'<a href="{safe_link}">{html_escape(game_link)}</a></p>'
+        )
+    return f"""<!doctype html>
+<html lang="en">
+<body style="margin:0;padding:24px;background:#f2f5f2;color:#25382e;font-family:Georgia,serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #c7d3c9;">
+        <tr><td style="padding:28px;">
+            <h1 style="margin:0 0 16px;font-size:24px;">{heading}</h1>
+            <p style="line-height:1.5;">{recipient_name} {status} your friendly chess invitation.</p>
+            <p style="line-height:1.5;">{safe_reply}</p>
+            {action}
+        </td></tr>
+    </table>
+</body>
+</html>"""
+
+
 def _opening_move(move: str) -> str:
     board = chess.Board()
     try:
@@ -1539,7 +1570,10 @@ async def respond_to_email_invite(request: EmailInviteResponse):
         body += f"\nView the board (sign-in required): {game_link}\n"
     emailed = True
     try:
-        _send_invite_email(inviter["email"], f"Chess invitation response from {invite['recipient']}", body)
+        _send_invite_email(
+            inviter["email"], f"Chess invitation response from {invite['recipient']}", body,
+            _game_invite_response_email_html(recipient_label, status, reply, game_link)
+        )
     except (RuntimeError, smtplib.SMTPException, OSError):
         emailed = False
     return {"success": True, "message": "Your decision has been recorded.", "status": status,
@@ -1568,6 +1602,30 @@ def _email_game_record(row: sqlite3.Row) -> dict:
     game["move_history"] = _json_module.loads(game["move_history"])
     game["waiting_seconds"] = max(0, int((datetime.now(timezone.utc) - datetime.fromisoformat(game["turn_started_at"])).total_seconds())) if game["status"] == "active" else 0
     return game
+
+
+def _email_game_capture_history(move_history: list[dict]) -> list[dict]:
+    board = chess.Board()
+    captured_by_white = []
+    captured_by_black = []
+    captures = [{"white": [], "black": []}]
+    for item in move_history:
+        try:
+            move = chess.Move.from_uci(item["uci"])
+        except (KeyError, ValueError, chess.InvalidMoveError) as exc:
+            raise HTTPException(status_code=409, detail="Stored move history cannot be replayed.") from exc
+        if move not in board.legal_moves:
+            raise HTTPException(status_code=409, detail="Stored move history cannot be replayed.")
+        captured_piece = board.piece_at(move.to_square)
+        if board.is_en_passant(move):
+            captured_square = move.to_square - 8 if board.turn == chess.WHITE else move.to_square + 8
+            captured_piece = board.piece_at(captured_square)
+        if captured_piece:
+            captures_by_player = captured_by_white if board.turn == chess.WHITE else captured_by_black
+            captures_by_player.append(captured_piece.symbol().lower())
+        board.push(move)
+        captures.append({"white": captured_by_white.copy(), "black": captured_by_black.copy()})
+    return captures
 
 
 def _email_game_listing(username: Optional[str], status: Optional[str], limit: int, offset: int) -> dict:
@@ -1636,7 +1694,9 @@ async def get_email_game(game_id: int, authorization: Optional[str] = Header(Non
                            (game_id, user["username"], user["username"])).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Game not found.")
-        return {"success": True, "game": _email_game_record(row), "username": user["username"]}
+        game = _email_game_record(row)
+        game["captured_pieces"] = _email_game_capture_history(game["move_history"])[-1]
+        return {"success": True, "game": game, "username": user["username"]}
     finally:
         conn.close()
 
@@ -1690,6 +1750,7 @@ async def replay_email_game(game_id: int, authorization: Optional[str] = Header(
         board = chess.Board()
         positions = [board.fen()]
         history = _json_module.loads(game["move_history"])
+        captured_pieces = _email_game_capture_history(history)
         for item in history:
             try:
                 move = chess.Move.from_uci(item["uci"])
@@ -1701,7 +1762,8 @@ async def replay_email_game(game_id: int, authorization: Optional[str] = Header(
             positions.append(board.fen())
         if board.fen() != game["fen"]:
             raise HTTPException(status_code=409, detail="Stored game position does not match its move history.")
-        return {"success": True, "positions": positions, "move_history": history,
+        return {"success": True, "positions": positions, "captured_pieces": captured_pieces,
+                "move_history": history,
                 "result": game["result"], "completion_reason": game["completion_reason"]}
     finally:
         conn.close()

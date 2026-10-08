@@ -73,8 +73,11 @@ Accepting creates a persistent game with the selected colors and any opening
 move. The accepted invitation links to `email-game.html?game_id=<id>`. Players
 can sign in normally or use a one-time magic link, and the board is oriented for
 the side to move so that player's pieces are at the bottom. Turn status identifies
-both the color and player to move. Opening `email-game.html` without a game ID lists the signed-in
-player's email games.
+both the color and player to move. When using a shared browser, the button above
+the board lets the next player switch accounts; it names the player whose turn it
+is. Captured pieces remain displayed below the board, including while stepping
+through a completed game's replay. Opening `email-game.html` without a game ID
+lists the signed-in player's email games.
 
 Records are stored in the existing auth-service SQLite database. The migration
 preserves older invitation responses as accepted but does not manufacture games
@@ -96,7 +99,9 @@ returned.
 
 Invitation decisions and games are committed before attempting response email.
 If delivery fails, the page reports that the decision is saved but notification
-failed.
+failed. Acceptance responses use a styled email with a **View the board** button
+and a plain-link fallback; decline responses use the same layout without a board
+button.
 
 ### Playing and notifications
 
@@ -104,7 +109,8 @@ Accepted email games are playable by both participants. Moves are validated agai
 the stored position, restricted to the player whose turn it is, and committed with
 the updated FEN, move history, turn, and version. Stale board versions and finished
 games are rejected. Checkmate, stalemate, and other terminal positions complete the
-game.
+game. Captured-piece rows sit below the board and update as the position changes
+during replay.
 
 After each non-final move, the next player receives a turn email with the move,
 the color to move, a **Go to game** button, and a plain-link fallback. Reminder,
@@ -219,7 +225,8 @@ npm test
 
 The Playwright smoke test covers offline invitation delivery and acceptance,
 invalid and stale move rejection, recipient turn email, moves from both players,
-non-participant access denial, resignation, replay controls, and PGN availability.
+player account switching from the board, non-participant access denial, resignation,
+replay controls, and PGN availability.
 It also checks that the player list can be resized, the Community refresh button
 updates presence, the turn email names the next color, and the board puts the side
 to move at the bottom for both players.
