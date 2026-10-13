@@ -79,6 +79,13 @@ is. Captured pieces remain displayed below the board, including while stepping
 through a completed game's replay. Opening `email-game.html` without a game ID
 lists the signed-in player's email games.
 
+The email-game board automatically detects touch-capable devices, including
+phones and tablets. Tap one of your pieces to select it (highlighted in yellow),
+then tap its destination to move. Tap the selected piece again to cancel, or tap
+another of your pieces to change the selection. Desktop players can still drag
+and drop pieces with a mouse. Moves are enabled only on your turn in an active
+game, and further input is blocked while a move is being submitted.
+
 Records are stored in the existing auth-service SQLite database. The migration
 preserves older invitation responses as accepted but does not manufacture games
 for those historical responses. New games store position, move history, version,
