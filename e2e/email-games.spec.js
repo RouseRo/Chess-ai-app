@@ -1,4 +1,5 @@
 const { randomUUID } = require('node:crypto');
+const path = require('node:path');
 const { test, expect } = require('@playwright/test');
 const jqueryPath = require.resolve('jquery/dist/jquery.min.js');
 
@@ -66,6 +67,141 @@ async function expectTurnSideAtBottom(page, color) {
   await expect.poll(() => page.locator('#board [data-square]').first().getAttribute('data-square'))
     .toBe(color === 'White' ? 'a8' : 'h1');
 }
+
+test.describe('email board input', () => {
+  async function openInputGame(browser, { touch = true, color = 'white', status = 'active', myTurn = true, fen } = {}) {
+    const context = await browser.newContext({
+      viewport: touch ? { width: 390, height: 844 } : { width: 1280, height: 900 },
+      hasTouch: touch,
+      isMobile: touch
+    });
+    const page = await context.newPage();
+    const submittedMoves = [];
+    const username = color === 'white' ? 'white_tester' : 'black_tester';
+    const game = {
+      white_player: 'white_tester', black_player: 'black_tester',
+      current_player: myTurn ? username : (color === 'white' ? 'black_tester' : 'white_tester'),
+      status, version: 7, move_history: [], captured_pieces: { white: [], black: [] },
+      fen: fen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+    };
+    await context.addInitScript(() => localStorage.setItem('authToken', 'input-test-token'));
+    await page.route('**/*', async route => {
+      const pathname = new URL(route.request().url()).pathname;
+      if (pathname === '/jquery-3.7.1.min.js') {
+        return route.fulfill({ path: jqueryPath, contentType: 'application/javascript' });
+      }
+      if (pathname === '/community/email-games/input-test/moves') {
+        submittedMoves.push(route.request().postDataJSON());
+        return route.fulfill({ json: { success: true } });
+      }
+      if (pathname === '/community/email-games/input-test/replay') {
+        return route.fulfill({ json: { success: true, positions: [game.fen], captured_pieces: [game.captured_pieces] } });
+      }
+      if (pathname === '/community/email-games/input-test') {
+        return route.fulfill({ json: { success: true, username, game } });
+      }
+      return route.fulfill({ path: path.join(__dirname, '..', 'ui', pathname) });
+    });
+    await page.goto('/email-game.html?game_id=input-test');
+    await expect(page.locator('#board .square-e2')).toBeVisible();
+    return { context, page, submittedMoves };
+  }
+
+  for (const { color, from, to, move, fen } of [
+    { color: 'white', from: 'e2', to: 'e4', move: 'e2e4' },
+    { color: 'black', from: 'e7', to: 'e5', move: 'e7e5' },
+    { color: 'white', from: 'e3', to: 'd4', move: 'e3d4', fen: '7k/8/8/8/3p4/4P3/8/7K w - - 0 1' },
+    { color: 'white', from: 'a7', to: 'a8', move: 'a7a8q', fen: '7k/P7/8/8/8/8/8/7K w - - 0 1' }
+  ]) {
+    test(`phone taps submit ${move}`, async ({ browser }, testInfo) => {
+      const { context, page, submittedMoves } = await openInputGame(browser, { color, fen });
+      await page.locator(`#board .square-${from}`).tap();
+      await expect(page.locator(`#board .square-${from}`)).toHaveClass(/touch-selected/);
+      if (move === 'e2e4') {
+        await page.screenshot({ path: testInfo.outputPath('phone-selection.png'), fullPage: true });
+        await expect(page.locator(`#board .square-${from}`)).toHaveClass(/touch-selected/);
+        await expect(page.locator(`#board .square-${from}`)).toHaveCSS('outline-style', 'solid');
+      }
+      await page.locator(`#board .square-${to}`).tap();
+      await expect.poll(() => submittedMoves).toEqual([{ move, expected_version: 7 }]);
+      await expect(page.locator('#board .touch-selected')).toHaveCount(0);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+      await context.close();
+    });
+  }
+
+  test('phone selection cancels and switches between own pieces', async ({ browser }) => {
+    const { context, page, submittedMoves } = await openInputGame(browser);
+    await page.locator('#board .square-e7').tap();
+    await page.locator('#board .square-e4').tap();
+    await expect(page.locator('#board .touch-selected')).toHaveCount(0);
+    await page.locator('#board .square-e2').tap();
+    await page.locator('#board .square-d2').tap();
+    await expect(page.locator('#board .square-d2')).toHaveClass(/touch-selected/);
+    await page.locator('#board .square-d2').tap();
+    await expect(page.locator('#board .touch-selected')).toHaveCount(0);
+    expect(submittedMoves).toEqual([]);
+    await context.close();
+  });
+
+  for (const options of [{ myTurn: false }, { status: 'completed' }]) {
+    test(`phone cannot move ${options.myTurn === false ? 'out of turn' : 'completed games'}`, async ({ browser }) => {
+      const { context, page, submittedMoves } = await openInputGame(browser, options);
+      await page.locator('#board .square-e2').tap();
+      await page.locator('#board .square-e4').tap();
+      await expect(page.locator('#board .touch-selected')).toHaveCount(0);
+      expect(submittedMoves).toEqual([]);
+      await context.close();
+    });
+  }
+
+  test('desktop mouse dragging still submits moves', async ({ browser }) => {
+    const { context, page, submittedMoves } = await openInputGame(browser, { touch: false });
+    await movePiece(page, 'e2', 'e4');
+    await expect.poll(() => submittedMoves).toEqual([{ move: 'e2e4', expected_version: 7 }]);
+    await context.close();
+  });
+
+  test('phone ignores further taps while a move is submitting', async ({ browser }) => {
+    const { context, page } = await openInputGame(browser);
+    let releaseMove;
+    const pendingMove = new Promise(resolve => { releaseMove = resolve; });
+    const requests = [];
+    await page.route('**/community/email-games/input-test/moves', async route => {
+      requests.push(route.request().postDataJSON());
+      await pendingMove;
+      await route.fulfill({ json: { success: true } });
+    });
+    await page.locator('#board .square-e2').tap();
+    await page.locator('#board .square-e4').tap();
+    await expect.poll(() => requests.length).toBe(1);
+    await page.locator('#board .square-d2').tap();
+    await page.locator('#board .square-d4').tap();
+    await expect(page.locator('#board .touch-selected')).toHaveCount(0);
+    expect(requests).toEqual([{ move: 'e2e4', expected_version: 7 }]);
+    releaseMove();
+    await expect.poll(() => page.evaluate(() => moveSubmitting)).toBe(false);
+    await context.close();
+  });
+
+  test('phone can retry after a rejected move and refresh clears selection', async ({ browser }) => {
+    const { context, page, submittedMoves } = await openInputGame(browser);
+    await page.route('**/community/email-games/input-test/moves', route =>
+      route.fulfill({ status: 400, json: { detail: 'Illegal move.' } }), { times: 1 });
+    await page.locator('#board .square-e2').tap();
+    await page.locator('#board .square-e5').tap();
+    await expect(page.locator('#feedback')).toHaveText('Illegal move.');
+    await expect(page.locator('#board .touch-selected')).toHaveCount(0);
+    await page.locator('#board .square-e2').tap();
+    await page.locator('#board .square-e4').tap();
+    await expect.poll(() => submittedMoves).toEqual([{ move: 'e2e4', expected_version: 7 }]);
+    await expect.poll(() => page.evaluate(() => moveSubmitting)).toBe(false);
+    await page.locator('#board .square-d2').tap();
+    await page.getByRole('button', { name: 'Refresh board' }).tap();
+    await expect(page.locator('#board .touch-selected')).toHaveCount(0);
+    await context.close();
+  });
+});
 
 test('community player list can be resized', async ({ browser, request }) => {
   const username = `resize_user_${randomUUID().slice(0, 8)}`;

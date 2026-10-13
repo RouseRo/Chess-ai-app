@@ -7,6 +7,8 @@ RUN npm run build
 RUN cp index.html dist/ || true
 RUN cp admin.html dist/ || true
 RUN cp mobile.html dist/ || true
+RUN cp email-game.html dist/ || true
+RUN cp invite.html dist/ || true
 RUN [ -d "assets" ] && cp -r assets dist/ || true
 RUN cp chessboard.js dist/ || true
 RUN cp chessboard.css dist/ || true

@@ -26,6 +26,7 @@
     #feedback { min-height: 24px; color: #a22121; }
     #game-layout { display: grid; grid-template-columns: minmax(0, 560px) minmax(180px, 1fr); gap: 28px; align-items: start; }
     #board { width: 100%; aspect-ratio: 1; }
+    #board .touch-selected { outline: 4px solid #f5c542; outline-offset: -4px; }
     #switch-player { width: 100%; margin-bottom: 8px; }
     #captured-pieces { display: grid; gap: 4px; padding: 8px 4px; border-top: 1px solid #c7d3c9; }
     #captured-pieces > div { display: flex; justify-content: space-between; align-items: center; min-height: 28px; }
@@ -101,6 +102,9 @@
     let token = localStorage.getItem('authToken');
     let currentGame = null;
     let currentUsername = null;
+    const usesTouchInput = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+    let selectedSquare = null;
+    let moveSubmitting = false;
     let replayPositions = [];
     let replayCaptures = [];
     let replayIndex = 0;
@@ -112,6 +116,7 @@
 
     async function loadGame() {
       feedback.textContent = '';
+      clearSelection();
       if (!token) {
         login.hidden = false;
         magicLogin.hidden = false;
@@ -196,12 +201,15 @@
         board = Chessboard('board', {
           position: replayPositions.length ? replayPositions[replayIndex] : game.fen,
           orientation,
-          draggable: myTurn,
+          draggable: myTurn && !usesTouchInput,
           pieceTheme: 'img/chesspieces/wikipedia/{piece}.png',
+          onDragStart: function (source, piece) {
+            return !moveSubmitting && piece[0] === orientation[0];
+          },
           onDrop: function (source, target, piece) {
-            let move = source + target;
-            if (piece[1] === 'P' && (target[1] === '1' || target[1] === '8')) move += 'q';
-            submitMove(move, game.version);
+            if (source !== target && /^[a-h][1-8]$/.test(target)) {
+              makeBoardMove(source, target, piece);
+            }
             return 'snapback';
           }
         });
@@ -229,7 +237,41 @@
       }
     }
 
+    function clearSelection() {
+      selectedSquare = null;
+      document.querySelectorAll('#board .touch-selected').forEach(square => square.classList.remove('touch-selected'));
+    }
+
+    function makeBoardMove(source, target, piece) {
+      let move = source + target;
+      if (piece[1] === 'P' && (target[1] === '1' || target[1] === '8')) move += 'q';
+      clearSelection();
+      submitMove(move, currentGame.version);
+    }
+
+    document.getElementById('board').addEventListener('click', event => {
+      if (!usesTouchInput || !board || moveSubmitting || !token || !currentGame ||
+          currentGame.status !== 'active' || currentGame.current_player !== currentUsername) return;
+      const squareElement = event.target.closest('[data-square]');
+      if (!squareElement) return;
+      const square = squareElement.dataset.square;
+      const position = board.position();
+      const piece = position[square];
+      const ownColor = currentUsername === currentGame.white_player ? 'w' : 'b';
+      if (square === selectedSquare) {
+        clearSelection();
+      } else if (piece && piece[0] === ownColor) {
+        clearSelection();
+        selectedSquare = square;
+        squareElement.classList.add('touch-selected');
+      } else if (selectedSquare) {
+        makeBoardMove(selectedSquare, square, position[selectedSquare]);
+      }
+    });
+
     async function submitMove(move, expectedVersion) {
+      if (moveSubmitting) return;
+      moveSubmitting = true;
       feedback.textContent = '';
       try {
         const response = await fetch('/community/email-games/' + encodeURIComponent(gameId) + '/moves', {
@@ -244,6 +286,8 @@
         const message = error.message || 'Move could not be submitted.';
         await loadGame();
         feedback.textContent = message;
+      } finally {
+        moveSubmitting = false;
       }
     }
 
@@ -411,7 +455,13 @@
     document.getElementById('replay-prev').addEventListener('click', () => stepReplay(-1));
     document.getElementById('replay-next').addEventListener('click', () => stepReplay(1));
     document.getElementById('export-pgn').addEventListener('click', downloadPgn);
-    window.addEventListener('resize', () => { if (board) board.resize(); });
+    window.addEventListener('resize', () => {
+      if (!board) return;
+      board.resize();
+      if (selectedSquare) {
+        document.querySelector('#board [data-square="' + selectedSquare + '"]').classList.add('touch-selected');
+      }
+    });
     async function initialize() {
       const params = new URLSearchParams(location.search);
       const magicToken = params.get('magic_token');
