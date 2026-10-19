@@ -324,59 +324,6 @@
       max-height: 80px;
       overflow-y: auto;
     }
-    /* Comm diagnostics panel */
-    .comm-log {
-      overflow-y: auto;
-      max-height: 420px;
-      font-family: monospace;
-      font-size: 12px;
-      background: #fafafa;
-      border: 1px solid #e0e0e0;
-      border-radius: 4px;
-      flex: 1;
-      min-height: 0;
-    }
-    .comm-entry {
-      border-bottom: 1px solid #e8e8e8;
-      padding: 6px 8px;
-    }
-    .comm-entry.comm-req {
-      border-left: 3px solid #1565c0;
-      background: #e3f2fd;
-    }
-    .comm-entry.comm-res.ok {
-      border-left: 3px solid #2e7d32;
-      background: #e8f5e9;
-    }
-    .comm-entry.comm-res.err {
-      border-left: 3px solid #c62828;
-      background: #ffebee;
-    }
-    .comm-entry.comm-conn-err {
-      border-left: 3px solid #e65100;
-      background: #fff3e0;
-    }
-    .comm-entry.comm-info {
-      border-left: 3px solid #6a1b9a;
-      background: #f3e5f5;
-    }
-    .comm-timestamp { color: #757575; font-size: 11px; }
-    .comm-direction { font-weight: bold; }
-    .comm-body {
-      margin-top: 4px;
-      word-break: break-all;
-      white-space: pre-wrap;
-      max-height: 80px;
-      overflow-y: auto;
-      background: rgba(0,0,0,0.04);
-      border-radius: 3px;
-      padding: 3px 5px;
-    }
-    #comm-panel {
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-    }
     /* Welcome Tab */
     .welcome-tab-grid {
       display: grid;
@@ -1074,56 +1021,6 @@
           };
           commMessages.push(msg);
           if (commMessages.length > 200) commMessages.shift();
-          renderCommEntry(msg);
-        }
-
-        function renderCommEntry(msg) {
-          const log = document.getElementById('comm-log');
-          if (!log) return;
-
-          const placeholder = log.querySelector('p');
-          if (placeholder) placeholder.remove();
-
-          let entryClass = 'comm-entry ';
-          let dirLabel = '';
-          if (msg.direction === 'req') {
-            entryClass += 'comm-req';
-            dirLabel = '→ REQ';
-          } else if (msg.direction === 'res') {
-            entryClass += 'comm-res ' + (msg.statusCode && msg.statusCode >= 400 ? 'err' : 'ok');
-            dirLabel = '← RES';
-          } else if (msg.direction === 'info') {
-            entryClass += 'comm-info';
-            dirLabel = 'ℹ SYNC';
-          } else {
-            entryClass += 'comm-conn-err';
-            dirLabel = '✕ ERR';
-          }
-
-          const statusText = msg.statusCode ? ` ${msg.statusCode}` : '';
-          const bodyText = JSON.stringify(msg.data, null, 2);
-          const safeBody = bodyText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-          const entry = document.createElement('div');
-          entry.className = entryClass;
-          entry.innerHTML =
-            `<span class="comm-timestamp">[${msg.ts}]</span> ` +
-            `<span class="comm-direction">${dirLabel}</span> ` +
-            `<strong>${msg.service}</strong>${statusText} <code>${msg.endpoint}</code>` +
-            `<div class="comm-body">${safeBody}</div>`;
-
-          log.insertBefore(entry, log.firstChild);
-
-          const badge = document.getElementById('comm-count');
-          if (badge) badge.textContent = `(${commMessages.length} message${commMessages.length !== 1 ? 's' : ''})`;
-        }
-
-        function clearCommLog() {
-          commMessages = [];
-          const log = document.getElementById('comm-log');
-          if (log) log.innerHTML = '<p style="color:#999; font-size:12px;">Log cleared.</p>';
-          const badge = document.getElementById('comm-count');
-          if (badge) badge.textContent = '(0 messages)';
         }
 
                           // ─── Community Panel ──────────────────────────────────────────────────
@@ -1970,17 +1867,6 @@
                               selectedPanel.style.display = 'block';
                             }
 
-                            // On first open of Comm panel, replay buffered pre-render messages
-                            if (tabName === 'comm-panel') {
-                              const log = document.getElementById('comm-log');
-                              if (log && log.querySelector('p') && commMessages.length > 0) {
-                                log.innerHTML = '';
-                                for (let i = 0; i < commMessages.length; i++) {
-                                  renderCommEntry(commMessages[i]);
-                                }
-                              }
-                            }
-
                             // Track community tab open state
                             communityTabOpen = (tabName === 'community-panel');
 
@@ -2039,13 +1925,6 @@
             b.classList.add('active');
           }
         });
-        if (tabName === 'comm-panel') {
-          const log = document.getElementById('comm-log');
-          if (log && log.querySelector('p') && commMessages.length > 0) {
-            log.innerHTML = '';
-            commMessages.forEach(m => renderCommEntry(m));
-          }
-        }
       }
 
       function showWelcomeInfo(type) {
@@ -2595,7 +2474,6 @@
                   <button class="tab-panel-button" onclick="switchTab('move-history-panel')">Move History</button>
                   <button class="tab-panel-button" onclick="switchTab('expert-panel')">Ask Expert</button>
                   <button class="tab-panel-button" onclick="switchTab('community-panel'); openCommunityTab();">Community<span id="community-unread-badge" class="comm-unread-badge" style="display:none;"></span></button>
-                  <button class="tab-panel-button" onclick="switchTab('comm-panel')">Comm</button>
                   <button class="tab-panel-button" onclick="switchTab('stats-panel'); renderStatsPanel();">Stats</button>
                   <button class="tab-panel-button" onclick="switchTab('rewards-panel'); loadMyRewards();">🏅 Rewards</button>
                   <button class="tab-panel-button" onclick="switchTab('feedback-panel'); initFeedbackTab();">💬 Feedback</button>
@@ -2949,16 +2827,6 @@
                   </div>
                 </div>
 
-                <!-- Comm Tab -->
-                <div id="comm-panel" class="tab-panel-content">
-                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-shrink:0;">
-                    <h3 style="margin:0;">Comm Log <span id="comm-count" style="font-size:0.75em; color:#757575; font-weight:normal;">(0 messages)</span></h3>
-                    <button onclick="clearCommLog()" style="padding:4px 10px; font-size:0.85em; background:#f44336; color:white; border:none; border-radius:3px; cursor:pointer;">Clear</button>
-                  </div>
-                  <div id="comm-log" class="comm-log">
-                    <p style="color:#999; font-size:12px;">No messages yet. Messages are captured from page load.</p>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
