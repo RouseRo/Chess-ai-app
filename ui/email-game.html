@@ -33,6 +33,13 @@
     #captured-pieces span:last-child { font-size: 1.35rem; }
     #players { font-weight: bold; }
     #moves { padding-left: 28px; line-height: 1.7; }
+    #message-list { max-height: 320px; overflow-y: auto; list-style: none; padding: 0; border-top: 1px solid #c7d3c9; }
+    #message-list li { padding: 10px 4px; border-bottom: 1px solid #c7d3c9; }
+    #message-list time { color: #52665a; font-size: .875rem; }
+    #message-list p { margin: 5px 0 0; white-space: pre-wrap; }
+    #message-form textarea { display: block; width: 100%; min-height: 88px; padding: 10px; font: inherit; border: 1px solid #9aafa0; resize: vertical; }
+    #message-form button { margin-top: 8px; }
+    #message-status { min-height: 24px; }
     #game-list { padding-left: 20px; line-height: 1.8; }
     @media (max-width: 680px) { #game-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; } }
   </style>
@@ -88,6 +95,16 @@
           </div>
         </div>
       </div>
+      <section id="conversation" aria-labelledby="conversation-heading">
+        <h2 id="conversation-heading">Messages</h2>
+        <ol id="message-list" aria-live="polite" aria-relevant="additions"></ol>
+        <form id="message-form">
+          <label for="message-input">Write a message</label>
+          <textarea id="message-input" maxlength="2000" required></textarea>
+          <button type="submit">Send message</button>
+        </form>
+        <p id="message-status" role="status" aria-live="polite"></p>
+      </section>
     </section>
     <section id="games" hidden><h2>Your email games</h2><ul id="game-list"></ul></section>
   </main>
@@ -108,6 +125,8 @@
     let replayPositions = [];
     let replayCaptures = [];
     let replayIndex = 0;
+    let lastMessageId = 0;
+    let messagesLoading = false;
     const capturedPieceSymbols = {
       p: { white: '♟', black: '♙' }, r: { white: '♜', black: '♖' },
       n: { white: '♞', black: '♘' }, b: { white: '♝', black: '♗' },
@@ -230,12 +249,81 @@
           item.textContent = game.move_history.slice(index, index + 2).map(move => move.san).join(' ');
           moves.append(item);
         }
+        document.getElementById('conversation').hidden = false;
+        await loadMessages(true);
       } catch (error) {
         feedback.textContent = error.message || 'Unable to load game.';
       } finally {
         refresh.disabled = false;
       }
     }
+
+    async function loadMessages(reset = false) {
+      if (!gameId || !token || messagesLoading) return;
+      messagesLoading = true;
+      const list = document.getElementById('message-list');
+      try {
+        if (reset) {
+          lastMessageId = 0;
+          list.replaceChildren();
+        }
+        let batch;
+        do {
+          const response = await fetch('/community/email-games/' + encodeURIComponent(gameId) +
+            '/messages?after_id=' + lastMessageId, {
+              headers: { Authorization: 'Bearer ' + token }, cache: 'no-store'
+            });
+          const data = await response.json();
+          if (!response.ok || !data.success) throw new Error(data.detail || 'Unable to load messages.');
+          batch = data.messages;
+          batch.forEach(message => {
+            const item = document.createElement('li');
+            const heading = document.createElement('strong');
+            heading.textContent = message.sender === currentUsername ? 'You' : message.sender;
+            const time = document.createElement('time');
+            time.dateTime = message.created_at;
+            time.textContent = ' · ' + new Date(message.created_at).toLocaleString();
+            const text = document.createElement('p');
+            text.textContent = message.body;
+            item.append(heading, time, text);
+            list.append(item);
+            lastMessageId = message.id;
+          });
+        } while (batch.length === 100);
+        if (list.lastElementChild) list.lastElementChild.scrollIntoView({ block: 'nearest' });
+        document.getElementById('message-status').textContent = '';
+      } catch (error) {
+        document.getElementById('message-status').textContent = error.message || 'Unable to load messages.';
+      } finally {
+        messagesLoading = false;
+      }
+    }
+
+    document.getElementById('message-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const input = document.getElementById('message-input');
+      const button = event.currentTarget.querySelector('button');
+      const message = input.value.trim();
+      if (!message || !token || !gameId) return;
+      button.disabled = true;
+      document.getElementById('message-status').textContent = '';
+      try {
+        const response = await fetch('/community/email-games/' + encodeURIComponent(gameId) + '/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+          body: JSON.stringify({ message })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.detail || 'Message could not be sent.');
+        input.value = '';
+        await loadMessages();
+        document.getElementById('message-status').textContent = 'Message sent.';
+      } catch (error) {
+        document.getElementById('message-status').textContent = error.message || 'Message could not be sent.';
+      } finally {
+        button.disabled = false;
+      }
+    });
 
     function clearSelection() {
       selectedSquare = null;
@@ -485,6 +573,9 @@
       }
       await loadGame();
     }
+    window.setInterval(() => {
+      if (!document.hidden) loadMessages();
+    }, 20000);
     initialize();
   </script>
 </body>

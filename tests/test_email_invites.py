@@ -446,6 +446,49 @@ class EmailInviteTests(unittest.TestCase):
         with patch.object(auth, "verify_jwt_token", wraps=verify_token):
             asyncio.run(exercise_routes())
 
+    def test_http_game_messages_are_private_and_notify_opponent(self):
+        self.invite()
+        invite_token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
+        game_id = asyncio.run(auth.respond_to_email_invite(
+            auth.EmailInviteResponse(token=invite_token)
+        ))["game_id"]
+
+        async def exercise_routes():
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=auth.app), base_url="http://testserver") as client:
+                inviter_headers = {"Authorization": "Bearer " + auth.create_token("inviter", False)}
+                opponent_headers = {"Authorization": "Bearer " + auth.create_token("smtptest", False)}
+                outsider_headers = {"Authorization": "Bearer " + auth.create_token("outsider", False)}
+                messages_url = f"/community/email-games/{game_id}/messages"
+
+                sent = await client.post(messages_url, headers=inviter_headers,
+                                         json={"message": "Good luck!", "sender": "outsider"})
+                self.assertEqual(sent.status_code, 200)
+                self.assertEqual(sent.json()["message"]["sender"], "inviter")
+                self.assertEqual(sent.json()["message"]["body"], "Good luck!")
+
+                received = await client.get(messages_url, headers=opponent_headers)
+                self.assertEqual(received.status_code, 200)
+                self.assertEqual([item["body"] for item in received.json()["messages"]], ["Good luck!"])
+                self.assertEqual((await client.get(messages_url, headers=outsider_headers)).status_code, 404)
+                self.assertEqual((await client.post(messages_url, headers=outsider_headers,
+                                                    json={"message": "Intrusion"})).status_code, 404)
+                self.assertEqual((await client.post(messages_url, headers=inviter_headers,
+                                                    json={"message": "  "})).status_code, 400)
+                self.assertEqual((await client.post(messages_url, headers=inviter_headers,
+                                                    json={"message": "x" * 2001})).status_code, 400)
+                with self.connect() as conn:
+                    notification = conn.execute(
+                        "SELECT recipient, notification_type, body FROM email_outbox WHERE notification_type = 'message'"
+                    ).fetchone()
+                    self.assertEqual(notification["recipient"], "smtptest@example.com")
+                    self.assertIn("message in your chess game", notification["body"])
+                    self.assertNotIn("Good luck!", notification["body"])
+                    game = conn.execute("SELECT version, move_history FROM email_games WHERE id = ?", (game_id,)).fetchone()
+                    self.assertEqual((game["version"], game["move_history"]), (0, "[]"))
+
+        with patch.object(auth, "verify_jwt_token", wraps=verify_token):
+            asyncio.run(exercise_routes())
+
     # Verifies a game remains accepted and accessible when notification delivery fails.
     def test_acceptance_survives_notification_failure(self):
         self.invite()
@@ -548,6 +591,7 @@ class EmailInviteTests(unittest.TestCase):
             ("draw_offer", f"Your opponent offered a draw.\n\nReview and respond: {game_link}\n", "Review draw offer", game_link),
             ("draw_response", f"The draw offer was declined.\n\nView the game: {game_link}\n", "View game", game_link),
             ("result", f"The game is complete.\n\nReview the game: {game_link}\n", "Review game", game_link),
+            ("message", f"A player sent a message.\n\nRead the message: {game_link}\n", "Read message", game_link),
             (None, "Use this link to sign in.\n\nhttp://localhost:8080/email-game.html?magic_token=test\n",
              "Sign in to your games", "http://localhost:8080/email-game.html?magic_token=test"),
         )

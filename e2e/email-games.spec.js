@@ -77,6 +77,8 @@ test.describe('email board input', () => {
     });
     const page = await context.newPage();
     const submittedMoves = [];
+    const messages = [];
+    const sentMessages = [];
     const username = color === 'white' ? 'white_tester' : 'black_tester';
     const game = {
       white_player: 'white_tester', black_player: 'black_tester',
@@ -97,6 +99,18 @@ test.describe('email board input', () => {
       if (pathname === '/community/email-games/input-test/replay') {
         return route.fulfill({ json: { success: true, positions: [game.fen], captured_pieces: [game.captured_pieces] } });
       }
+      if (pathname === '/community/email-games/input-test/messages') {
+        if (route.request().method() === 'POST') {
+          const request = route.request().postDataJSON();
+          const message = { id: messages.length + 1, sender: username, body: request.message,
+            created_at: new Date().toISOString() };
+          messages.push(message);
+          sentMessages.push(request);
+          return route.fulfill({ json: { success: true, message } });
+        }
+        const afterId = Number(new URL(route.request().url()).searchParams.get('after_id') || 0);
+        return route.fulfill({ json: { success: true, messages: messages.filter(message => message.id > afterId) } });
+      }
       if (pathname === '/community/email-games/input-test') {
         return route.fulfill({ json: { success: true, username, game } });
       }
@@ -104,7 +118,7 @@ test.describe('email board input', () => {
     });
     await page.goto('/email-game.html?game_id=input-test');
     await expect(page.locator('#board .square-e2')).toBeVisible();
-    return { context, page, submittedMoves };
+    return { context, page, submittedMoves, messages, sentMessages };
   }
 
   for (const { color, from, to, move, fen } of [
@@ -159,6 +173,18 @@ test.describe('email board input', () => {
     const { context, page, submittedMoves } = await openInputGame(browser, { touch: false });
     await movePiece(page, 'e2', 'e4');
     await expect.poll(() => submittedMoves).toEqual([{ move: 'e2e4', expected_version: 7 }]);
+    await context.close();
+  });
+
+  test('players can send and read plain-text game messages', async ({ browser }) => {
+    const { context, page, messages, sentMessages } = await openInputGame(browser);
+    await page.getByLabel('Write a message').fill('<b>Good luck!</b>');
+    await page.getByRole('button', { name: 'Send message' }).click();
+    await expect(page.locator('#message-list')).toContainText('You');
+    await expect(page.locator('#message-list')).toContainText('<b>Good luck!</b>');
+    await expect(page.locator('#message-list b')).toHaveCount(0);
+    expect(sentMessages).toEqual([{ message: '<b>Good luck!</b>' }]);
+    expect(messages).toHaveLength(1);
     await context.close();
   });
 

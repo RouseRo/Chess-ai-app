@@ -714,6 +714,16 @@ def _init_community_tables(conn: sqlite3.Connection):
             draw_offer_by TEXT
         )
     ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS email_game_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            game_id INTEGER NOT NULL REFERENCES email_games(id),
+            sender TEXT NOT NULL,
+            body TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    ''')
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_email_game_messages_game_id ON email_game_messages(game_id, id)")
     game_columns = {row[1] for row in conn.execute("PRAGMA table_info(email_games)")}
     for column in (
         "result TEXT",
@@ -968,6 +978,10 @@ class EmailGameActionRequest(BaseModel):
     expected_version: int
 
 
+class EmailGameMessageRequest(BaseModel):
+    message: str
+
+
 class EmailGameLinkRequest(BaseModel):
     email: str
 
@@ -1015,6 +1029,7 @@ def _notification_email_html(body: str, notification_type: Optional[str]) -> Opt
         "draw_offer": "Review draw offer",
         "draw_response": "View game",
         "result": "Review game",
+        "message": "Read message",
     }
     action_label = "Sign in to your games" if "magic_token=" in link else action_labels.get(
         notification_type, "Open game"
@@ -2092,6 +2107,82 @@ async def remind_email_game_player(game_id: int, authorization: Optional[str] = 
         conn.commit()
         return {"success": True, "message": "Reminder queued for email delivery.",
                 "last_reminder_at": now.isoformat()}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@app.get("/community/email-games/{game_id}/messages")
+async def list_email_game_messages(game_id: int, after_id: int = Query(0, ge=0),
+                                   authorization: Optional[str] = Header(None)):
+    user = _email_game_user(authorization)
+    conn = get_db()
+    try:
+        _init_community_tables(conn)
+        game = conn.execute(
+            "SELECT id FROM email_games WHERE id = ? AND (white_player = ? OR black_player = ?)",
+            (game_id, user["username"], user["username"])
+        ).fetchone()
+        if not game:
+            raise HTTPException(status_code=404, detail="Game not found.")
+        rows = conn.execute(
+            "SELECT id, sender, body, created_at FROM email_game_messages "
+            "WHERE game_id = ? AND id > ? ORDER BY id LIMIT 100",
+            (game_id, after_id)
+        ).fetchall()
+        return {"success": True, "messages": [dict(row) for row in rows]}
+    finally:
+        conn.close()
+
+
+@app.post("/community/email-games/{game_id}/messages")
+async def send_email_game_message(game_id: int, request: EmailGameMessageRequest,
+                                  authorization: Optional[str] = Header(None)):
+    user = _email_game_user(authorization)
+    body = request.message.strip()
+    if not body or len(body) > 2000:
+        raise HTTPException(status_code=400, detail="Messages must contain 1 to 2000 characters.")
+
+    now = datetime.now(timezone.utc)
+    conn = get_db()
+    try:
+        _init_community_tables(conn)
+        conn.execute("BEGIN IMMEDIATE")
+        game = conn.execute(
+            "SELECT * FROM email_games WHERE id = ? AND (white_player = ? OR black_player = ?)",
+            (game_id, user["username"], user["username"])
+        ).fetchone()
+        if not game:
+            raise HTTPException(status_code=404, detail="Game not found.")
+
+        recent_count = conn.execute(
+            "SELECT COUNT(*) FROM email_game_messages WHERE game_id = ? AND sender = ? AND created_at >= ?",
+            (game_id, user["username"], (now - timedelta(minutes=1)).isoformat())
+        ).fetchone()[0]
+        if recent_count >= 10:
+            raise HTTPException(status_code=429, detail="You can send up to 10 messages per minute in this game.")
+
+        cursor = conn.execute(
+            "INSERT INTO email_game_messages (game_id, sender, body, created_at) VALUES (?, ?, ?, ?)",
+            (game_id, user["username"], body, now.isoformat())
+        )
+        opponent = game["black_player"] if game["white_player"] == user["username"] else game["white_player"]
+        recipient = conn.execute("SELECT email FROM users WHERE username = ?", (opponent,)).fetchone()
+        if recipient and recipient["email"]:
+            game_link = f"{APP_BASE_URL.rstrip('/')}/email-game.html?game_id={game_id}"
+            _queue_email(
+                conn, recipient["email"], "New message in your chess game",
+                f"{user['username']} sent you a message in your chess game.\n\nRead the message: {game_link}\n",
+                now.isoformat(), game_id, "message"
+            )
+        conn.commit()
+        return {
+            "success": True,
+            "message": {"id": cursor.lastrowid, "sender": user["username"], "body": body,
+                        "created_at": now.isoformat()},
+        }
     except Exception:
         conn.rollback()
         raise
