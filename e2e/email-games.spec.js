@@ -229,6 +229,33 @@ test.describe('email board input', () => {
       await page.screenshot({ path: testInfo.outputPath('histories.png'), fullPage: true });
       await context.close();
     });
+
+    test(`move history matches board height and scrolls on ${touch ? 'phone' : 'desktop'}`, async ({ browser }, testInfo) => {
+      const moveHistory = Array.from({ length: 120 }, (_, index) => ({
+        san: index % 2 ? 'e5' : 'e4', played_at: '2026-10-25T12:00:00+00:00'
+      }));
+      const { context, page } = await openInputGame(browser, { touch, moveHistory });
+      const moves = page.locator('#moves');
+      await expect(moves.locator('li')).toHaveCount(120);
+      const heightDifference = () => page.evaluate(() =>
+        Math.abs(document.getElementById('moves').getBoundingClientRect().height -
+          document.getElementById('board').getBoundingClientRect().height));
+      await expect.poll(heightDifference).toBeLessThan(2);
+      expect(await moves.evaluate(element => element.scrollHeight > element.clientHeight &&
+        element.scrollHeight - element.scrollTop - element.clientHeight < 2)).toBeTruthy();
+      await moves.focus();
+      await page.keyboard.press('Control+Home');
+      await expect.poll(() => moves.evaluate(element => element.scrollTop)).toBe(0);
+      await expect(moves.locator('li').first()).toBeInViewport();
+      await page.setViewportSize(touch ? { width: 430, height: 900 } : { width: 800, height: 900 });
+      await expect.poll(heightDifference).toBeLessThan(2);
+      expect(await moves.evaluate(element => element.scrollTop)).toBe(0);
+      await page.keyboard.press('Control+End');
+      await expect(moves.locator('li').last()).toBeInViewport();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+      await page.screenshot({ path: testInfo.outputPath('scrolling-moves.png'), fullPage: true });
+      await context.close();
+    });
   }
 
   test('phone ignores further taps while a move is submitting', async ({ browser }) => {

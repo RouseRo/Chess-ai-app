@@ -32,7 +32,7 @@
     #captured-pieces > div { display: flex; justify-content: space-between; align-items: center; min-height: 28px; }
     #captured-pieces span:last-child { font-size: 1.35rem; }
     #players { font-weight: bold; }
-    #moves { padding: 0; list-style: none; line-height: 1.7; }
+    #moves { height: 560px; overflow-y: auto; overscroll-behavior-y: contain; padding: 0 6px; list-style: none; line-height: 1.7; border: 1px solid #9aafa0; }
     #moves li { display: grid; grid-template-columns: minmax(64px, auto) minmax(0, 1fr); gap: 8px; border-bottom: 1px solid #c7d3c9; padding: 4px 0; }
     #moves time, #moves .missing-time { color: #52665a; font-size: .8rem; text-align: right; overflow-wrap: anywhere; }
     #message-list { height: 200px; overflow-y: auto; overscroll-behavior-y: contain; list-style: none; padding: 0; border: 1px solid #9aafa0; }
@@ -85,8 +85,8 @@
           </div>
         </div>
         <div>
-          <h2>Move history</h2>
-          <ol id="moves"></ol>
+          <h2 id="moves-heading">Move history</h2>
+          <ol id="moves" tabindex="0" aria-labelledby="moves-heading"></ol>
           <button id="refresh" type="button">Refresh board</button>
           <button id="remind" type="button" hidden>Remind on move</button>
           <div id="replay-controls" hidden>
@@ -262,6 +262,8 @@
           item.append(notation, time);
           moves.append(item);
         });
+        resizeMoveHistory();
+        moves.scrollTop = moves.scrollHeight;
         document.getElementById('conversation').hidden = false;
         await loadMessages(true);
       } catch (error) {
@@ -557,9 +559,16 @@
     document.getElementById('replay-prev').addEventListener('click', () => stepReplay(-1));
     document.getElementById('replay-next').addEventListener('click', () => stepReplay(1));
     document.getElementById('export-pgn').addEventListener('click', downloadPgn);
+    function resizeMoveHistory() {
+      const moves = document.getElementById('moves');
+      const followLatest = moves.scrollHeight - moves.scrollTop - moves.clientHeight < 32;
+      moves.style.height = document.getElementById('board').getBoundingClientRect().height + 'px';
+      if (followLatest) moves.scrollTop = moves.scrollHeight;
+    }
     window.addEventListener('resize', () => {
       if (!board) return;
       board.resize();
+      resizeMoveHistory();
       if (selectedSquare) {
         document.querySelector('#board [data-square="' + selectedSquare + '"]').classList.add('touch-selected');
       }
