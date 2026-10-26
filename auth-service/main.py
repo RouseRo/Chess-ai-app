@@ -1919,8 +1919,8 @@ async def submit_email_game_move(game_id: int, request: EmailGameMoveRequest,
         san = board.san(move)
         board.push(move)
         history = _json_module.loads(game["move_history"])
-        history.append({"uci": move.uci(), "san": san})
         now = datetime.now(timezone.utc).isoformat()
+        history.append({"uci": move.uci(), "san": san, "played_at": now})
         outcome = board.outcome()
         status = "completed" if outcome else "active"
         result = board.result() if outcome else None

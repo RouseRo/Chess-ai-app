@@ -69,7 +69,7 @@ async function expectTurnSideAtBottom(page, color) {
 }
 
 test.describe('email board input', () => {
-  async function openInputGame(browser, { touch = true, color = 'white', status = 'active', myTurn = true, fen } = {}) {
+  async function openInputGame(browser, { touch = true, color = 'white', status = 'active', myTurn = true, fen, moveHistory = [], initialMessages = [] } = {}) {
     const context = await browser.newContext({
       viewport: touch ? { width: 390, height: 844 } : { width: 1280, height: 900 },
       hasTouch: touch,
@@ -77,13 +77,13 @@ test.describe('email board input', () => {
     });
     const page = await context.newPage();
     const submittedMoves = [];
-    const messages = [];
+    const messages = [...initialMessages];
     const sentMessages = [];
     const username = color === 'white' ? 'white_tester' : 'black_tester';
     const game = {
       white_player: 'white_tester', black_player: 'black_tester',
       current_player: myTurn ? username : (color === 'white' ? 'black_tester' : 'white_tester'),
-      status, version: 7, move_history: [], captured_pieces: { white: [], black: [] },
+      status, version: 7, move_history: moveHistory, captured_pieces: { white: [], black: [] },
       fen: fen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
     };
     await context.addInitScript(() => localStorage.setItem('authToken', 'input-test-token'));
@@ -187,6 +187,49 @@ test.describe('email board input', () => {
     expect(messages).toHaveLength(1);
     await context.close();
   });
+
+  for (const touch of [true, false]) {
+    test(`history scrolls and move timestamps render on ${touch ? 'phone' : 'desktop'}`, async ({ browser }, testInfo) => {
+      const initialMessages = Array.from({ length: 105 }, (_, index) => ({
+        id: index + 1, sender: 'white_tester', body: `Message ${index + 1}`,
+        created_at: '2026-10-25T12:00:00+00:00'
+      }));
+      const moveHistory = [
+        { san: 'e4', played_at: '2026-10-25T12:00:00+00:00' },
+        { san: 'e5', played_at: '2026-10-25T12:05:00+00:00' },
+        { san: 'Nf3' }
+      ];
+      const { context, page, messages } = await openInputGame(browser, { touch, moveHistory, initialMessages });
+      const list = page.locator('#message-list');
+      await expect(list.locator('li')).toHaveCount(105);
+      expect(await list.evaluate(element => element.scrollHeight > element.clientHeight && element.clientHeight <= 200)).toBeTruthy();
+      expect(await list.evaluate(element => element.scrollTop > 0)).toBeTruthy();
+      await list.focus();
+      await page.keyboard.press('Control+Home');
+      await expect.poll(() => list.evaluate(element => element.scrollTop)).toBe(0);
+      messages.push({ id: 106, sender: 'black_tester', body: 'Newest message', created_at: '2026-10-25T12:06:00Z' });
+      await page.evaluate(() => loadMessages());
+      await expect(list.locator('li')).toHaveCount(106);
+      expect(await list.evaluate(element => element.scrollTop)).toBe(0);
+      const rows = page.locator('#moves li');
+      await expect(rows).toHaveCount(3);
+      await expect(rows.nth(0)).toContainText('1. e4');
+      await expect(rows.nth(1)).toContainText('1... e5');
+      await expect(rows.nth(2)).toContainText('Not recorded');
+      for (let index = 0; index < 2; index++) {
+        const time = rows.nth(index).locator('time');
+        await expect(time).toHaveAttribute('datetime', moveHistory[index].played_at);
+        const expected = await page.evaluate(value => new Date(value).toLocaleString(), moveHistory[index].played_at);
+        await expect(time).toHaveText(expected);
+        const notationBox = await rows.nth(index).locator('span').boundingBox();
+        const timeBox = await time.boundingBox();
+        expect(timeBox.x).toBeGreaterThanOrEqual(notationBox.x + notationBox.width);
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+      await page.screenshot({ path: testInfo.outputPath('histories.png'), fullPage: true });
+      await context.close();
+    });
+  }
 
   test('phone ignores further taps while a move is submitting', async ({ browser }) => {
     const { context, page } = await openInputGame(browser);

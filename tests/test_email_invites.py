@@ -507,15 +507,23 @@ class EmailInviteTests(unittest.TestCase):
         token = self.mail.call_args.args[2].split("?token=", 1)[1].splitlines()[0]
         game_id = asyncio.run(auth.respond_to_email_invite(auth.EmailInviteResponse(token=token)))['game_id']
 
+        before_move = datetime.now(timezone.utc)
         result = asyncio.run(auth.submit_email_game_move(
             game_id, auth.EmailGameMoveRequest(move="e2e4", expected_version=0), "Bearer test"
         ))
+        after_move = datetime.now(timezone.utc)
 
         board = auth.chess.Board()
         board.push_san("e4")
         self.assertEqual(result["move"], {"uci": "e2e4", "san": "e4"})
         self.assertEqual(result["game"]["fen"], board.fen())
-        self.assertEqual(result["game"]["move_history"], [{"uci": "e2e4", "san": "e4"}])
+        played_at = result["game"]["move_history"][0]["played_at"]
+        self.assertEqual(result["game"]["move_history"], [{"uci": "e2e4", "san": "e4", "played_at": played_at}])
+        self.assertLessEqual(before_move, datetime.fromisoformat(played_at))
+        self.assertLessEqual(datetime.fromisoformat(played_at), after_move)
+        self.assertEqual(result["game"]["last_move_at"], played_at)
+        saved_game = asyncio.run(auth.get_email_game(game_id, "Bearer test"))["game"]
+        self.assertEqual(saved_game["move_history"], result["game"]["move_history"])
         self.assertEqual(result["game"]["current_player"], "smtptest")
         self.assertEqual(result["game"]["version"], 1)
         with self.connect() as conn:

@@ -32,8 +32,10 @@
     #captured-pieces > div { display: flex; justify-content: space-between; align-items: center; min-height: 28px; }
     #captured-pieces span:last-child { font-size: 1.35rem; }
     #players { font-weight: bold; }
-    #moves { padding-left: 28px; line-height: 1.7; }
-    #message-list { max-height: 320px; overflow-y: auto; list-style: none; padding: 0; border-top: 1px solid #c7d3c9; }
+    #moves { padding: 0; list-style: none; line-height: 1.7; }
+    #moves li { display: grid; grid-template-columns: minmax(64px, auto) minmax(0, 1fr); gap: 8px; border-bottom: 1px solid #c7d3c9; padding: 4px 0; }
+    #moves time, #moves .missing-time { color: #52665a; font-size: .8rem; text-align: right; overflow-wrap: anywhere; }
+    #message-list { height: 200px; overflow-y: auto; overscroll-behavior-y: contain; list-style: none; padding: 0; border: 1px solid #9aafa0; }
     #message-list li { padding: 10px 4px; border-bottom: 1px solid #c7d3c9; }
     #message-list time { color: #52665a; font-size: .875rem; }
     #message-list p { margin: 5px 0 0; white-space: pre-wrap; }
@@ -97,7 +99,7 @@
       </div>
       <section id="conversation" aria-labelledby="conversation-heading">
         <h2 id="conversation-heading">Messages</h2>
-        <ol id="message-list" aria-live="polite" aria-relevant="additions"></ol>
+        <ol id="message-list" tabindex="0" aria-labelledby="conversation-heading" aria-live="polite" aria-relevant="additions"></ol>
         <form id="message-form">
           <label for="message-input">Write a message</label>
           <textarea id="message-input" maxlength="2000" required></textarea>
@@ -244,11 +246,22 @@
         updateReplayControls();
         const moves = document.getElementById('moves');
         moves.replaceChildren();
-        for (let index = 0; index < game.move_history.length; index += 2) {
+        game.move_history.forEach((move, index) => {
           const item = document.createElement('li');
-          item.textContent = game.move_history.slice(index, index + 2).map(move => move.san).join(' ');
+          const notation = document.createElement('span');
+          notation.textContent = (Math.floor(index / 2) + 1) + (index % 2 ? '... ' : '. ') + move.san;
+          const timestamp = new Date(move.played_at || '');
+          const time = document.createElement(Number.isNaN(timestamp.getTime()) ? 'span' : 'time');
+          if (Number.isNaN(timestamp.getTime())) {
+            time.className = 'missing-time';
+            time.textContent = 'Not recorded';
+          } else {
+            time.dateTime = move.played_at;
+            time.textContent = timestamp.toLocaleString();
+          }
+          item.append(notation, time);
           moves.append(item);
-        }
+        });
         document.getElementById('conversation').hidden = false;
         await loadMessages(true);
       } catch (error) {
@@ -262,6 +275,7 @@
       if (!gameId || !token || messagesLoading) return;
       messagesLoading = true;
       const list = document.getElementById('message-list');
+      const followLatest = reset || list.scrollHeight - list.scrollTop - list.clientHeight < 32;
       try {
         if (reset) {
           lastMessageId = 0;
@@ -290,7 +304,7 @@
             lastMessageId = message.id;
           });
         } while (batch.length === 100);
-        if (list.lastElementChild) list.lastElementChild.scrollIntoView({ block: 'nearest' });
+        if (followLatest) list.scrollTop = list.scrollHeight;
         document.getElementById('message-status').textContent = '';
       } catch (error) {
         document.getElementById('message-status').textContent = error.message || 'Unable to load messages.';
