@@ -17,7 +17,7 @@
   "chat.sessionSync.enabled": true,
   "chat.editor.preferCopilotHarness": false,
   "chat.defaultToCopilotHarness": false,
-  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+  "python.defaultInterpreterPath": "${workspaceFolder}/venv/Scripts/python.exe",
   "python.terminal.activateEnvironment": true,
   "C_Cpp_Runner.msvcBatchPath": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Auxiliary/Build/vcvarsall.bat",
   "C_Cpp_Runner.cCompilerPath": "gcc",
