@@ -25,6 +25,34 @@
     #login button { margin-top: 16px; }
     #feedback { min-height: 24px; color: #a22121; }
     #game-layout { display: grid; grid-template-columns: minmax(0, 560px) minmax(180px, 1fr); gap: 28px; align-items: start; }
+    .page-tabs { display: flex; gap: 4px; margin: 20px 0 16px; border-bottom: 1px solid #9aafa0; }
+    .page-tab { padding: 10px 16px; background: transparent; color: #25382e; border-bottom: 3px solid transparent; }
+    .page-tab[aria-selected="true"] { color: #245c35; border-bottom-color: #3e714a; }
+    .page-tab:focus-visible { outline: 2px solid #315d94; outline-offset: 2px; }
+    #community-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; }
+    #community-toolbar h2, #community-players h3, #community-chat h3 { margin: 0 0 10px; }
+    #community-toolbar > div { display: flex; align-items: center; gap: 10px; }
+    #community-online-status { color: #52665a; font-size: .9rem; }
+    #community-layout { display: grid; grid-template-columns: minmax(190px, .75fr) minmax(0, 1.5fr); gap: 20px; }
+    #community-players, #community-chat { min-width: 0; }
+    #community-invite-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; margin-bottom: 14px; }
+    #community-invite-form label { grid-column: 1 / -1; margin: 0; }
+    #community-invite-form input, #community-message-input { min-width: 0; padding: 10px; font: inherit; border: 1px solid #9aafa0; }
+    #community-player-list { max-height: 360px; overflow-y: auto; border-top: 1px solid #c7d3c9; }
+    .community-player { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 2px; border-bottom: 1px solid #dce4dd; }
+    .community-player-name { min-width: 0; overflow-wrap: anywhere; }
+    .community-presence { color: #52665a; font-size: .85rem; }
+    #community-messages { height: min(45vh, 360px); min-height: 200px; overflow-y: auto; padding: 8px; border: 1px solid #9aafa0; }
+    .community-message { padding: 8px 4px; border-bottom: 1px solid #dce4dd; overflow-wrap: anywhere; }
+    .community-message header { display: flex; justify-content: space-between; gap: 8px; padding: 0; background: transparent; border: 0; font-size: .85rem; }
+    .community-message time { color: #52665a; }
+    .community-message p { margin: 4px 0 0; white-space: pre-wrap; }
+    #community-message-form { display: flex; gap: 8px; margin-top: 8px; }
+    #community-message-input { flex: 1; }
+    #community-invite-preview { margin-top: 14px; padding: 10px; border: 1px solid #9aafa0; }
+    #community-invite-preview iframe { width: 100%; height: 190px; border: 1px solid #c7d3c9; }
+    .community-preview-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+    .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
     #board { width: 100%; aspect-ratio: 1; }
     #board .touch-selected { outline: 4px solid #f5c542; outline-offset: -4px; }
     #switch-player { width: 100%; margin-bottom: 8px; }
@@ -43,7 +71,13 @@
     #message-form button { margin-top: 8px; }
     #message-status { min-height: 24px; }
     #game-list { padding-left: 20px; line-height: 1.8; }
-    @media (max-width: 680px) { #game-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; } }
+    @media (max-width: 680px) {
+      #game-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+      #community-layout { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+      #community-player-list { max-height: 180px; }
+      #community-messages { height: 240px; }
+      #community-toolbar { align-items: flex-start; }
+    }
   </style>
 </head>
 <body>
@@ -75,37 +109,80 @@
         <button id="decline-draw" type="button" hidden>Decline draw</button>
         <span id="draw-status" aria-live="polite"></span>
       </div>
-      <div id="game-layout">
-        <div>
-          <button id="switch-player" type="button">Switch player</button>
-          <div id="board" aria-label="Saved chess position"></div>
-          <div id="captured-pieces" aria-label="Captured pieces">
-            <div><span>Captured by White</span><span id="white-captured" aria-live="polite">—</span></div>
-            <div><span>Captured by Black</span><span id="black-captured" aria-live="polite">—</span></div>
-          </div>
-        </div>
-        <div>
-          <h2 id="moves-heading">Move history</h2>
-          <ol id="moves" tabindex="0" aria-labelledby="moves-heading"></ol>
-          <button id="refresh" type="button">Refresh board</button>
-          <button id="remind" type="button" hidden>Remind on move</button>
-          <div id="replay-controls" hidden>
-            <button id="replay-prev" type="button">Previous position</button>
-            <span id="replay-position" aria-live="polite"></span>
-            <button id="replay-next" type="button">Next position</button>
-            <button id="export-pgn" type="button">Download PGN</button>
-          </div>
-        </div>
+      <div class="page-tabs" role="tablist" aria-label="Game pages">
+        <button id="game-tab" class="page-tab" type="button" role="tab" aria-selected="true" aria-controls="game-tab-panel" tabindex="0">Game</button>
+        <button id="community-tab" class="page-tab" type="button" role="tab" aria-selected="false" aria-controls="community-tab-panel" tabindex="-1">Community</button>
       </div>
-      <section id="conversation" aria-labelledby="conversation-heading">
-        <h2 id="conversation-heading">Messages</h2>
-        <ol id="message-list" tabindex="0" aria-labelledby="conversation-heading" aria-live="polite" aria-relevant="additions"></ol>
-        <form id="message-form">
-          <label for="message-input">Write a message</label>
-          <textarea id="message-input" maxlength="2000" required></textarea>
-          <button type="submit">Send message</button>
-        </form>
-        <p id="message-status" role="status" aria-live="polite"></p>
+      <section id="game-tab-panel" role="tabpanel" aria-labelledby="game-tab" tabindex="0">
+        <div id="game-layout">
+          <div>
+            <button id="switch-player" type="button">Switch player</button>
+            <div id="board" aria-label="Saved chess position"></div>
+            <div id="captured-pieces" aria-label="Captured pieces">
+              <div><span>Captured by White</span><span id="white-captured" aria-live="polite">—</span></div>
+              <div><span>Captured by Black</span><span id="black-captured" aria-live="polite">—</span></div>
+            </div>
+          </div>
+          <div>
+            <h2 id="moves-heading">Move history</h2>
+            <ol id="moves" tabindex="0" aria-labelledby="moves-heading"></ol>
+            <button id="refresh" type="button">Refresh board</button>
+            <button id="remind" type="button" hidden>Remind on move</button>
+            <div id="replay-controls" hidden>
+              <button id="replay-prev" type="button">Previous position</button>
+              <span id="replay-position" aria-live="polite"></span>
+              <button id="replay-next" type="button">Next position</button>
+              <button id="export-pgn" type="button">Download PGN</button>
+            </div>
+          </div>
+        </div>
+        <section id="conversation" aria-labelledby="conversation-heading">
+          <h2 id="conversation-heading">Messages</h2>
+          <ol id="message-list" tabindex="0" aria-labelledby="conversation-heading" aria-live="polite" aria-relevant="additions"></ol>
+          <form id="message-form">
+            <label for="message-input">Write a message</label>
+            <textarea id="message-input" maxlength="2000" required></textarea>
+            <button type="submit">Send message</button>
+          </form>
+          <p id="message-status" role="status" aria-live="polite"></p>
+        </section>
+      </section>
+      <section id="community-tab-panel" role="tabpanel" aria-labelledby="community-tab" tabindex="0" hidden>
+        <div id="community-toolbar">
+          <h2>Community</h2>
+          <div><span id="community-online-status" aria-live="polite"></span><button id="community-refresh" type="button">Refresh</button></div>
+        </div>
+        <div id="community-layout">
+          <section id="community-players" aria-labelledby="community-players-heading">
+            <h3 id="community-players-heading">Players</h3>
+            <form id="community-invite-form">
+              <label for="community-invite-recipient">Invite by email or username</label>
+              <input id="community-invite-recipient" type="text" maxlength="254" autocomplete="email" required>
+              <button type="submit">Preview invite</button>
+            </form>
+            <div id="community-player-list" aria-label="Community players"><p>Open Community to load players.</p></div>
+            <section id="community-invite-preview" aria-labelledby="community-invite-preview-heading" hidden>
+              <h3 id="community-invite-preview-heading">Invitation preview</h3>
+              <p id="community-invite-subject"></p>
+              <iframe id="community-invite-email" title="Game invitation email preview" sandbox referrerpolicy="no-referrer"></iframe>
+              <p id="community-invite-error" role="alert"></p>
+              <div class="community-preview-actions">
+                <button id="community-invite-cancel" type="button">Cancel</button>
+                <button id="community-invite-send" type="button" disabled>Send email</button>
+              </div>
+            </section>
+          </section>
+          <section id="community-chat" aria-labelledby="community-chat-heading">
+            <h3 id="community-chat-heading">Community chat</h3>
+            <div id="community-messages" role="log" aria-live="polite"><p>No messages yet.</p></div>
+            <form id="community-message-form">
+              <label class="visually-hidden" for="community-message-input">Write a community message</label>
+              <input id="community-message-input" type="text" maxlength="500" required>
+              <button type="submit">Send</button>
+            </form>
+            <p id="community-message-status" role="status" aria-live="polite"></p>
+          </section>
+        </div>
       </section>
     </section>
     <section id="games" hidden><h2>Your email games</h2><ul id="game-list"></ul></section>
@@ -129,6 +206,8 @@
     let replayIndex = 0;
     let lastMessageId = 0;
     let messagesLoading = false;
+    let pendingCommunityInvite = null;
+    let communityLoading = false;
     const capturedPieceSymbols = {
       p: { white: '♟', black: '♙' }, r: { white: '♜', black: '♖' },
       n: { white: '♞', black: '♘' }, b: { white: '♝', black: '♗' },
@@ -314,6 +393,228 @@
         messagesLoading = false;
       }
     }
+
+    async function refreshCommunityUsers() {
+      if (!token) return;
+      const list = document.getElementById('community-player-list');
+      const status = document.getElementById('community-online-status');
+      try {
+        const response = await fetch('/community/online-users', {
+          headers: { Authorization: 'Bearer ' + token }, cache: 'no-store'
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.message || 'Players could not be loaded.');
+        const users = data.users || [];
+        const onlineCount = users.filter(user => user.activity !== 'offline').length;
+        status.textContent = onlineCount + ' online, ' + (users.length - onlineCount) + ' offline';
+        list.replaceChildren();
+        users.sort((left, right) => {
+          const activityOrder = Number(left.activity === 'offline') - Number(right.activity === 'offline');
+          return activityOrder || left.username.localeCompare(right.username);
+        }).forEach(user => {
+          const item = document.createElement('div');
+          item.className = 'community-player';
+          const details = document.createElement('span');
+          details.className = 'community-player-name';
+          details.textContent = user.username === currentUsername ? user.username + ' (you)' : user.username;
+          const presence = document.createElement('span');
+          presence.className = 'community-presence';
+          presence.textContent = user.activity === 'offline' ? 'Offline' : user.activity === 'playing' ? 'Playing' : 'Online';
+          item.append(details, presence);
+          if (user.username !== currentUsername) {
+            const invite = document.createElement('button');
+            invite.type = 'button';
+            invite.textContent = 'Invite';
+            invite.setAttribute('aria-label', 'Invite ' + user.username + ' to a game');
+            invite.addEventListener('click', () => inviteCommunityPlayer(user.username, user.activity));
+            item.append(invite);
+          }
+          list.append(item);
+        });
+        if (!users.length) list.innerHTML = '<p>No community players yet.</p>';
+      } catch (error) {
+        status.textContent = error.message || 'Players could not be loaded.';
+      }
+    }
+
+    async function loadCommunityMessages() {
+      if (!token || communityLoading) return;
+      communityLoading = true;
+      const list = document.getElementById('community-messages');
+      const followLatest = list.scrollHeight - list.scrollTop - list.clientHeight < 32;
+      try {
+        const response = await fetch('/community/messages?limit=60', {
+          headers: { Authorization: 'Bearer ' + token }, cache: 'no-store'
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.message || 'Community messages could not be loaded.');
+        list.replaceChildren();
+        (data.messages || []).forEach(message => {
+          const item = document.createElement('article');
+          item.className = 'community-message';
+          const heading = document.createElement('header');
+          const sender = document.createElement('strong');
+          sender.textContent = message.sender;
+          const time = document.createElement('time');
+          time.dateTime = message.created_at;
+          time.textContent = new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          heading.append(sender, time);
+          const content = document.createElement('p');
+          content.textContent = message.content;
+          item.append(heading, content);
+          list.append(item);
+        });
+        if (!data.messages?.length) list.innerHTML = '<p>No messages yet. Say hello!</p>';
+        if (followLatest) list.scrollTop = list.scrollHeight;
+        document.getElementById('community-message-status').textContent = '';
+      } catch (error) {
+        document.getElementById('community-message-status').textContent = error.message || 'Community messages could not be loaded.';
+      } finally {
+        communityLoading = false;
+      }
+    }
+
+    async function previewCommunityInvite(recipient) {
+      const preview = document.getElementById('community-invite-preview');
+      const sendButton = document.getElementById('community-invite-send');
+      pendingCommunityInvite = recipient;
+      preview.hidden = false;
+      sendButton.disabled = true;
+      document.getElementById('community-invite-subject').textContent = 'Loading invitation preview...';
+      document.getElementById('community-invite-email').srcdoc = '';
+      document.getElementById('community-invite-error').textContent = '';
+      try {
+        const response = await fetch('/community/game-invite/preview?recipient=' + encodeURIComponent(recipient), {
+          headers: { Authorization: 'Bearer ' + token }, cache: 'no-store'
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.message || 'Invitation preview could not be loaded.');
+        pendingCommunityInvite = data.recipient || recipient;
+        document.getElementById('community-invite-subject').textContent = data.subject;
+        document.getElementById('community-invite-email').srcdoc = data.html_body;
+        sendButton.disabled = false;
+      } catch (error) {
+        document.getElementById('community-invite-error').textContent = error.message || 'Invitation preview could not be loaded.';
+      }
+    }
+
+    async function postCommunityInvite(recipient) {
+      const response = await fetch('/community/game-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ recipient })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Game invitation could not be sent.');
+      return data;
+    }
+
+    async function inviteCommunityPlayer(username, activity) {
+      try {
+        if (activity === 'offline') {
+          await previewCommunityInvite(username);
+          return;
+        }
+        await postCommunityInvite(username);
+        document.getElementById('community-message-status').textContent = 'Game invitation sent to ' + username + '.';
+        await loadCommunityMessages();
+      } catch (error) {
+        document.getElementById('community-message-status').textContent = error.message || 'Game invitation could not be sent.';
+      }
+    }
+
+    document.getElementById('community-invite-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const recipient = document.getElementById('community-invite-recipient').value.trim();
+      if (recipient) await previewCommunityInvite(recipient);
+    });
+    document.getElementById('community-invite-send').addEventListener('click', async () => {
+      if (!pendingCommunityInvite) return;
+      const button = document.getElementById('community-invite-send');
+      button.disabled = true;
+      try {
+        const result = await postCommunityInvite(pendingCommunityInvite);
+        document.getElementById('community-invite-preview').hidden = true;
+        document.getElementById('community-invite-email').srcdoc = '';
+        document.getElementById('community-invite-recipient').value = '';
+        pendingCommunityInvite = null;
+        document.getElementById('community-message-status').textContent = result.emailed
+          ? 'Email invitation sent.' : 'Game invitation sent.';
+        await loadCommunityMessages();
+      } catch (error) {
+        document.getElementById('community-invite-error').textContent = error.message || 'Game invitation could not be sent.';
+        button.disabled = false;
+      }
+    });
+    document.getElementById('community-invite-cancel').addEventListener('click', () => {
+      pendingCommunityInvite = null;
+      document.getElementById('community-invite-preview').hidden = true;
+      document.getElementById('community-invite-email').srcdoc = '';
+    });
+    document.getElementById('community-refresh').addEventListener('click', () => {
+      refreshCommunityUsers();
+      loadCommunityMessages();
+    });
+    document.getElementById('community-message-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const input = document.getElementById('community-message-input');
+      const button = event.currentTarget.querySelector('button');
+      const content = input.value.trim();
+      if (!content || !token) return;
+      button.disabled = true;
+      try {
+        const response = await fetch('/community/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+          body: JSON.stringify({ content })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.message || 'Message could not be sent.');
+        input.value = '';
+        await loadCommunityMessages();
+      } catch (error) {
+        document.getElementById('community-message-status').textContent = error.message || 'Message could not be sent.';
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    function activateGameTab(community) {
+      const gameTab = document.getElementById('game-tab');
+      const communityTab = document.getElementById('community-tab');
+      const gamePanel = document.getElementById('game-tab-panel');
+      const communityPanel = document.getElementById('community-tab-panel');
+      gameTab.setAttribute('aria-selected', String(!community));
+      gameTab.tabIndex = community ? -1 : 0;
+      communityTab.setAttribute('aria-selected', String(community));
+      communityTab.tabIndex = community ? 0 : -1;
+      gamePanel.hidden = community;
+      communityPanel.hidden = !community;
+      if (community) {
+        refreshCommunityUsers();
+        loadCommunityMessages();
+      } else {
+        window.requestAnimationFrame(() => {
+          if (board) board.resize();
+          resizeMoveHistory();
+        });
+      }
+    }
+
+    document.getElementById('game-tab').addEventListener('click', () => activateGameTab(false));
+    document.getElementById('community-tab').addEventListener('click', () => activateGameTab(true));
+    document.querySelector('[role="tablist"]').addEventListener('keydown', event => {
+      const tabs = [...event.currentTarget.querySelectorAll('[role="tab"]')];
+      const currentIndex = tabs.indexOf(document.activeElement);
+      const nextIndex = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? (currentIndex + 1) % tabs.length
+        : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? (currentIndex + tabs.length - 1) % tabs.length
+          : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : -1;
+      if (nextIndex >= 0) {
+        event.preventDefault();
+        tabs[nextIndex].focus();
+        tabs[nextIndex].click();
+      }
+    });
 
     document.getElementById('message-form').addEventListener('submit', async event => {
       event.preventDefault();
@@ -597,7 +898,12 @@
       await loadGame();
     }
     window.setInterval(() => {
-      if (!document.hidden) loadMessages();
+      if (document.hidden) return;
+      loadMessages();
+      if (!document.getElementById('game').hidden && !document.getElementById('community-tab-panel').hidden) {
+        refreshCommunityUsers();
+        loadCommunityMessages();
+      }
     }, 20000);
     initialize();
   </script>

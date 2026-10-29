@@ -42,6 +42,7 @@ app.add_middleware(
 JWT_SECRET = os.environ.get("JWT_SECRET_KEY", "chess-app-secret-key-change-in-production")
 JWT_EXPIRATION_HOURS = int(os.environ.get("JWT_EXPIRATION_HOURS", "24"))
 DATABASE_PATH = os.environ.get("DATABASE_PATH", "/app/data/users.db")
+SQLITE_VFS = os.environ.get("SQLITE_VFS", "unix-dotfile")
 DEV_MODE = os.environ.get("CHESS_DEV_MODE", "").lower() == "true"
 SMTP_HOST = os.environ.get("SMTP_HOST", "")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
@@ -140,8 +141,8 @@ class ResendVerificationRequest(BaseModel):
 
 # Database functions
 def _sqlite_connect(path: str) -> sqlite3.Connection:
-    """Open a SQLite connection using unix-dotfile VFS for Azure Files SMB compatibility."""
-    uri = f"file:{path}?vfs=unix-dotfile"
+    """Open a SQLite connection using the configured VFS."""
+    uri = f"file:{path}?vfs={SQLITE_VFS}"
     return sqlite3.connect(uri, uri=True, timeout=30, check_same_thread=False)
 
 
