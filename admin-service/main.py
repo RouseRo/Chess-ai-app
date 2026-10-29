@@ -24,6 +24,7 @@ app.add_middleware(
 
 # Database configuration
 DATABASE_PATH = os.environ.get("DATABASE_PATH", "/app/data/users.db")
+SQLITE_VFS = os.environ.get("SQLITE_VFS", "unix-dotfile")
 
 print(f"\n[INIT] ========== ADMIN SERVICE INITIALIZATION ==========")
 print(f"[INIT] DATABASE_PATH: {DATABASE_PATH}")
@@ -70,8 +71,8 @@ class AIModelResponse(BaseModel):
 # ========== Helper Functions ==========
 
 def get_db_connection():
-    """Get SQLite database connection using unix-dotfile VFS for Azure Files SMB compatibility."""
-    uri = f"file:{DATABASE_PATH}?vfs=unix-dotfile"
+    """Get a SQLite database connection using the configured VFS."""
+    uri = f"file:{DATABASE_PATH}?vfs={SQLITE_VFS}"
     conn = sqlite3.connect(uri, uri=True, timeout=30, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn

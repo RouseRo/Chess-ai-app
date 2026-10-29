@@ -50,7 +50,7 @@ async function openGamePage(browser, gameId, username, request) {
     route.fulfill({ path: jqueryPath, contentType: 'application/javascript' })
   );
   await page.goto(`/email-game.html?game_id=${gameId}`);
-  await page.getByLabel('Username').fill(username);
+  await page.locator('#username').fill(username);
   await page.getByLabel('Password').fill(testPassword);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.locator('#game')).toBeVisible();
@@ -79,6 +79,9 @@ test.describe('email board input', () => {
     const submittedMoves = [];
     const messages = [...initialMessages];
     const sentMessages = [];
+    const communityChatMessages = [];
+    const communityInvites = [];
+    const invitePreviews = [];
     const username = color === 'white' ? 'white_tester' : 'black_tester';
     const game = {
       white_player: 'white_tester', black_player: 'black_tester',
@@ -111,6 +114,34 @@ test.describe('email board input', () => {
         const afterId = Number(new URL(route.request().url()).searchParams.get('after_id') || 0);
         return route.fulfill({ json: { success: true, messages: messages.filter(message => message.id > afterId) } });
       }
+      if (pathname === '/community/online-users') {
+        return route.fulfill({ json: { success: true, users: [
+          { username: 'white_tester', activity: 'online' },
+          { username: 'online_friend', activity: 'online' },
+          { username: 'offline_friend', activity: 'offline' }
+        ] } });
+      }
+      if (pathname === '/community/messages') {
+        if (route.request().method() === 'POST') {
+          const request = route.request().postDataJSON();
+          communityChatMessages.push({ sender: username, content: request.content, created_at: new Date().toISOString() });
+          return route.fulfill({ json: { success: true, id: communityChatMessages.length } });
+        }
+        return route.fulfill({ json: { success: true, messages: communityChatMessages } });
+      }
+      if (pathname === '/community/game-invite/preview') {
+        const recipient = new URL(route.request().url()).searchParams.get('recipient');
+        invitePreviews.push(recipient);
+        return route.fulfill({ json: {
+          success: true, recipient, subject: `Chess invitation from ${username}`,
+          html_body: '<p>Join me for a chess game.</p>'
+        } });
+      }
+      if (pathname === '/community/game-invite') {
+        const invite = route.request().postDataJSON();
+        communityInvites.push(invite);
+        return route.fulfill({ json: { success: true, recipient: invite.recipient, emailed: invite.recipient.includes('@') } });
+      }
       if (pathname === '/community/email-games/input-test') {
         return route.fulfill({ json: { success: true, username, game } });
       }
@@ -118,8 +149,43 @@ test.describe('email board input', () => {
     });
     await page.goto('/email-game.html?game_id=input-test');
     await expect(page.locator('#board .square-e2')).toBeVisible();
-    return { context, page, submittedMoves, messages, sentMessages };
+    return { context, page, submittedMoves, messages, sentMessages, communityChatMessages, communityInvites, invitePreviews };
   }
+
+  test('community tab supports chat and game invitations on phone', async ({ browser }) => {
+    const { context, page, communityChatMessages, communityInvites, invitePreviews } = await openInputGame(browser);
+    const communityTab = page.getByRole('tab', { name: 'Community' });
+    await communityTab.click();
+    await expect(page.locator('#community-tab-panel')).toBeVisible();
+    await expect(page.locator('#game-tab-panel')).toBeHidden();
+    await expect(page.getByText('online_friend')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Invite online_friend to a game' }).click();
+    await expect.poll(() => communityInvites).toEqual([{ recipient: 'online_friend' }]);
+
+    await page.getByLabel('Write a community message').fill('Ready for a rematch?');
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(page.locator('#community-messages')).toContainText('Ready for a rematch?');
+    await expect(page.locator('#community-messages article header')).toHaveCSS('padding-top', '0px');
+    expect(communityChatMessages).toHaveLength(1);
+
+    await page.getByLabel('Invite by email or username').fill('friend@example.com');
+    await page.getByRole('button', { name: 'Preview invite' }).click();
+    await expect(page.locator('#community-invite-preview')).toBeVisible();
+    await expect.poll(() => invitePreviews).toEqual(['friend@example.com']);
+    await page.getByRole('button', { name: 'Send email' }).click();
+    await expect.poll(() => communityInvites).toEqual([
+      { recipient: 'online_friend' }, { recipient: 'friend@example.com' }
+    ]);
+    await expect(page.locator('#community-invite-preview')).toBeHidden();
+
+    await communityTab.focus();
+    await page.keyboard.press('ArrowLeft');
+    await expect(page.getByRole('tab', { name: 'Game' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#game-tab-panel')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+    await context.close();
+  });
 
   for (const { color, from, to, move, fen } of [
     { color: 'white', from: 'e2', to: 'e4', move: 'e2e4' },
@@ -461,19 +527,19 @@ test('offline invitation, playable game, and completed-game review', async ({ br
   const gameId = new URL(recipientPage.url()).searchParams.get('game_id');
   const recipientToken = await loginUser(request, recipient);
 
-  await recipientPage.getByLabel('Username').fill(recipient);
+  await recipientPage.locator('#username').fill(recipient);
   await recipientPage.getByLabel('Password').fill(testPassword);
   await recipientPage.getByRole('button', { name: 'Sign in' }).click();
   await expect(recipientPage.locator('#turn')).toHaveText(`White to move (${inviter})`);
   await expectTurnSideAtBottom(recipientPage, 'White');
   await recipientPage.getByRole('button', { name: `Sign in as White (${inviter})` }).click();
   await expect(recipientPage.locator('#game')).toBeHidden();
-  await recipientPage.getByLabel('Username').fill(inviter);
+  await recipientPage.locator('#username').fill(inviter);
   await recipientPage.getByLabel('Password').fill(testPassword);
   await recipientPage.getByRole('button', { name: 'Sign in' }).click();
   await expect(recipientPage.locator('#turn')).toHaveText('Your turn (White)');
   await recipientPage.getByRole('button', { name: 'Switch player' }).click();
-  await recipientPage.getByLabel('Username').fill(recipient);
+  await recipientPage.locator('#username').fill(recipient);
   await recipientPage.getByLabel('Password').fill(testPassword);
   await recipientPage.getByRole('button', { name: 'Sign in' }).click();
   await expect(recipientPage.locator('#turn')).toHaveText(`White to move (${inviter})`);
