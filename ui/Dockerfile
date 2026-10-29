@@ -1,7 +1,8 @@
 FROM node:20-alpine AS build
 WORKDIR /app
+COPY package*.json ./
+RUN npm ci --include=dev
 COPY . .
-RUN npm install && chmod +x node_modules/.bin/tsc
 RUN npm run build
 # Copy static assets to dist if not handled by build
 RUN cp index.html dist/ || true
