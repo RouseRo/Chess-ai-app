@@ -78,6 +78,11 @@ the board lets the next player switch accounts; it names the player whose turn i
 is. Captured pieces remain displayed below the board, including while stepping
 through a completed game's replay. Opening `email-game.html` without a game ID
 lists the signed-in player's email games.
+The signed-in email-game page also has a **Community** tab. Players can refresh
+the online player list, see who is online or playing, and send community chat
+messages. Invite an online player directly, or enter a username or email address
+to preview an email invitation before sending it.
+
 
 The email-game board automatically detects touch-capable devices, including
 phones and tablets. Tap one of your pieces to select it (highlighted in yellow),
