@@ -1,0 +1,44 @@
+services:
+  chess-engine:
+    container_name: chess-email-test-engine
+    environment:
+      - OPENAI_API_KEY=
+      - JWT_SECRET_KEY=email-games-local-test-secret
+
+  auth-service:
+    container_name: chess-email-test-auth
+    environment:
+      - CHESS_DEV_MODE=true
+      - DATABASE_PATH=/app/data/users.db
+      - JWT_SECRET_KEY=email-games-local-test-secret
+      - SMTP_HOST=email-test-mailpit
+      - SMTP_PORT=1025
+      - SMTP_USER=local-test
+      - SMTP_PASSWORD=local-test
+      - SMTP_FROM_EMAIL=chess-test@example.test
+      - SMTP_USE_STARTTLS=false
+      - SMTP_USE_AUTH=false
+      - APP_BASE_URL=http://localhost:18080
+    volumes:
+      - email-games-test-data:/app/data
+
+  admin-service:
+    container_name: chess-email-test-admin
+    environment:
+      - DATABASE_PATH=/app/data/users.db
+    volumes:
+      - email-games-test-data:/app/data
+
+  chess-ui:
+    container_name: chess-email-test-ui
+
+  email-test-mailpit:
+    image: axllent/mailpit:latest
+    container_name: chess-email-test-mailpit
+    ports:
+      - "18025:8025"
+    networks:
+      - chess-network
+
+volumes:
+  email-games-test-data:
