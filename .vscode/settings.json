@@ -17,8 +17,17 @@
   "chat.sessionSync.enabled": true,
   "chat.editor.preferCopilotHarness": false,
   "chat.defaultToCopilotHarness": false,
-  "python.defaultInterpreterPath": "${workspaceFolder}/venv/Scripts/python.exe",
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
   "python.terminal.activateEnvironment": true,
+  "terminal.integrated.profiles.windows": {
+    "PowerShell (No Profile)": {
+      "source": "PowerShell",
+      "args": [
+        "-NoProfile"
+      ]
+    }
+  },
+  "terminal.integrated.defaultProfile.windows": "PowerShell (No Profile)",
   "C_Cpp_Runner.msvcBatchPath": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Auxiliary/Build/vcvarsall.bat",
   "C_Cpp_Runner.cCompilerPath": "gcc",
   "C_Cpp_Runner.cppCompilerPath": "g++",

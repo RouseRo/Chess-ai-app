@@ -35,10 +35,11 @@
     #community-online-status { color: #52665a; font-size: .9rem; }
     #community-layout { display: grid; grid-template-columns: minmax(190px, .75fr) minmax(0, 1.5fr); gap: 20px; }
     #community-players, #community-chat { min-width: 0; }
+    #community-chat { border-left: 2px solid #718979; padding-left: 20px; }
     #community-invite-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; margin-bottom: 14px; }
     #community-invite-form label { grid-column: 1 / -1; margin: 0; }
     #community-invite-form input, #community-message-input { min-width: 0; padding: 10px; font: inherit; border: 1px solid #9aafa0; }
-    #community-player-list { max-height: 360px; overflow-y: auto; border-top: 1px solid #c7d3c9; }
+    #community-player-list { max-height: 360px; overflow-y: auto; border: 1px solid #718979; padding: 0 6px; background: #fff; scrollbar-color: #718979 #e9eee9; scrollbar-width: thin; }
     .community-player { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 2px; border-bottom: 1px solid #dce4dd; }
     .community-player-name { min-width: 0; overflow-wrap: anywhere; }
     .community-presence { color: #52665a; font-size: .85rem; }
@@ -75,6 +76,7 @@
       #game-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
       #community-layout { grid-template-columns: minmax(0, 1fr); gap: 20px; }
       #community-player-list { max-height: 180px; }
+      #community-chat { border-left: 0; border-top: 2px solid #718979; padding: 16px 0 0; }
       #community-messages { height: 240px; }
       #community-toolbar { align-items: flex-start; }
     }
