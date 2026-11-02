@@ -106,6 +106,7 @@
         <li><a class="nav-link" onclick="switchTab('feedback'); loadFeedback();">Feedback <span id="feedback-badge"
               style="display:none; background:#f44336; color:white; font-size:0.75em; padding:1px 6px; border-radius:10px; margin-left:4px;"></span></a>
         </li>
+          <li><a class="nav-link" onclick="switchTab('email-games')">Email Games</a></li>
         <li><a class="nav-link" onclick="switchTab('models')">AI Models</a></li>
         <li><a class="nav-link" onclick="switchTab('settings')">Settings</a></li>
       </ul>
@@ -262,6 +263,47 @@
         </div>
       </section>
 
+      <section id="email-games" class="content-section">
+        <h2 class="page-title">Email Games</h2>
+        <p class="page-subtitle">Review accepted games, invitation decisions, and waiting times</p>
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+            <label for="email-games-status">Status
+              <select id="email-games-status" onchange="emailGamesOffset = 0; loadEmailGames()">
+                <option value="">All statuses</option>
+                <option value="pending">Pending</option>
+                <option value="accepted">Accepted</option>
+                <option value="declined">Declined</option>
+                <option value="expired">Expired</option>
+                <option value="active">Active</option>
+                <option value="completed">Completed</option>
+              </select>
+            </label>
+            <button class="btn btn-secondary" onclick="loadEmailGames()" title="Refresh email games and invitations">&#8635; Refresh</button>
+          </div>
+          <p id="email-games-summary" aria-live="polite"></p>
+          <h3>Games</h3>
+          <div class="table-responsive">
+            <table>
+              <thead><tr><th>ID</th><th>White</th><th>Black</th><th>Status</th><th>To move</th><th>Waiting</th><th>Last move</th><th>Last reminder</th></tr></thead>
+              <tbody id="email-games-tbody"><tr><td colspan="8" class="loading">Select Email Games to load records.</td></tr></tbody>
+            </table>
+          </div>
+          <h3 style="margin-top:24px;">Invitations</h3>
+          <div class="table-responsive">
+            <table>
+              <thead><tr><th>ID</th><th>Sender</th><th>Recipient</th><th>Status</th><th>Sent</th><th>Expires</th><th>Answered</th><th>Color</th><th>Opening</th></tr></thead>
+              <tbody id="email-invites-tbody"><tr><td colspan="9" class="loading">Select Email Games to load records.</td></tr></tbody>
+            </table>
+          </div>
+          <div style="display:flex; justify-content:flex-end; align-items:center; gap:12px; margin-top:14px;">
+            <button class="btn btn-secondary" id="email-games-prev" onclick="changeEmailGamesPage(-1)" disabled>Previous</button>
+            <span id="email-games-page">Page 1</span>
+            <button class="btn btn-secondary" id="email-games-next" onclick="changeEmailGamesPage(1)" disabled>Next</button>
+          </div>
+        </div>
+      </section>
+
       <section id="settings" class="content-section">
         <h2 class="page-title">Admin Settings</h2>
         <p class="page-subtitle">Configure admin preferences</p>
@@ -362,6 +404,8 @@
     var API_AUTH = '';
     var usersRefreshTimer = null;
     var dashboardController = null;
+    var emailGamesOffset = 0;
+    var emailGamesLimit = 50;
 
     window.onload = function() {
       var token = localStorage.getItem('authToken');
@@ -415,6 +459,7 @@
       }
       else if (tabName === 'models') { loadModels(); }
       else if (tabName === 'dashboard') { loadDashboard(); }
+      else if (tabName === 'email-games') { loadEmailGames(); }
       // announcements section loads via its own onclick handler
     }
 
@@ -883,6 +928,103 @@
             })
             .catch(function () { histEl.innerHTML = '<p style="color:#999;">Error loading history.</p>'; });
         }
+
+      function emailGameDate(value) {
+        if (!value) return '—';
+        var date = new Date(value);
+        return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+      }
+
+      function emailGameWait(seconds) {
+        var total = Math.max(0, Number(seconds) || 0);
+        var days = Math.floor(total / 86400);
+        var hours = Math.floor((total % 86400) / 3600);
+        var minutes = Math.floor((total % 3600) / 60);
+        if (days) return days + 'd ' + hours + 'h';
+        if (hours) return hours + 'h ' + minutes + 'm';
+        return minutes + 'm';
+      }
+
+      function renderEmailRows(tbodyId, rows, columns) {
+        var tbody = document.getElementById(tbodyId);
+        tbody.replaceChildren();
+        if (!rows.length) {
+          var emptyRow = document.createElement('tr');
+          var emptyCell = document.createElement('td');
+          emptyCell.colSpan = columns.length;
+          emptyCell.className = 'empty-state';
+          emptyCell.textContent = 'No records match this filter.';
+          emptyRow.appendChild(emptyCell);
+          tbody.appendChild(emptyRow);
+          return;
+        }
+        rows.forEach(function (record) {
+          var row = document.createElement('tr');
+          columns.forEach(function (column) {
+            var cell = document.createElement('td');
+            var value = column(record);
+            cell.textContent = value === null || value === undefined || value === '' ? '—' : String(value);
+            row.appendChild(cell);
+          });
+          tbody.appendChild(row);
+        });
+      }
+
+      function loadEmailGames() {
+        var status = document.getElementById('email-games-status').value;
+        var summary = document.getElementById('email-games-summary');
+        summary.textContent = 'Loading email-game records…';
+        var query = '?limit=' + emailGamesLimit + '&offset=' + emailGamesOffset;
+        if (status) query += '&status=' + encodeURIComponent(status);
+        fetch(API_AUTH + '/community/admin/email-games' + query, {
+          headers: { 'Authorization': 'Bearer ' + adminToken }, cache: 'no-store'
+        })
+          .then(function (response) {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+          })
+          .then(function (data) {
+            if (!data.success) throw new Error(data.message || 'Unable to load email games.');
+            renderEmailRows('email-games-tbody', data.games || [], [
+              function (game) { return game.id; },
+              function (game) { return game.white_player; },
+              function (game) { return game.black_player; },
+              function (game) { return game.status; },
+              function (game) { return game.status === 'active' ? game.current_player : '—'; },
+              function (game) { return game.status === 'active' ? emailGameWait(game.waiting_seconds) : '—'; },
+              function (game) { return emailGameDate(game.last_move_at); },
+              function (game) { return emailGameDate(game.last_reminder_at); }
+            ]);
+            renderEmailRows('email-invites-tbody', data.invitations || [], [
+              function (invite) { return invite.id; },
+              function (invite) { return invite.sender; },
+              function (invite) { return invite.recipient; },
+              function (invite) { return invite.status; },
+              function (invite) { return emailGameDate(invite.created_at); },
+              function (invite) { return emailGameDate(invite.expires_at); },
+              function (invite) { return emailGameDate(invite.responded_at); },
+              function (invite) { return invite.recipient_color; },
+              function (invite) { return invite.first_move; }
+            ]);
+            summary.textContent = 'Games: ' + data.game_total + ' | Invitations: ' + data.invitation_total;
+            document.getElementById('email-games-page').textContent = 'Page ' + (Math.floor(emailGamesOffset / emailGamesLimit) + 1);
+            document.getElementById('email-games-prev').disabled = emailGamesOffset === 0;
+            document.getElementById('email-games-next').disabled =
+              emailGamesOffset + emailGamesLimit >= Math.max(data.game_total, data.invitation_total);
+          })
+          .catch(function (error) {
+            summary.textContent = 'Unable to load email-game records: ' + error.message;
+            renderEmailRows('email-games-tbody', [], Array(8).fill(function () { return ''; }));
+            renderEmailRows('email-invites-tbody', [], Array(9).fill(function () { return ''; }));
+            document.getElementById('email-games-prev').disabled = true;
+            document.getElementById('email-games-next').disabled = true;
+          });
+      }
+
+      function changeEmailGamesPage(direction) {
+        emailGamesOffset = Math.max(0, emailGamesOffset + direction * emailGamesLimit);
+        loadEmailGames();
+      }
 
       var currentFeedbackFilter = 'all';
 

@@ -30,5 +30,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
 
 # Copy startup script and run both uvicorn processes
 COPY auth-service/start.sh /app/start.sh
-RUN chmod +x /app/start.sh
+RUN sed -i 's/\r$//' /app/start.sh && chmod +x /app/start.sh
 CMD ["/bin/sh", "/app/start.sh"]

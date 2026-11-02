@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Chess invitation</title>
+  <style>
+    :root { color-scheme: light; font-family: Georgia, serif; color: #25382e; background: #e9eee9; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+    main { width: min(100%, 530px); background: #fff; border: 1px solid #c7d3c9; border-top: 5px solid #3e714a; padding: clamp(24px, 5vw, 42px); }
+    h1 { font-size: 1.9rem; margin: 0 0 12px; }
+    p { line-height: 1.55; }
+    fieldset { border: 0; padding: 0; margin: 28px 0 20px; }
+    legend { font-weight: bold; margin-bottom: 12px; }
+    label.option { display: flex; gap: 12px; align-items: center; padding: 12px; border: 1px solid #d2ddd4; margin: 8px 0; cursor: pointer; }
+    label.option:has(input:checked) { border-color: #3e714a; background: #f1f7f1; }
+    input[type="radio"] { accent-color: #3e714a; }
+    #registration-fields { margin: 24px 0; }
+    #registration-fields label { display: block; font-weight: bold; margin: 12px 0 6px; }
+    #registration-fields input { width: 100%; padding: 12px; font: inherit; border: 1px solid #9aafa0; }
+    #move-field { display: none; margin: 16px 0; }
+    #move-field label { display: block; font-weight: bold; margin-bottom: 7px; }
+    #move { width: 100%; padding: 12px; font: inherit; border: 1px solid #9aafa0; }
+    button { width: 100%; border: 0; background: #3e714a; color: white; padding: 13px; font: bold 1rem Georgia, serif; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: default; }
+    button[value="decline"] { margin-top: 10px; background: #fff; color: #25382e; border: 1px solid #9aafa0; }
+    #feedback { min-height: 24px; }
+    .error { color: #a22121; }
+    .success { color: #256531; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Friendly chess invitation</h1>
+    <p id="intro">Loading your invitation...</p>
+    <form id="response" hidden>
+      <section id="registration-fields" hidden>
+        <h2>Create your Community account</h2>
+        <p>This invitation confirms your email address. Choose a username and password to join the Community and accept the game.</p>
+        <label for="new-username">Username</label>
+        <input id="new-username" autocomplete="username" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" required>
+        <label for="new-password">Password</label>
+        <input id="new-password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required>
+      </section>
+      <fieldset id="opening-options">
+        <legend>How would you like to begin?</legend>
+        <label class="option"><input type="radio" name="choice" value="white" required> I play White and send my first move</label>
+        <label class="option"><input type="radio" name="choice" value="black" checked> You play White</label>
+        <label class="option"><input type="radio" name="choice" value="random"> Select the first move at random</label>
+      </fieldset>
+      <div id="move-field">
+        <label for="move">Your first move as White</label>
+        <input id="move" name="first_move" placeholder="e4" maxlength="12" autocomplete="off">
+      </div>
+      <button id="accept-invitation" type="submit" name="decision" value="accept">Accept invitation</button>
+      <button id="decline-invitation" type="submit" name="decision" value="decline" formnovalidate>Decline invitation</button>
+    </form>
+    <a id="game-link" hidden>View game board</a>
+    <p id="feedback" role="status" aria-live="polite"></p>
+  </main>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const token = params.get('token');
+    const requestedDecision = params.get('decision');
+    const intro = document.getElementById('intro');
+    const feedback = document.getElementById('feedback');
+    const form = document.getElementById('response');
+    const move = document.getElementById('move');
+    const moveField = document.getElementById('move-field');
+    const registrationFields = document.getElementById('registration-fields');
+    const newUsername = document.getElementById('new-username');
+    const newPassword = document.getElementById('new-password');
+    const openingOptions = document.getElementById('opening-options');
+    const acceptButton = document.getElementById('accept-invitation');
+    const declineButton = document.getElementById('decline-invitation');
+    if (token) {
+      fetch('/community/email-invite?token=' + encodeURIComponent(token), { cache: 'no-store' })
+        .then(response => response.json())
+        .then(data => {
+          if (!data.success) throw new Error(data.message);
+          intro.textContent = data.needs_registration
+            ? data.sender + ' invited ' + data.recipient_email + '. Create a Community account to accept.'
+            : data.sender + ' has invited you to play a friendly game of chess.';
+          registrationFields.hidden = !data.needs_registration;
+          newUsername.required = data.needs_registration;
+          newPassword.required = data.needs_registration;
+          if (requestedDecision === 'decline') {
+            registrationFields.hidden = true;
+            newUsername.required = false;
+            newPassword.required = false;
+            openingOptions.hidden = true;
+            acceptButton.hidden = true;
+            declineButton.textContent = 'Confirm decline';
+          }
+          form.hidden = false;
+        })
+        .catch(error => { intro.textContent = error.message || 'Unable to load this invitation.'; });
+    } else {
+      intro.textContent = 'This invitation link is incomplete.';
+    }
+    form.addEventListener('change', () => {
+      const isWhite = form.elements.choice.value === 'white';
+      moveField.style.display = isWhite ? 'block' : 'none';
+      move.required = isWhite;
+      if (!isWhite) move.value = '';
+    });
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const decision = event.submitter ? event.submitter.value : 'accept';
+      const buttons = form.querySelectorAll('button');
+      buttons.forEach(button => { button.disabled = true; });
+      feedback.textContent = '';
+      try {
+        const response = await fetch('/community/email-invite/respond', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token,
+            decision,
+            choice: form.elements.choice.value,
+            first_move: decision === 'decline' ? '' : move.value,
+            username: decision === 'accept' ? newUsername.value.trim() : undefined,
+            password: decision === 'accept' ? newPassword.value : undefined
+          })
+        });
+        const data = await response.json();
+        if (!data.success) throw new Error(data.message);
+        form.hidden = true;
+        intro.textContent = data.status === 'declined' ? 'You declined this invitation.' : 'You accepted this invitation.';
+        feedback.className = 'success';
+        feedback.textContent = data.username
+          ? 'Your account is ready. Sign in on the game page to play.'
+          : data.emailed === false
+            ? 'Your decision is saved, but the email notification could not be delivered.'
+            : 'The inviting player has been notified.';
+        if (data.game_id) {
+          const gameLink = document.getElementById('game-link');
+          gameLink.href = 'email-game.html?game_id=' + encodeURIComponent(data.game_id);
+          gameLink.hidden = false;
+        }
+      } catch (error) {
+        feedback.className = 'error';
+        feedback.textContent = error.message || 'Could not send your response. Please try again.';
+        buttons.forEach(button => { button.disabled = false; });
+      }
+    });
+  </script>
+</body>
+</html>

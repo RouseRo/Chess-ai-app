@@ -4,12 +4,15 @@
   "description": "Frontend for Chess AI App using TypeScript",
   "main": "index.js",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc && esbuild avatar.ts --bundle --format=iife --outfile=avatar.js"
   },
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "typescript": "^5.4.3",
-    "lite-server": "^2.6.1"
+    "@dicebear/collection": "^9.4.2",
+    "@dicebear/core": "^9.4.3",
+    "esbuild": "^0.28.2",
+    "lite-server": "^2.6.1",
+    "typescript": "^5.4.3"
   }
 }

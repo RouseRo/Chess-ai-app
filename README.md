@@ -18,6 +18,7 @@ The application is for people that are new to the game of chess and want to lear
 - [API Services](#api-services)
 - [Playing Chess](#playing-chess)
 - [Classic Game Rewards](#classic-game-rewards)
+- [Email Games](#email-games)
 - [Configuration](#configuration)
 - [Troubleshooting](#troubleshooting)
 - [Architecture](#architecture)
@@ -30,7 +31,7 @@ The application is for people that are new to the game of chess and want to lear
 - **Interactive Web UI**: Drag-and-drop chessboard with real-time updates
 - **Human vs Human (H vs H) Sync**: Two players can play against each other from separate browser sessions with automatic board synchronization every 2 seconds
 - **Game ID Banner**: A unique sync game ID is displayed above the board during H vs H games
-- **Community Panel**: See who is online, send public chat messages, send direct messages to other players, and send/receive game invitations
+- **Community Panel**: See and refresh player presence, resize the player list, send public chat messages and direct messages, and send/receive game invitations
 - **Multiple AI Engines**: 
   - Stockfish (local, fast, strong)
   - OpenAI GPT models
@@ -62,6 +63,254 @@ The application is for people that are new to the game of chess and want to lear
 - **Microservices Architecture**: Scalable, modular design with separate services
 - **Mobile Interface**: A dedicated mobile-optimized chess interface (`/mobile.html`) designed for smartphones (Samsung Galaxy S23 and similar); supports touch drag-and-drop, tabbed layout (Game / Setup / History / Expert), JWT auth, and 3-slot local save system
 - **Docker Support**: Complete containerization with docker-compose
+
+## Email Games
+
+Offline-player invitations now offer Accept and Decline. Opening a link only
+previews the invitation; an explicit submission records the decision once.
+Declines are included in invitation statistics, not game losses or ratings.
+Accepting creates a persistent game with the selected colors and any opening
+move. The accepted invitation links to `email-game.html?game_id=<id>`. Players
+can sign in normally or use a one-time magic link, and the board is oriented for
+the side to move so that player's pieces are at the bottom. Turn status identifies
+both the color and player to move. When using a shared browser, the button above
+the board lets the next player switch accounts; it names the player whose turn it
+is. Captured pieces remain displayed below the board, including while stepping
+through a completed game's replay. Opening `email-game.html` without a game ID
+lists the signed-in player's email games.
+The signed-in email-game page also has a **Community** tab. Players can refresh
+the online player list, see who is online or playing, and send community chat
+messages. Invite an online player directly, or enter a username or email address
+to preview an email invitation before sending it.
+
+
+The email-game board automatically detects touch-capable devices, including
+phones and tablets. Tap one of your pieces to select it (highlighted in yellow),
+then tap its destination to move. Tap the selected piece again to cancel, or tap
+another of your pieces to change the selection. Desktop players can still drag
+and drop pieces with a mouse. Moves are enabled only on your turn in an active
+game, and further input is blocked while a move is being submitted.
+
+Records are stored in the existing auth-service SQLite database. The migration
+preserves older invitation responses as accepted but does not manufacture games
+for those historical responses. New games store position, move history, version,
+whose turn it is, turn-start time, last-move time, and last-reminder time.
+
+All read endpoints require a valid Bearer token and an existing account:
+
+- `GET /community/email-games`: participant-scoped games, invitations, and invitation statistics.
+- `GET /community/email-games/{id}`: board and history, restricted to the two players.
+- `GET /community/admin/email-games`: all games and invitations, restricted to database-confirmed admins.
+
+Listings support `status`, `limit` (1-100), and `offset`. Status filters are
+`pending`, `accepted`, `declined`, `expired`, `active`, and `completed`;
+invitation and game collections are paginated separately. Invitation statistics
+remain unfiltered. Pending invitations past their expiry are reported as expired.
+Admin game records include elapsed waiting time; invitation token hashes are never
+returned.
+
+Invitation decisions and games are committed before attempting response email.
+If delivery fails, the page reports that the decision is saved but notification
+failed. Acceptance responses use a styled email with a **View the board** button
+and a plain-link fallback; decline responses use the same layout without a board
+button.
+
+### Playing and notifications
+
+Accepted email games are playable by both participants. Moves are validated against
+the stored position, restricted to the player whose turn it is, and committed with
+the updated FEN, move history, turn, and version. Stale board versions and finished
+games are rejected. Checkmate, stalemate, and other terminal positions complete the
+game. Captured-piece rows sit below the board and update as the position changes
+during replay.
+
+After each non-final move, the next player receives a turn email with the move,
+the color to move, a **Go to game** button, and a plain-link fallback. Reminder,
+draw-offer, draw-response, result, and sign-in emails also include contextual
+action buttons and a plain-link fallback. Active-game turn and reminder notices
+identify whether White or Black is next; completed-game messages report the result.
+Emails are stored in a SQLite outbox and retried after 1, 2, 4,
+and 8 minutes, for up to five delivery attempts. A persistent worker resumes pending
+delivery after an auth-service restart.
+
+Players can request a sign-in link from `email-game.html`. The response does not
+reveal whether an account exists; verified non-admin accounts receive a one-use
+link that expires after 30 minutes. Admin accounts continue to use the admin login.
+Participants can remind the opponent whose turn it is, at most once per game every
+24 hours. Reminder emails use the same outbox and retry behavior.
+
+The admin dashboard's **Email Games** tab lists games and invitations, supports
+status filtering and pagination, and shows current turn, waiting time, last move,
+and last reminder. It uses the existing admin-only listing API; invitation token
+hashes are never exposed.
+
+Move submission requires a Bearer token and an expected game version:
+
+```json
+{ "move": "e2e4", "expected_version": 0 }
+```
+
+`POST /community/email-games/{id}/moves` accepts SAN or UCI. It returns `409` if
+the game version is stale or the game has ended. `POST
+/community/email-games/{id}/remind` queues a reminder for the player to move and
+returns `429` during the 24-hour cooldown. Both endpoints require a game participant.
+
+Magic-link endpoints are `POST /auth/email-game-link` with `{ "email": "..." }`
+and `POST /auth/email-game-link/consume` with `{ "token": "..." }`. The consume
+endpoint returns a normal user JWT; magic links cannot authenticate administrators.
+
+For local Docker use, rebuild and restart only the auth service:
+
+```powershell
+docker compose up -d --build auth-service
+```
+
+The UI files are served from the existing live volume at http://localhost:8080.
+Focused automated checks use temporary databases and mocked email delivery:
+
+```powershell
+python -m pytest tests/test_email_invites.py -q
+```
+
+Manual verification: accept an offline invitation, sign in as both participants,
+and play alternating legal moves. Try an illegal move, a move out of turn, and a
+stale version; each must leave the game unchanged. Complete a checkmate and confirm
+further moves are rejected. Request a magic link, use it once, and confirm replay
+fails. Send a reminder from the player not to move, then confirm the cooldown and
+the corresponding outbox email. Open the admin dashboard's Email Games tab and
+check filtering, pagination, and waiting-time details. An unrelated account must
+not read or modify the game.
+
+### Results and review
+
+Completed games record why they ended and provide actions and review tools:
+
+- **Persisted outcomes**: Completed games record result, winner, completion reason,
+  and completion time. Checkmate, stalemate, resignation, and agreed draws are
+  represented. The additive migration leaves the outcome fields empty on older
+  completed games rather than guessing their results.
+- **Resignation and draw offers**: Participants can resign; the player to move can
+  offer a draw, which the opponent can accept or decline. Actions enforce game
+  membership and an expected game version.
+- **Terminal notifications**: Both players receive the result by email with a
+  **Review game** action button. Pending turn, reminder, and draw-offer notices are
+  canceled when they are no longer valid.
+- **Replay and PGN export**: Participants can step through completed-game positions
+  and download a PGN. The server reconstructs and validates history before returning
+  either representation.
+
+`POST /community/email-games/{id}/actions` accepts `{ "action": "resign",
+"expected_version": 0 }`; valid actions are `resign`, `offer_draw`, `accept_draw`,
+and `decline_draw`. `GET /community/email-games/{id}/replay` returns the ordered FEN
+positions for a completed game. `GET /community/email-games/{id}/pgn` downloads the
+completed game as a PGN file. These endpoints require a participant's Bearer token.
+
+Focused automated checks use `python -m pytest tests/test_email_invites.py -q`.
+Coverage includes legacy migration, result recording, action authorization and
+version conflicts, notification cancellation, replay positions, and PGN export.
+
+### Local testing
+
+Local interface testing is available through a separate Docker Compose project
+with its own SQLite volume and Mailpit SMTP capture. It uses alternate host ports
+and never mounts or modifies the regular `data/users.db`. The auth service's
+STARTTLS and SMTP authentication defaults remain enabled outside this test setup;
+the local override disables them only for Mailpit.
+
+Prerequisites: Docker Desktop, Node.js 20 or later, and npm.
+
+Start the isolated app and mail catcher from the repository root:
+
+```powershell
+docker compose --env-file .env.email-games-test -p chess-email-test -f docker-compose.yml -f docker-compose.email-games-test.yml up -d --build
+```
+
+Open the app at http://localhost:18080 and the captured-mail inbox at
+http://localhost:18025. The browser test creates uniquely named, verified test
+accounts automatically. Run it from the `e2e` directory:
+
+```powershell
+npm ci
+npm run install:browsers
+npm test
+```
+
+The Playwright smoke test covers offline invitation delivery and acceptance,
+invalid and stale move rejection, recipient turn email, moves from both players,
+player account switching from the board, non-participant access denial, resignation,
+replay controls, and PGN availability.
+It also checks that the player list can be resized, the Community refresh button
+updates presence, the turn email names the next color, and the board puts the side
+to move at the bottom for both players.
+The existing API tests in `tests/test_email_invites.py` remain the faster
+temporary-database regression layer. The browser smoke test does not cover
+magic-link or reminder behavior, or the admin dashboard.
+
+To manually test the reminder email and its **Go to game** button:
+
+1. Open the app at [http://localhost:18080](http://localhost:18080) and create a
+  game between two test accounts.
+2. After a move, sign in as the player who is not to move and select **Remind on
+  move** on the game page.
+3. Open Mailpit at [http://localhost:18025](http://localhost:18025), open the
+  reminder email, and select **Go to game**. Sign in as the player whose turn it
+  is if prompted; the link should open that game's board.
+
+A reminder can only be sent once per game every 24 hours. The button and its
+destination are also checked by `python -m pytest tests/test_email_invites.py -q`.
+
+Stop the test project and delete its database volume when finished:
+
+```powershell
+docker compose --env-file .env.email-games-test -p chess-email-test -f docker-compose.yml -f docker-compose.email-games-test.yml down --volumes --remove-orphans
+```
+
+Because this uses the `chess-email-test` Compose project name and a separate
+named volume, cleanup does not remove the normal app's containers or database.
+
+### Mailpit for the regular local app
+
+The regular app at http://localhost:8080 can also capture outgoing email in
+Mailpit at http://localhost:8025. This inbox is separate from the isolated test
+inbox at http://localhost:18025. Mailpit captures messages sent to its SMTP
+server regardless of recipient; it does not intercept email from other apps or
+the Azure deployment.
+
+With the regular Compose project running under its default project name, create
+a mail catcher on the app's network:
+
+```powershell
+docker run -d --name mailpit --network chess-ai-app_chess-network -p 127.0.0.1:1025:1025 -p 127.0.0.1:8025:8025 axllent/mailpit:latest
+```
+
+If the `mailpit` container already exists, use `docker start mailpit` instead.
+If it is not yet attached to the app's network, run
+`docker network connect chess-ai-app_chess-network mailpit`. Substitute your
+actual Compose network name if using a different project name.
+
+To keep capture enabled across auth-service recreations, set these values in the
+root `.env` file, retaining a nonempty `SMTP_FROM_EMAIL`:
+
+```env
+SMTP_HOST=mailpit
+SMTP_PORT=1025
+SMTP_USE_STARTTLS=false
+SMTP_USE_AUTH=false
+APP_BASE_URL=http://localhost:8080
+```
+
+Apply the settings without restarting the other app services:
+
+```powershell
+docker compose -f docker-compose.yml up -d --no-deps auth-service
+```
+
+Temporary PowerShell environment overrides also work, but recreating the auth
+service without those overrides restores the settings from `.env`. Keep TLS and
+SMTP authentication enabled for production providers such as Brevo. Development
+mode skips registration verification emails; invitations and email-game notices
+still use SMTP. Captured messages remain local and are not delivered to the
+recipients' real inboxes.
 
 ## Requirements
 
@@ -114,6 +363,7 @@ Chess-ai-app/
 │   ├── index.html           # Login/Register + game interface (single-page app)
 │   ├── admin.html           # Admin dashboard
 │   ├── mobile.html          # Mobile-optimized chess interface (smartphones)
+│   ├── email-game.html      # Email-game play, sign-in, and review page
 │   ├── game-play.ts         # Chessboard drag-and-drop logic (TypeScript)
 │   ├── player-selection.ts  # Player/opening/defense selection logic (TypeScript)
 │   ├── chessboard.js        # Chessboard library
@@ -211,6 +461,7 @@ docker-compose down
 | Service | URL | Description |
 |---------|-----|-------------|
 | **Chess UI** | http://localhost:8080 | Login & game interface |
+| **Email Games** | http://localhost:8080/email-game.html | Sign in, play, and review email games |
 | **Admin Dashboard** | http://localhost:8080/admin.html | User management |
 | **Auth API** | http://localhost:8002 | Authentication service (regular users) |
 | **Admin Auth API** | port 8003 (Docker-internal only) | Admin login — not published to host |
@@ -220,6 +471,22 @@ docker-compose down
 ## Azure Deployment
 
 The application can be deployed to **Azure Container Apps** using the provided PowerShell script. All four services (engine, auth, admin, UI) are built and pushed to Azure Container Registry, then deployed as Container Apps backed by Azure Files for persistent storage.
+
+### Azure Project Information (September 2026)
+
+**Purpose:** Host the chess learning and play app for a small number of personal/demo users. The UI supports human and AI games, Stockfish, community features, and an admin dashboard. The Azure plan favors a low-cost, always-available deployment in **East US**.
+
+**Existing environment:** Resource group `chess-ai-rg` contains the running `chess-ui`, `chess-engine`, `chess-auth`, and `chess-admin` Container Apps in `chess-ai-env`. The plan reuses the existing Basic container registry (`chessairegistry7646`), storage account (`chessaistorage4996`) with Azure Files shares, and Log Analytics workspace (`workspace-chessairgzT1F`). It proposes a new workspace-based Application Insights resource (`appi-chess-ai-dev-8827`) and system-assigned identities for registry access.
+
+**Service roles:** `chess-ui` serves the TypeScript site through Nginx and proxies API requests; `chess-engine` runs Python/FastAPI and Stockfish; `chess-auth` handles JWT login and registration; `chess-admin` provides the admin API. The plan keeps one minimum replica per service and uses the existing Consumption environment. Auth and admin share a persistent SQLite database on Azure Files, with one replica per database writer.
+
+**Planning estimate:** About **$34.43 USD/month**, including $29.43 for four Container Apps and $5.00 for the registry. This is a planning estimate based on East US prices checked September 29, 2026, not a bill forecast. It assumes 22 idle and 2 active hours per day, 1 million requests per month, and available free grants. Azure Files usage, monitoring beyond the grant, outbound traffic, taxes, and other workloads' use of free grants are not included. Check Azure Cost Management for actual charges.
+
+**Readiness and status:** Static readiness review found four deployable components and no remaining deployment blockers after the Nginx upstream and Docker build-context fixes. The newer declarative **Bicep onboarding plan is paused at scaffolding** because its required task dispatcher and Bicep validation tools were unavailable. Its proposed infrastructure changes and Application Insights resource have **not** been deployed by that plan. The live deployment described below predates this plan and uses the PowerShell scripts; do not treat the estimate or proposed resources as a record of completed deployment.
+
+**Before a production rollout:** Replace the seeded default passwords and hardcoded JWT secret fallback; set `APP_BASE_URL` to the deployed UI URL and configure SMTP for verification emails. LLM opponents also need `OPENAI_API_KEY` (Stockfish does not). SQLite on Azure Files limits concurrent writes and scaling; a managed database would require an application migration.
+
+The project snapshot above is drawn from the local [Azure readiness report](.copilot-azure/sessions/88271d3e-935f-4343-89a8-5f329288fbd5/readiness-report.md) and [Azure preparation plan](.copilot-azure/sessions/88271d3e-935f-4343-89a8-5f329288fbd5/prepare-plan.json). The following instructions document the existing script-based deployment.
 
 ### Prerequisites
 
@@ -273,11 +540,11 @@ When the Azure infrastructure is already provisioned and you only need to rebuil
 | Service | FQDN |
 |---------|------|
 | **Chess UI (public)** | `chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
-| chess-auth (internal) | `chess-auth.internal.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
+| **Chess Auth (public)** | `chess-auth.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
 | chess-admin (internal) | `chess-admin.internal.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
 | chess-engine (internal) | `chess-engine.internal.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
 
-> **nginx routing**: `/auth/`, `/community/`, `/rewards/`, and `/feedback/` all proxy to `chess-auth`. Local Docker Compose uses `nginx.local.conf` (routes to `auth-service:8002`); the Azure image bakes `nginx.conf` (routes to the public ACA FQDN).
+> **nginx routing**: `/auth/`, `/community/`, `/rewards/`, and `/feedback/` all proxy to `chess-auth`. Local Docker Compose uses `nginx.local.conf` (routes to `auth-service:8002`); the Azure image bakes `nginx.conf` (routes to the public ACA FQDN). Email-game pages and API requests use the Chess UI URL; the APIs are served under `/auth/` and `/community/`.
 
 ### Accessing the Deployed App
 
@@ -290,10 +557,11 @@ https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io
 | Page | URL |
 |------|-----|
 | Login / Play Chess | `https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io` |
+| Email Games | `https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io/email-game.html` |
 | Mobile Interface | `https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io/mobile.html` |
 | Admin Dashboard | `https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io/admin.html` |
 
-The three backend services (`chess-engine`, `chess-auth`, `chess-admin`) are internal-only and not reachable from the public internet — they communicate with each other over the private Container Apps Environment network.
+The engine and admin services are internal-only. The auth service has external ingress for the UI's Nginx proxy; email-game API calls should use the Chess UI URL and its `/auth/` and `/community/` routes.
 
 ### Resource Configuration
 
@@ -477,7 +745,9 @@ This allows switching accounts without having to first navigate to the admin pan
 | `/community/messages` | POST | Post a public chat message |
 | `/community/announcements` | POST | Post an announcement (admin only) |
 | `/community/dm` | POST | Send a direct message |
-| `/community/game-invite` | POST | Send a game invitation |
+| `/community/game-invite` | POST | Send an in-app invitation to online players or an email invitation to offline players |
+| `/community/email-invite` | GET | Load an email invitation by its single-use link token |
+| `/community/email-invite/respond` | POST | Send the invitee's White opening move, random White opening, or "You play White" response |
 | `/community/clear-activity` | POST | Clear own game activity status |
 
 ### Rewards API Endpoints
@@ -530,6 +800,7 @@ Access at **http://localhost:8080/admin.html**
 | **User Management** | Create, delete, promote/demote users; view online status and game activity |
 | **Announcements** | Send messages to all online players or selected users |
 | **Feedback** | View, resolve, and delete user-submitted bug reports, suggestions, and feature requests |
+| **Email Games** | Review invitations and games, filter records, and inspect turn waiting times |
 | **AI Models** | Configure AI model settings |
 | **Settings** | Change admin password |
 
@@ -796,6 +1067,10 @@ SMTP_FROM_EMAIL=your_verified_sender@example.com
 APP_BASE_URL=https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io
 ```
 
+Offline game invitations use these SMTP settings to email a multipart message with **Accept invitation** and **Decline** buttons linking to `invite.html`. The recipient confirms the choice on that page; opening a link alone does not record a decision. The link stays valid for 30 days and can be answered once without logging in. Choosing White requires a legal opening move (for example `e4`); the random option chooses a legal White opening move. The inviter receives the choice and move by email and as a Community direct message. An unsent email leaves no pending invitation.
+
+Set `APP_BASE_URL` to a URL the recipient can reach. Its default, `http://localhost:8080`, is suitable only when opening invitations on the same computer running the local app; external recipients need the app's deployed public URL or another reachable host.
+
 > **AI model selection**: The active AI model for the chess expert and AI opponents is configured in `src/config.json` under `chess_expert_model` and `ai_models`. All models are accessed through [OpenRouter](https://openrouter.ai) using the `OPENAI_API_KEY`.
 
 ### Docker Compose Services
@@ -1014,10 +1289,11 @@ CREATE TABLE community_messages (
 
 ## Future Enhancements
 
-- [ ] PGN export/import
+- [x] PGN export for completed email games
+- [ ] PGN import
 - [x] Classic games step-through review with annotated move commentary
 - [x] Classic game reward badges and Grand Scholar award
-- [ ] Full game replay from saved game history
+- [x] Full game replay from saved email-game history
 - [ ] ELO rating system
 - [x] Human vs Human multiplayer (browser-to-browser sync)
 - [x] Community chat, DMs, and game invitations

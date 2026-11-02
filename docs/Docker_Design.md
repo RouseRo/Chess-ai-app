@@ -414,6 +414,8 @@ services:
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASSWORD=${SMTP_PASSWORD:-}
       - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-}
+      - SMTP_USE_STARTTLS=${SMTP_USE_STARTTLS:-true}
+      - SMTP_USE_AUTH=${SMTP_USE_AUTH:-true}
       - APP_BASE_URL=${APP_BASE_URL:-http://localhost:8080}
     volumes:
       - ./data:/app/data
@@ -666,14 +668,56 @@ JWT_SECRET_KEY=your-secure-secret-key-change-in-production
 # Development Mode (auto-verifies new users)
 CHESS_DEV_MODE=false
 
-# Email verification (optional — users auto-verified if unset)
+# SMTP email configuration (optional; use provider credentials outside local testing)
 SMTP_HOST=
 SMTP_PORT=587
 SMTP_USER=
 SMTP_PASSWORD=
 SMTP_FROM_EMAIL=
+SMTP_USE_STARTTLS=true
+SMTP_USE_AUTH=true
 APP_BASE_URL=http://localhost:8080
 ```
+
+### Local Email Testing with Mailpit
+
+Mailpit captures local email without delivering it to recipients. With the
+default Compose project name, start it on the app network:
+
+```powershell
+docker run -d --name mailpit --network chess-ai-app_chess-network -p 127.0.0.1:1025:1025 -p 127.0.0.1:8025:8025 axllent/mailpit:latest
+```
+
+If `mailpit` already exists, start it with `docker start mailpit`. Configure the
+root `.env` for local capture, keeping the dummy SMTP credentials nonempty because
+the auth service requires them even though Mailpit authentication is disabled:
+
+```env
+SMTP_HOST=mailpit
+SMTP_PORT=1025
+SMTP_USER=local-test
+SMTP_PASSWORD=local-test
+SMTP_FROM_EMAIL=chess-test@example.test
+SMTP_USE_STARTTLS=false
+SMTP_USE_AUTH=false
+APP_BASE_URL=http://localhost:8080
+```
+
+Apply the settings by recreating only the auth service, then open the inbox at
+http://localhost:8025:
+
+```powershell
+docker compose up -d --no-deps auth-service
+```
+
+In email games, the player-switch button above the board lets another participant
+sign in in the same browser. Captured pieces appear below the board and follow the
+selected position during replay. Accepted-invitation response emails include a
+**View the board** button. These behaviors can be checked manually through the
+local app and Mailpit inbox.
+
+Keep TLS and SMTP authentication enabled for production email providers. Restore
+the provider settings in `.env` before sending mail through a real SMTP service.
 
 ---
 
