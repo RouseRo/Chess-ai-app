@@ -7,79 +7,167 @@
   <title>Email chess game</title>
   <link rel="stylesheet" href="chessboard.css">
   <style>
-    :root { color-scheme: light; font-family: Georgia, serif; color: #25382e; background: #e9eee9; }
+    :root {
+      color-scheme: light;
+      --ink: #1d2b25;
+      --muted: #64736a;
+      --forest: #28513f;
+      --forest-deep: #1b3c2f;
+      --copper: #b94f37;
+      --paper: #f0f2ed;
+      --surface: #fffefa;
+      --line: #d3dbd3;
+      --line-strong: #aab9ad;
+      --focus: #286ba1;
+      color-scheme: light;
+      font-family: "Palatino Linotype", "Book Antiqua", Georgia, serif;
+      color: var(--ink);
+      background: var(--paper);
+    }
     * { box-sizing: border-box; }
-    body { margin: 0; }
-    header { background: #fff; border-bottom: 1px solid #c7d3c9; padding: 20px max(20px, calc((100% - 960px) / 2)); }
-    main { max-width: 960px; margin: auto; padding: 24px 20px; }
-    h1 { margin: 12px 0 0; font-size: 1.8rem; }
-    h2 { font-size: 1.2rem; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      background-color: var(--paper);
+      background-image: repeating-linear-gradient(90deg, transparent 0 59px, rgba(40, 81, 63, .025) 60px),
+        linear-gradient(180deg, #f7f8f4, #e9ede7);
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      min-height: 92px;
+      color: #f7f5eb;
+      background-color: var(--forest-deep);
+      background-image: repeating-linear-gradient(135deg, transparent 0 13px, rgba(255, 255, 255, .025) 14px 15px);
+      border-bottom: 4px solid var(--copper);
+      padding: 18px max(20px, calc((100% - 1080px) / 2));
+    }
+    header a { color: #dce8dd; font: 600 .9rem/1.3 system-ui, sans-serif; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+    header a:hover { color: #fff; }
+    main { max-width: 1120px; margin: auto; padding: 28px 20px 56px; }
+    h1 { margin: 0; font-size: 1.8rem; font-weight: 500; }
+    h2 { font-size: 1.2rem; font-weight: 600; }
     p { line-height: 1.5; overflow-wrap: anywhere; }
-    a { color: #315d94; }
+    a { color: #285b79; }
     [hidden] { display: none !important; }
     #login { max-width: 360px; }
-    label { display: block; margin: 14px 0 6px; }
-    input { width: 100%; padding: 12px; font: inherit; border: 1px solid #9aafa0; }
-    button { background: #3e714a; color: #fff; border: 0; padding: 12px 18px; font: bold 1rem Georgia, serif; cursor: pointer; }
-    button:disabled { opacity: .5; cursor: default; }
+    label { display: block; margin: 14px 0 6px; font: 600 .9rem/1.4 system-ui, sans-serif; }
+    input, textarea { color: var(--ink); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 3px; }
+    input { width: 100%; padding: 12px; font: 1rem/1.4 system-ui, sans-serif; }
+    input:focus-visible, textarea:focus-visible { outline: 3px solid rgba(40, 107, 161, .28); border-color: var(--focus); }
+    button {
+      min-height: 44px;
+      background: var(--forest);
+      color: #fff;
+      border: 1px solid var(--forest);
+      border-radius: 3px;
+      padding: 10px 16px;
+      font: 650 .92rem/1.3 system-ui, sans-serif;
+      cursor: pointer;
+      transition: background-color .16s ease, border-color .16s ease, transform .16s ease;
+    }
+    button:hover:not(:disabled) { background: var(--forest-deep); border-color: var(--forest-deep); transform: translateY(-1px); }
+    button:active:not(:disabled) { transform: translateY(0); }
+    button:focus-visible { outline: 3px solid rgba(40, 107, 161, .38); outline-offset: 2px; }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    button.button-secondary { background: #526977; border-color: #526977; }
+    button.button-secondary:hover:not(:disabled) { background: #3d515d; border-color: #3d515d; }
+    button.button-danger { background: #a53d38; border-color: #a53d38; }
+    button.button-danger:hover:not(:disabled) { background: #87302c; border-color: #87302c; }
+    button.button-secondary:focus-visible, button.button-danger:focus-visible { outline-color: rgba(40, 107, 161, .55); }
     #login button { margin-top: 16px; }
-    #feedback { min-height: 24px; color: #a22121; }
+    #feedback { min-height: 24px; color: #a12e2e; font: 500 .95rem/1.5 system-ui, sans-serif; }
+    #game > #players { margin: 4px 0 4px; font-size: 1.08rem; font-weight: 700; }
+    #game > #turn { display: inline-block; margin: 0 0 8px; border-left: 3px solid var(--copper); padding: 3px 10px; color: var(--forest-deep); font: 650 .92rem/1.4 system-ui, sans-serif; }
+    #game-result:not([hidden]) { margin: 8px 0; border-left: 3px solid var(--copper); padding: 8px 12px; background: rgba(255, 254, 250, .75); }
+    #game-actions:not([hidden]) { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; }
+    #draw-status { color: var(--muted); font: .9rem/1.4 system-ui, sans-serif; }
     #game-layout { display: grid; grid-template-columns: minmax(0, 560px) minmax(180px, 1fr); gap: 28px; align-items: start; }
-    .page-tabs { display: flex; gap: 4px; margin: 20px 0 16px; border-bottom: 1px solid #9aafa0; }
-    .page-tab { padding: 10px 16px; background: transparent; color: #25382e; border-bottom: 3px solid transparent; }
-    .page-tab[aria-selected="true"] { color: #245c35; border-bottom-color: #3e714a; }
-    .page-tab:focus-visible { outline: 2px solid #315d94; outline-offset: 2px; }
-    #community-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .page-tabs { display: flex; width: max-content; max-width: 100%; gap: 4px; margin: 20px 0 16px; border: 1px solid var(--line); border-radius: 5px; padding: 4px; background: #e4e9e3; }
+    .page-tab { padding: 9px 17px; background: transparent; color: var(--ink); border-color: transparent; border-radius: 3px; }
+    .page-tab:hover:not(:disabled) { background: #d6dfd7; color: var(--ink); border-color: transparent; }
+    .page-tab[aria-selected="true"] { color: #fff; background: var(--forest); border-color: var(--forest); }
+    .page-tab[aria-selected="true"]:hover { background: var(--forest-deep); }
+    .page-tab:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+    #community-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
     #community-toolbar h2, #community-players h3, #community-chat h3 { margin: 0 0 10px; }
     #community-toolbar > div { display: flex; align-items: center; gap: 10px; }
-    #community-online-status { color: #52665a; font-size: .9rem; }
+    #community-online-status { color: var(--muted); font: .9rem/1.4 system-ui, sans-serif; }
     #community-layout { display: grid; grid-template-columns: minmax(190px, .75fr) minmax(0, 1.5fr); gap: 20px; }
     #community-players, #community-chat { min-width: 0; }
-    #community-chat { border-left: 2px solid #718979; padding-left: 20px; }
+    #community-chat { border-left: 1px solid var(--line-strong); padding-left: 20px; }
     #community-invite-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; margin-bottom: 14px; }
     #community-invite-form label { grid-column: 1 / -1; margin: 0; }
-    #community-invite-form input, #community-message-input { min-width: 0; padding: 10px; font: inherit; border: 1px solid #9aafa0; }
-    #community-player-list { max-height: 360px; overflow-y: auto; border: 1px solid #718979; padding: 0 6px; background: #fff; scrollbar-color: #718979 #e9eee9; scrollbar-width: thin; }
-    .community-player { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 2px; border-bottom: 1px solid #dce4dd; }
+    #community-invite-form input, #community-message-input { min-width: 0; padding: 10px; font: 1rem/1.4 system-ui, sans-serif; }
+    #community-player-list { max-height: 360px; overflow-y: auto; border: 1px solid var(--line); border-radius: 3px; padding: 0 10px; background: var(--surface); scrollbar-color: var(--line-strong) var(--paper); scrollbar-width: thin; }
+    .community-player { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 2px; border-bottom: 1px solid #e6e9e3; }
+    .community-player-identity { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .community-player-avatar { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 50%; background: #e8ede7; cursor: context-menu; }
     .community-player-name { min-width: 0; overflow-wrap: anywhere; }
-    .community-presence { color: #52665a; font-size: .85rem; }
-    #community-messages { height: min(45vh, 360px); min-height: 200px; overflow-y: auto; padding: 8px; border: 1px solid #9aafa0; }
-    .community-message { padding: 8px 4px; border-bottom: 1px solid #dce4dd; overflow-wrap: anywhere; }
-    .community-message header { display: flex; justify-content: space-between; gap: 8px; padding: 0; background: transparent; border: 0; font-size: .85rem; }
-    .community-message time { color: #52665a; }
+    .community-presence { color: var(--muted); font: .85rem/1.4 system-ui, sans-serif; }
+    #community-messages { height: min(45vh, 360px); min-height: 200px; overflow-y: auto; padding: 8px 12px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); }
+    .community-message { padding: 8px 4px; border-bottom: 1px solid #e6e9e3; overflow-wrap: anywhere; }
+    .community-message header { display: flex; justify-content: space-between; gap: 8px; padding: 0; background: transparent; border: 0; font: 600 .85rem/1.4 system-ui, sans-serif; }
+    .community-message time { color: var(--muted); font-weight: 400; }
     .community-message p { margin: 4px 0 0; white-space: pre-wrap; }
     #community-message-form { display: flex; gap: 8px; margin-top: 8px; }
     #community-message-input { flex: 1; }
-    #community-invite-preview { margin-top: 14px; padding: 10px; border: 1px solid #9aafa0; }
-    #community-invite-preview iframe { width: 100%; height: 190px; border: 1px solid #c7d3c9; }
+    #community-invite-preview { margin-top: 14px; border-left: 3px solid var(--copper); padding: 10px 12px; background: rgba(255, 254, 250, .75); }
+    #community-invite-preview iframe { width: 100%; height: 190px; border: 1px solid var(--line); background: #fff; }
     .community-preview-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
     .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
     #board { width: 100%; aspect-ratio: 1; }
+    #board .board-b72b1 { border: 4px solid #294637; box-shadow: 0 10px 24px rgba(27, 60, 47, .16); }
     #board .touch-selected { outline: 4px solid #f5c542; outline-offset: -4px; }
     #switch-player { width: 100%; margin-bottom: 8px; }
-    #captured-pieces { display: grid; gap: 4px; padding: 8px 4px; border-top: 1px solid #c7d3c9; }
+    #captured-pieces { display: grid; gap: 4px; padding: 8px 4px; border-top: 1px solid var(--line-strong); }
     #captured-pieces > div { display: flex; justify-content: space-between; align-items: center; min-height: 28px; }
     #captured-pieces span:last-child { font-size: 1.35rem; }
     #players { font-weight: bold; }
-    #moves { height: 560px; overflow-y: auto; overscroll-behavior-y: contain; padding: 0 6px; list-style: none; line-height: 1.7; border: 1px solid #9aafa0; }
-    #moves li { display: grid; grid-template-columns: minmax(64px, auto) minmax(0, 1fr); gap: 8px; border-bottom: 1px solid #c7d3c9; padding: 4px 0; }
-    #moves time, #moves .missing-time { color: #52665a; font-size: .8rem; text-align: right; overflow-wrap: anywhere; }
-    #message-list { height: 200px; overflow-y: auto; overscroll-behavior-y: contain; list-style: none; padding: 0; border: 1px solid #9aafa0; }
-    #message-list li { padding: 10px 4px; border-bottom: 1px solid #c7d3c9; }
-    #message-list time { color: #52665a; font-size: .875rem; }
+    #moves { height: 560px; overflow-y: auto; overscroll-behavior-y: contain; padding: 0 10px; list-style: none; line-height: 1.7; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); scrollbar-color: var(--line-strong) var(--paper); scrollbar-width: thin; }
+    #moves li { display: grid; grid-template-columns: minmax(64px, auto) minmax(0, 1fr); gap: 8px; border-bottom: 1px solid #e6e9e3; padding: 4px 0; }
+    #moves time, #moves .missing-time { color: var(--muted); font: .8rem/1.5 system-ui, sans-serif; text-align: right; overflow-wrap: anywhere; }
+    #message-list { height: 200px; overflow-y: auto; overscroll-behavior-y: contain; list-style: none; padding: 0 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); }
+    #message-list li { padding: 10px 4px; border-bottom: 1px solid #e6e9e3; }
+    #message-list time { color: var(--muted); font: .875rem/1.4 system-ui, sans-serif; }
     #message-list p { margin: 5px 0 0; white-space: pre-wrap; }
-    #message-form textarea { display: block; width: 100%; min-height: 88px; padding: 10px; font: inherit; border: 1px solid #9aafa0; resize: vertical; }
+    #message-form textarea { display: block; width: 100%; min-height: 88px; padding: 10px; font: 1rem/1.5 system-ui, sans-serif; resize: vertical; }
     #message-form button { margin-top: 8px; }
-    #message-status { min-height: 24px; }
+    #message-status, #community-message-status { min-height: 24px; color: var(--muted); font: .9rem/1.4 system-ui, sans-serif; }
+    #conversation { margin-top: 28px; border-top: 1px solid var(--line-strong); padding-top: 18px; }
+    #moves-heading, #conversation-heading { margin-top: 0; }
     #game-list { padding-left: 20px; line-height: 1.8; }
     @media (max-width: 680px) {
+      header { align-items: flex-start; flex-direction: column; justify-content: center; gap: 8px; min-height: 100px; padding: 16px 18px; }
+      h1 { font-size: 1.6rem; }
+      main { padding: 20px 16px 40px; }
       #game-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
       #community-layout { grid-template-columns: minmax(0, 1fr); gap: 20px; }
       #community-player-list { max-height: 180px; }
-      #community-chat { border-left: 0; border-top: 2px solid #718979; padding: 16px 0 0; }
+      #community-chat { border-left: 0; border-top: 1px solid var(--line-strong); padding: 16px 0 0; }
       #community-messages { height: 240px; }
       #community-toolbar { align-items: flex-start; }
+      .page-tabs { width: 100%; }
+      .page-tab { flex: 1; padding-inline: 8px; }
+      #community-message-form { align-items: stretch; }
     }
+    #player-profile-overlay { position: fixed; inset: 0; z-index: 2100; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(15, 28, 21, .58); }
+    .player-profile-dialog { width: min(520px, 100%); max-height: min(680px, 90vh); overflow-y: auto; padding: 0 20px 20px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--surface); box-shadow: 0 16px 42px rgba(20, 35, 25, .25); }
+    .player-profile-dialog header { position: sticky; top: 0; min-height: 64px; margin: 0 -20px 14px; padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--line); }
+    .player-profile-dialog h2 { margin: 0; font-size: 1.15rem; }
+    .player-profile-close { padding: 5px 10px; }
+    .player-profile-summary { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .player-profile-summary img { width: 56px; height: 56px; border-radius: 50%; background: #e8ede7; }
+    .player-profile-summary p { margin: 2px 0; }
+    .player-profile-state { margin-left: auto !important; color: var(--forest); font-weight: 700; }
+    .player-profile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; }
+    .player-profile-field { min-width: 0; padding: 9px 0; border-top: 1px solid var(--line); }
+    .player-profile-label { display: block; color: var(--muted); font: 600 .75rem/1.3 system-ui, sans-serif; text-transform: uppercase; }
+    .player-profile-value { display: block; margin-top: 3px; overflow-wrap: anywhere; }
+    #player-profile-status { min-height: 22px; color: var(--muted); }
+    @media (max-width: 480px) { .player-profile-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -105,10 +193,10 @@
       <p id="turn"></p>
       <p id="game-result" hidden></p>
       <div id="game-actions" hidden>
-        <button id="resign" type="button">Resign</button>
-        <button id="offer-draw" type="button">Offer draw</button>
+        <button id="resign" class="button-danger" type="button">Resign</button>
+        <button id="offer-draw" class="button-secondary" type="button">Offer draw</button>
         <button id="accept-draw" type="button" hidden>Accept draw</button>
-        <button id="decline-draw" type="button" hidden>Decline draw</button>
+        <button id="decline-draw" class="button-danger" type="button" hidden>Decline draw</button>
         <span id="draw-status" aria-live="polite"></span>
       </div>
       <div class="page-tabs" role="tablist" aria-label="Game pages">
@@ -118,7 +206,7 @@
       <section id="game-tab-panel" role="tabpanel" aria-labelledby="game-tab" tabindex="0">
         <div id="game-layout">
           <div>
-            <button id="switch-player" type="button">Switch player</button>
+            <button id="switch-player" class="button-secondary" type="button">Switch player</button>
             <div id="board" aria-label="Saved chess position"></div>
             <div id="captured-pieces" aria-label="Captured pieces">
               <div><span>Captured by White</span><span id="white-captured" aria-live="polite">—</span></div>
@@ -128,13 +216,13 @@
           <div>
             <h2 id="moves-heading">Move history</h2>
             <ol id="moves" tabindex="0" aria-labelledby="moves-heading"></ol>
-            <button id="refresh" type="button">Refresh board</button>
+            <button id="refresh" class="button-secondary" type="button">Refresh board</button>
             <button id="remind" type="button" hidden>Remind on move</button>
             <div id="replay-controls" hidden>
-              <button id="replay-prev" type="button">Previous position</button>
+              <button id="replay-prev" class="button-secondary" type="button">Previous position</button>
               <span id="replay-position" aria-live="polite"></span>
-              <button id="replay-next" type="button">Next position</button>
-              <button id="export-pgn" type="button">Download PGN</button>
+              <button id="replay-next" class="button-secondary" type="button">Next position</button>
+              <button id="export-pgn" class="button-secondary" type="button">Download PGN</button>
             </div>
           </div>
         </div>
@@ -152,7 +240,7 @@
       <section id="community-tab-panel" role="tabpanel" aria-labelledby="community-tab" tabindex="0" hidden>
         <div id="community-toolbar">
           <h2>Community</h2>
-          <div><span id="community-online-status" aria-live="polite"></span><button id="community-refresh" type="button">Refresh</button></div>
+          <div><span id="community-online-status" aria-live="polite"></span><button id="community-refresh" class="button-secondary" type="button">Refresh</button></div>
         </div>
         <div id="community-layout">
           <section id="community-players" aria-labelledby="community-players-heading">
@@ -169,7 +257,7 @@
               <iframe id="community-invite-email" title="Game invitation email preview" sandbox referrerpolicy="no-referrer"></iframe>
               <p id="community-invite-error" role="alert"></p>
               <div class="community-preview-actions">
-                <button id="community-invite-cancel" type="button">Cancel</button>
+                <button id="community-invite-cancel" class="button-secondary" type="button">Cancel</button>
                 <button id="community-invite-send" type="button" disabled>Send email</button>
               </div>
             </section>
@@ -189,8 +277,32 @@
     </section>
     <section id="games" hidden><h2>Your email games</h2><ul id="game-list"></ul></section>
   </main>
+  <div id="player-profile-overlay" style="display:none;" role="presentation">
+    <section class="player-profile-dialog" role="dialog" aria-modal="true" aria-labelledby="player-profile-title">
+      <header>
+        <h2 id="player-profile-title">Player Profile</h2>
+        <button id="player-profile-close" class="player-profile-close button-secondary" type="button" aria-label="Close profile">Close</button>
+      </header>
+      <div class="player-profile-summary">
+        <img id="player-profile-avatar" alt="">
+        <div><strong id="player-profile-name"></strong><p id="player-profile-username"></p></div>
+        <p id="player-profile-online" class="player-profile-state"></p>
+      </div>
+      <div class="player-profile-grid">
+        <div class="player-profile-field"><span class="player-profile-label">Email</span><span id="player-profile-email" class="player-profile-value"></span></div>
+        <div class="player-profile-field"><span class="player-profile-label">Location</span><span id="player-profile-location" class="player-profile-value"></span></div>
+        <div class="player-profile-field"><span class="player-profile-label">Chess ability</span><span id="player-profile-ability" class="player-profile-value"></span></div>
+        <div class="player-profile-field"><span class="player-profile-label">Playing statistics</span><span id="player-profile-stats" class="player-profile-value"></span></div>
+        <div class="player-profile-field"><span class="player-profile-label">Rewards</span><span id="player-profile-rewards" class="player-profile-value"></span></div>
+        <div class="player-profile-field"><span class="player-profile-label">Playing status</span><span id="player-profile-playing" class="player-profile-value"></span></div>
+        <div class="player-profile-field"><span class="player-profile-label">Last game played</span><span id="player-profile-last-game" class="player-profile-value"></span></div>
+      </div>
+      <p id="player-profile-status" role="status" aria-live="polite"></p>
+    </section>
+  </div>
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="chessboard.js"></script>
+  <script src="avatar.js"></script>
   <script>
     const gameId = new URLSearchParams(location.search).get('game_id');
     const feedback = document.getElementById('feedback');
@@ -416,16 +528,39 @@
         }).forEach(user => {
           const item = document.createElement('div');
           item.className = 'community-player';
+          const identity = document.createElement('div');
+          identity.className = 'community-player-identity';
+          const avatar = document.createElement('img');
+          avatar.className = 'community-player-avatar';
+          avatar.src = window.chessAvatars.dataUri(user.avatar_id);
+          avatar.alt = '';
+          avatar.setAttribute('role', 'button');
+          avatar.tabIndex = 0;
+          avatar.setAttribute('aria-label', 'View ' + user.username + '\'s profile');
+          avatar.addEventListener('click', () => openCommunityProfile(user.username));
+          avatar.addEventListener('contextmenu', event => {
+            event.preventDefault();
+            openCommunityProfile(user.username);
+          });
+          avatar.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              openCommunityProfile(user.username);
+            }
+          });
           const details = document.createElement('span');
           details.className = 'community-player-name';
-          details.textContent = user.username === currentUsername ? user.username + ' (you)' : user.username;
+          const displayName = user.display_name || user.username;
+          details.textContent = user.username === currentUsername ? displayName + ' (you)' : displayName;
+          identity.append(avatar, details);
           const presence = document.createElement('span');
           presence.className = 'community-presence';
           presence.textContent = user.activity === 'offline' ? 'Offline' : user.activity === 'playing' ? 'Playing' : 'Online';
-          item.append(details, presence);
+          item.append(identity, presence);
           if (user.username !== currentUsername) {
             const invite = document.createElement('button');
             invite.type = 'button';
+            invite.className = 'button-secondary';
             invite.textContent = 'Invite';
             invite.setAttribute('aria-label', 'Invite ' + user.username + ' to a game');
             invite.addEventListener('click', () => inviteCommunityPlayer(user.username, user.activity));
@@ -438,6 +573,49 @@
         status.textContent = error.message || 'Players could not be loaded.';
       }
     }
+
+    async function openCommunityProfile(username) {
+      const overlay = document.getElementById('player-profile-overlay');
+      const status = document.getElementById('player-profile-status');
+      overlay.style.display = 'flex';
+      status.textContent = 'Loading profile...';
+      try {
+        const response = await fetch('/community/profiles/' + encodeURIComponent(username), {
+          headers: { Authorization: 'Bearer ' + token }, cache: 'no-store'
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.message || 'Player profile could not be loaded.');
+        const profile = data.profile;
+        document.getElementById('player-profile-avatar').src = window.chessAvatars.dataUri(profile.avatar_id);
+        document.getElementById('player-profile-name').textContent = profile.display_name;
+        document.getElementById('player-profile-username').textContent = '@' + profile.username;
+        document.getElementById('player-profile-email').textContent = profile.email || 'Hidden by player';
+        document.getElementById('player-profile-location').textContent = profile.location || 'Not provided';
+        document.getElementById('player-profile-ability').textContent = profile.chess_ability || 'Not provided';
+        document.getElementById('player-profile-stats').textContent = `${profile.stats.total} games · ${profile.stats.wins} wins · ${profile.stats.draws} draws · ${profile.stats.losses} losses`;
+        document.getElementById('player-profile-rewards').textContent = profile.rewards.badges.length
+          ? profile.rewards.badges.map(badge => `${badge.badge} ${badge.title}`).join(', ')
+          : `${profile.rewards.completed_count}/${profile.rewards.total_games} classic games reviewed`;
+        document.getElementById('player-profile-online').textContent = profile.presence.online ? 'Online' : 'Offline';
+        document.getElementById('player-profile-playing').textContent = profile.presence.activity === 'playing'
+          ? 'Playing a game' : profile.presence.activity === 'idle' ? 'Idle' : profile.presence.activity === 'online' ? 'Online' : 'Not playing';
+        document.getElementById('player-profile-last-game').textContent = profile.last_game
+          ? `${profile.last_game.opponent || 'Unknown opponent'} · ${profile.last_game.result} · ${new Date(profile.last_game.played_at).toLocaleString()}`
+          : 'No games recorded yet';
+        status.textContent = '';
+      } catch (error) {
+        status.textContent = error.message || 'Player profile could not be loaded.';
+      }
+    }
+
+    function closeCommunityProfile() {
+      document.getElementById('player-profile-overlay').style.display = 'none';
+    }
+
+    document.getElementById('player-profile-close').addEventListener('click', closeCommunityProfile);
+    document.getElementById('player-profile-overlay').addEventListener('click', event => {
+      if (event.target.id === 'player-profile-overlay') closeCommunityProfile();
+    });
 
     async function loadCommunityMessages() {
       if (!token || communityLoading) return;

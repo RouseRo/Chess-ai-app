@@ -52,6 +52,12 @@ SMTP_FROM_EMAIL = os.environ.get("SMTP_FROM_EMAIL", SMTP_USER)
 SMTP_USE_STARTTLS = os.environ.get("SMTP_USE_STARTTLS", "true").lower() == "true"
 SMTP_USE_AUTH = os.environ.get("SMTP_USE_AUTH", "true").lower() == "true"
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:8080")
+PROFILE_AVATAR_IDS = {
+    "rook", "knight", "bishop", "queen", "king", "pawn",
+    "castle", "crown", "gambit", "blitz", "check", "mate"
+}
+DEFAULT_AVATAR_ID = "rook"
+CHESS_ABILITY_OPTIONS = {"beginner", "casual", "intermediate", "advanced", "expert"}
 
 def send_verification_email(to_email: str, username: str, token: str) -> None:
     """Send email verification link via SMTP. Logs on failure without raising."""
@@ -184,6 +190,11 @@ def init_db():
         ('last_login', 'TIMESTAMP'),
         ('last_activity', 'TIMESTAMP'),
         ('current_activity', "TEXT DEFAULT 'offline'"),
+        ('display_name', 'TEXT'),
+        ('avatar_id', f"TEXT DEFAULT '{DEFAULT_AVATAR_ID}'"),
+        ('location', 'TEXT'),
+        ('chess_ability', 'TEXT'),
+        ('email_public', 'BOOLEAN DEFAULT 0'),
     ]:
         if col not in existing_columns:
             cursor.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
@@ -198,6 +209,20 @@ def init_db():
             UNIQUE(username, game_key)
         )
     ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS player_game_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            result TEXT NOT NULL CHECK(result IN ('win', 'loss', 'draw')),
+            opponent TEXT,
+            played_at TIMESTAMP NOT NULL
+        )
+    ''')
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_player_game_results_user_played "
+        "ON player_game_results(username, played_at DESC)"
+    )
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS feedback (
@@ -797,6 +822,219 @@ class AnnouncementRequest(BaseModel):
     target_users: Optional[list] = None  # None = broadcast to all
 
 
+class ProfileUpdateRequest(BaseModel):
+    display_name: str
+    avatar_id: str
+    location: str = ""
+    chess_ability: str = ""
+    email_public: bool = False
+
+
+class GameResultRequest(BaseModel):
+    result: str
+    opponent: Optional[str] = None
+
+
+@app.get("/auth/profile")
+async def get_profile(authorization: Optional[str] = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+
+    username = payload.get("username")
+    conn = get_db()
+    row = conn.execute(
+        "SELECT username, display_name, avatar_id, location, chess_ability, email_public "
+        "FROM users WHERE username = ?",
+        (username,)
+    ).fetchone()
+    conn.close()
+    if not row:
+        return {"success": False, "message": "User not found."}
+    return {
+        "success": True,
+        "profile": {
+            "username": row["username"],
+            "display_name": row["display_name"] or row["username"],
+            "avatar_id": row["avatar_id"] or DEFAULT_AVATAR_ID,
+            "location": row["location"] or "",
+            "chess_ability": row["chess_ability"] or "",
+            "email_public": bool(row["email_public"])
+        }
+    }
+
+
+@app.put("/auth/profile")
+async def update_profile(
+    request: ProfileUpdateRequest,
+    authorization: Optional[str] = Header(None)
+):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+
+    display_name = request.display_name.strip()
+    if not display_name or len(display_name) > 24:
+        return {"success": False, "message": "Display name must be 1 to 24 characters."}
+    if request.avatar_id not in PROFILE_AVATAR_IDS:
+        return {"success": False, "message": "Choose an available avatar."}
+    location = request.location.strip()
+    if len(location) > 60:
+        return {"success": False, "message": "Location must be 60 characters or fewer."}
+    if request.chess_ability and request.chess_ability not in CHESS_ABILITY_OPTIONS:
+        return {"success": False, "message": "Choose an available chess ability level."}
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE users SET display_name = ?, avatar_id = ?, location = ?, chess_ability = ?, "
+        "email_public = ? WHERE username = ?",
+        (
+            display_name,
+            request.avatar_id,
+            location,
+            request.chess_ability,
+            bool(request.email_public),
+            payload.get("username")
+        )
+    )
+    conn.commit()
+    updated = cursor.rowcount > 0
+    conn.close()
+    if not updated:
+        return {"success": False, "message": "User not found."}
+    return {"success": True, "message": "Profile updated."}
+
+
+@app.post("/auth/game-result")
+async def record_player_game_result(
+    request: GameResultRequest,
+    authorization: Optional[str] = Header(None)
+):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+    if request.result not in {"win", "loss", "draw"}:
+        return {"success": False, "message": "Invalid game result."}
+
+    username = payload.get("username")
+    opponent = (request.opponent or "").strip()[:80] or None
+    played_at = datetime.now(timezone.utc).isoformat()
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO player_game_results (username, result, opponent, played_at) VALUES (?, ?, ?, ?)",
+        (username, request.result, opponent, played_at)
+    )
+    cursor.execute(
+        "UPDATE users SET games_count = games_count + 1 WHERE username = ?",
+        (username,)
+    )
+    conn.commit()
+    conn.close()
+    return {"success": True}
+
+
+@app.get("/community/profiles/{username}")
+async def get_public_profile(
+    username: str,
+    authorization: Optional[str] = Header(None)
+):
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"success": False, "message": "Authorization required."}
+    payload = verify_jwt_token(authorization.replace("Bearer ", ""))
+    if not payload:
+        return {"success": False, "message": "Invalid or expired token."}
+
+    viewer = payload.get("username")
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT username, email, display_name, avatar_id, location, chess_ability, email_public, "
+        "last_activity, current_activity FROM users "
+        "WHERE LOWER(username) = LOWER(?) AND is_verified = 1",
+        (username,)
+    )
+    user = cursor.fetchone()
+    if not user:
+        conn.close()
+        return {"success": False, "message": "Player not found."}
+
+    cursor.execute(
+        "SELECT COUNT(*) AS total, "
+        "SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END) AS wins, "
+        "SUM(CASE WHEN result = 'loss' THEN 1 ELSE 0 END) AS losses, "
+        "SUM(CASE WHEN result = 'draw' THEN 1 ELSE 0 END) AS draws "
+        "FROM player_game_results WHERE username = ?",
+        (user["username"],)
+    )
+    stats = cursor.fetchone()
+    cursor.execute(
+        "SELECT opponent, result, played_at FROM player_game_results "
+        "WHERE username = ? ORDER BY played_at DESC, id DESC LIMIT 1",
+        (user["username"],)
+    )
+    last_game = cursor.fetchone()
+    cursor.execute(
+        "SELECT game_key, completed_at FROM classic_game_reviews "
+        "WHERE username = ? ORDER BY completed_at",
+        (user["username"],)
+    )
+    completed_rows = cursor.fetchall()
+    conn.close()
+
+    completed = {row["game_key"]: row["completed_at"] for row in completed_rows}
+    badges = [
+        {
+            "badge": CLASSIC_GAMES_CATALOG[key]["badge"],
+            "title": CLASSIC_GAMES_CATALOG[key]["title"]
+        }
+        for key in completed
+        if key in CLASSIC_GAMES_CATALOG
+    ]
+    all_reviews_complete = len(completed) == len(CLASSIC_GAMES_CATALOG)
+    if all_reviews_complete:
+        badges.append({"badge": GRAND_SCHOLAR_BADGE["badge"], "title": GRAND_SCHOLAR_BADGE["title"]})
+
+    is_online = _is_online(user["last_activity"], user["current_activity"])
+    activity = (user["current_activity"] or "online") if is_online else "offline"
+    can_view_email = bool(user["email_public"]) or user["username"].casefold() == (viewer or "").casefold()
+    return {
+        "success": True,
+        "profile": {
+            "username": user["username"],
+            "display_name": user["display_name"] or user["username"],
+            "avatar_id": user["avatar_id"] or DEFAULT_AVATAR_ID,
+            "email": user["email"] if can_view_email else None,
+            "location": user["location"] or "",
+            "chess_ability": user["chess_ability"] or "",
+            "stats": {
+                "total": stats["total"] or 0,
+                "wins": stats["wins"] or 0,
+                "losses": stats["losses"] or 0,
+                "draws": stats["draws"] or 0
+            },
+            "rewards": {
+                "completed_count": len(completed),
+                "total_games": len(CLASSIC_GAMES_CATALOG),
+                "badges": badges
+            },
+            "presence": {"online": is_online, "activity": activity},
+            "last_game": {
+                "opponent": last_game["opponent"],
+                "result": last_game["result"],
+                "played_at": last_game["played_at"]
+            } if last_game else None
+        }
+    }
+
+
 @app.get("/community/online-users")
 async def get_online_users(authorization: Optional[str] = Header(None)):
     """Return verified users with their current presence."""
@@ -809,7 +1047,7 @@ async def get_online_users(authorization: Optional[str] = Header(None)):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT username, current_activity, last_activity FROM users WHERE is_verified = 1"
+        "SELECT username, display_name, avatar_id, current_activity, last_activity FROM users WHERE is_verified = 1"
     )
     rows = cursor.fetchall()
     conn.close()
@@ -819,6 +1057,8 @@ async def get_online_users(authorization: Optional[str] = Header(None)):
         online = _is_online(row["last_activity"], row["current_activity"])
         users.append({
             "username": row["username"],
+            "display_name": row["display_name"] or row["username"],
+            "avatar_id": row["avatar_id"] or DEFAULT_AVATAR_ID,
             "activity": (row["current_activity"] or "online") if online else "offline"
         })
     return {"success": True, "users": users}

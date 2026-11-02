@@ -1575,6 +1575,16 @@
       if (result === 'loss') playerStats[currentOpponent].l++;
       if (result === 'draw') playerStats[currentOpponent].d++;
       localStorage.setItem('chessPlayerStats', JSON.stringify(playerStats));
+      if (authToken) {
+        fetch('/auth/game-result', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + authToken
+          },
+          body: JSON.stringify({ result, opponent: currentOpponent })
+        }).catch(() => { });
+      }
       postActivityM('idle');
     }
 

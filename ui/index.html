@@ -466,7 +466,8 @@
     .community-users-sidebar h4 { font-size: 0.78em; color: #888; text-transform: uppercase;
       padding: 0 8px 6px; margin: 0; border-bottom: 1px solid #eee; }
     .community-user-item { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 5px 8px; font-size: 0.85em; }
-    .community-user-item > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .community-user-item > .community-user-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .community-user-avatar { width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; background: #e8edf0; cursor: context-menu; }
     .community-user-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
     .community-user-group { padding: 8px 8px 3px; font-size: 0.72em; color: #777; text-transform: uppercase; }
     .cu-online  { background: #4CAF50; }
@@ -648,6 +649,8 @@
     .board-theme-name { font-weight: 700; color: #263238; font-size: 0.92em; }
     .board-theme-colors { color: #667; font-family: monospace; font-size: 0.78em; margin-top: 2px; }
     #piece-set-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; display: flex; align-items: center; justify-content: center; }
+    #profile-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; display: flex; align-items: center; justify-content: center; }
+    #public-profile-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2100; display: flex; align-items: center; justify-content: center; }
     .piece-set-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
     .piece-set-option { display: flex; gap: 10px; align-items: center; padding: 9px; background: #fff; border: 1px solid #d9dee2; border-radius: 6px; cursor: pointer; text-align: left; }
     .piece-set-option:hover { background: #f5f7f8; border-color: #b0bec5; }
@@ -656,6 +659,27 @@
     .piece-set-sample img { width: 34px; height: 34px; }
     .piece-set-name { font-weight: 700; color: #263238; font-size: 0.92em; }
     .piece-set-description { color: #667; font-size: 0.78em; margin-top: 2px; line-height: 1.35; }
+    .profile-avatar-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .profile-avatar-option { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; border: 1px solid #d9dee2; border-radius: 5px; background: #fff; cursor: pointer; color: #263238; }
+    .profile-avatar-option:hover, .profile-avatar-option.active { border-color: #2196F3; background: #f2f8fc; }
+    .profile-avatar-option img { width: 48px; height: 48px; }
+    .profile-avatar-option span { font-size: 0.78em; text-transform: capitalize; }
+    .profile-status { min-height: 1.3em; color: #b3261e; font-size: 0.88em; }
+    .profile-details-modal { width: 520px; }
+    .profile-details-summary { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .profile-details-summary img { width: 64px; height: 64px; border-radius: 50%; background: #e8edf0; }
+    .profile-details-name { display: block; font-size: 1.08em; }
+    .profile-details-username { color: #667; font-size: 0.86em; }
+    .profile-details-presence { margin-left: auto; font-size: 0.85em; font-weight: 600; }
+    .profile-details-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
+    .profile-detail { min-width: 0; padding: 8px 0; border-top: 1px solid #e6eaed; }
+    .profile-detail-label { display: block; color: #667; font-size: 0.78em; text-transform: uppercase; }
+    .profile-detail-value { display: block; overflow-wrap: anywhere; margin-top: 3px; }
+    .profile-edit-fields { display: grid; gap: 10px; }
+    .profile-edit-fields input, .profile-edit-fields select { width: 100%; box-sizing: border-box; padding: 8px; }
+    .profile-email-visibility { display: flex; gap: 7px; align-items: center; font-size: 0.88em; }
+    @media (max-width: 480px) { .profile-avatar-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @media (max-width: 520px) { .profile-details-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -664,6 +688,7 @@
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="chessboard.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+  <script src="avatar.js"></script>
   
   <script>
     const UI_VERSION = '1.0.0';
@@ -697,6 +722,7 @@
 
     let authToken = null;
     let currentUser = null;
+    let selectedAvatarId = 'rook';
     let board = null;
       let game = null;
       let moveHistory = [];
@@ -1499,6 +1525,120 @@
                               if (menu) menu.classList.remove('open');
                             }
 
+                            function openProfileSettings() {
+                              closeSettingsMenu();
+                              const overlay = document.getElementById('profile-overlay');
+                              const status = document.getElementById('profile-status');
+                              const nameInput = document.getElementById('profile-display-name');
+                              if (overlay) overlay.style.display = 'flex';
+                              if (status) status.textContent = 'Loading profile...';
+                              fetch('/auth/profile', { headers: { 'Authorization': 'Bearer ' + authToken } })
+                                .then(response => response.json())
+                                .then(data => {
+                                  if (!data.success) throw new Error(data.message || 'Could not load profile.');
+                                  if (nameInput) nameInput.value = data.profile.display_name;
+                                  document.getElementById('profile-location').value = data.profile.location || '';
+                                  document.getElementById('profile-chess-ability').value = data.profile.chess_ability || '';
+                                  document.getElementById('profile-email-public').checked = data.profile.email_public;
+                                  selectedAvatarId = data.profile.avatar_id;
+                                  renderProfileAvatarOptions();
+                                  if (status) status.textContent = '';
+                                })
+                                .catch(error => {
+                                  if (status) status.textContent = error.message || 'Could not load profile.';
+                                });
+                            }
+
+                            function closeProfileSettings() {
+                              const overlay = document.getElementById('profile-overlay');
+                              if (overlay) overlay.style.display = 'none';
+                            }
+
+                            function renderProfileAvatarOptions() {
+                              const container = document.getElementById('profile-avatar-options');
+                              if (!container) return;
+                              container.innerHTML = window.chessAvatars.ids.map(avatarId => {
+                                const label = avatarId.charAt(0).toUpperCase() + avatarId.slice(1);
+                                const active = avatarId === selectedAvatarId ? ' active' : '';
+                                const pressed = avatarId === selectedAvatarId ? 'true' : 'false';
+                                return `<button type="button" class="profile-avatar-option${active}" aria-pressed="${pressed}" onclick="selectProfileAvatar('${avatarId}')"><img src="${window.chessAvatars.dataUri(avatarId)}" alt=""><span>${label}</span></button>`;
+                              }).join('');
+                            }
+
+                            function selectProfileAvatar(avatarId) {
+                              if (!window.chessAvatars.ids.includes(avatarId)) return;
+                              selectedAvatarId = avatarId;
+                              renderProfileAvatarOptions();
+                            }
+
+                            function saveProfileSettings() {
+                              const status = document.getElementById('profile-status');
+                              const nameInput = document.getElementById('profile-display-name');
+                              if (status) status.textContent = 'Saving...';
+                              fetch('/auth/profile', {
+                                method: 'PUT',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'Authorization': 'Bearer ' + authToken
+                                },
+                                body: JSON.stringify({
+                                  display_name: nameInput ? nameInput.value : '',
+                                  avatar_id: selectedAvatarId,
+                                  location: document.getElementById('profile-location').value,
+                                  chess_ability: document.getElementById('profile-chess-ability').value,
+                                  email_public: document.getElementById('profile-email-public').checked
+                                })
+                              })
+                                .then(response => response.json())
+                                .then(data => {
+                                  if (!data.success) throw new Error(data.message || 'Could not save profile.');
+                                  closeProfileSettings();
+                                  refreshOnlineUsers();
+                                })
+                                .catch(error => {
+                                  if (status) status.textContent = error.message || 'Could not save profile.';
+                                });
+                            }
+
+                            function openPublicProfile(username) {
+                              const overlay = document.getElementById('public-profile-overlay');
+                              const loading = document.getElementById('public-profile-loading');
+                              if (!overlay) return;
+                              overlay.style.display = 'flex';
+                              loading.textContent = 'Loading profile...';
+                              fetch('/community/profiles/' + encodeURIComponent(username), {
+                                headers: { 'Authorization': 'Bearer ' + authToken }
+                              })
+                                .then(response => response.json())
+                                .then(data => {
+                                  if (!data.success) throw new Error(data.message || 'Could not load player profile.');
+                                  const profile = data.profile;
+                                  document.getElementById('public-profile-avatar').src = window.chessAvatars.dataUri(profile.avatar_id);
+                                  document.getElementById('public-profile-name').textContent = profile.display_name;
+                                  document.getElementById('public-profile-username').textContent = '@' + profile.username;
+                                  document.getElementById('public-profile-email').textContent = profile.email || 'Hidden by player';
+                                  document.getElementById('public-profile-location').textContent = profile.location || 'Not provided';
+                                  document.getElementById('public-profile-ability').textContent = profile.chess_ability || 'Not provided';
+                                  document.getElementById('public-profile-stats').textContent = `${profile.stats.total} games · ${profile.stats.wins} wins · ${profile.stats.draws} draws · ${profile.stats.losses} losses`;
+                                  document.getElementById('public-profile-rewards').textContent = profile.rewards.badges.length
+                                    ? profile.rewards.badges.map(badge => `${badge.badge} ${badge.title}`).join(', ')
+                                    : `${profile.rewards.completed_count}/${profile.rewards.total_games} classic games reviewed`;
+                                  document.getElementById('public-profile-online').textContent = profile.presence.online ? 'Online' : 'Offline';
+                                  document.getElementById('public-profile-playing').textContent = profile.presence.activity === 'playing'
+                                    ? 'Playing a game' : profile.presence.activity === 'idle' ? 'Idle' : profile.presence.activity === 'online' ? 'Online' : 'Not playing';
+                                  document.getElementById('public-profile-last-game').textContent = profile.last_game
+                                    ? `${profile.last_game.opponent || 'Unknown opponent'} · ${profile.last_game.result} · ${new Date(profile.last_game.played_at).toLocaleString()}`
+                                    : 'No games recorded yet';
+                                  loading.textContent = '';
+                                })
+                                .catch(error => { loading.textContent = error.message || 'Could not load player profile.'; });
+                            }
+
+                            function closePublicProfile() {
+                              const overlay = document.getElementById('public-profile-overlay');
+                              if (overlay) overlay.style.display = 'none';
+                            }
+
                             function openBoardThemeSettings() {
                               closeSettingsMenu();
                               renderBoardThemeOptions();
@@ -1752,15 +1892,17 @@
                                     : u.activity === 'playing' ? 'community-user-dot cu-playing' : 'community-user-dot cu-online';
                                   const nameCls = u.username === currentUser ? 'cu-me' : '';
                                   const safeU = u.username.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                                  const safeUAttr = u.username.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-                                  const label = u.username === currentUser ? safeU + ' (you)' : safeU;
+                                  const safeUAttr = u.username.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                  const displayName = (u.display_name || u.username).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                  const label = u.username === currentUser ? displayName + ' (you)' : displayName;
+                                  const avatar = window.chessAvatars.dataUri(u.avatar_id);
                                   const actionsHtml = u.username !== currentUser
                                     ? `<span class="user-actions">`
                                     + `<button class="user-action-btn" title="Send direct message" onclick="openDmCompose('${safeUAttr}')">✉</button>`
                                     + `<button class="user-action-btn" title="Invite to game" data-recipient="${safeUAttr}" onclick="openGameInvite(this.dataset.recipient, '${u.activity === 'offline' ? 'offline' : 'online'}')">♟</button>`
                                     + `</span>`
                                     : '';
-                                  return `<div class="community-user-item" title="${u.activity === 'offline' ? 'Offline' : u.activity === 'playing' ? 'Playing' : 'Online'}"><span class="${dotCls}"></span><span class="${nameCls}">${label}</span>${actionsHtml}</div>`;
+                                  return `<div class="community-user-item" title="${u.activity === 'offline' ? 'Offline' : u.activity === 'playing' ? 'Playing' : 'Online'}"><span class="${dotCls}"></span><img class="community-user-avatar" src="${avatar}" alt="" data-username="${safeUAttr}" role="button" tabindex="0" aria-label="View ${safeUAttr}'s profile" onclick="openPublicProfile(this.dataset.username)" oncontextmenu="openPublicProfile(this.dataset.username);return false;" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPublicProfile(this.dataset.username)}"><span class="community-user-name ${nameCls}">${label}</span>${actionsHtml}</div>`;
                                 });
                                 const onlineCount = users.filter(u => u.activity !== 'offline').length;
                                 listEl.innerHTML = aiEntry
@@ -2146,6 +2288,16 @@
       playerStats[key][result === 'win' ? 'wins' : result === 'loss' ? 'losses' : 'draws']++;
       playerStats[key].lastPlayed = new Date().toLocaleDateString();
       localStorage.setItem('chessPlayerStats', JSON.stringify(playerStats));
+      if (authToken) {
+        fetch('/auth/game-result', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + authToken
+          },
+          body: JSON.stringify({ result, opponent: key })
+        }).catch(() => { });
+      }
     }
 
     function renderStatsPanel() {
@@ -2411,6 +2563,7 @@
             <div class="settings-menu">
               <button onclick="toggleSettingsMenu(event)" title="Settings" class="settings-btn">⚙ Settings</button>
               <div id="settings-dropdown" class="settings-dropdown">
+                <button type="button" class="settings-menu-item" onclick="openProfileSettings()">Player Profile</button>
                 <button type="button" class="settings-menu-item" onclick="openBoardThemeSettings()">Board Theme</button>
                 <button type="button" class="settings-menu-item" onclick="openPieceSetSettings()">Piece Set Theme</button>
               </div>
@@ -4151,6 +4304,70 @@
         <h3>Piece Set</h3>
         <div id="piece-set-options" class="piece-set-options"></div>
       </div>
+    </div>
+  </div>
+</div>
+<!-- Player Profile Modal -->
+<div id="profile-overlay" style="display:none;" onclick="if(event.target===this)closeProfileSettings()">
+  <div class="help-modal">
+    <div class="help-modal-header">
+      <h2>Player Profile</h2>
+      <button class="help-close-btn" onclick="closeProfileSettings()">&#x2715;</button>
+    </div>
+    <div class="help-modal-body">
+      <div class="help-section">
+        <div class="profile-edit-fields">
+          <label>Display name<input id="profile-display-name" type="text" maxlength="24" autocomplete="nickname"></label>
+          <label>Location<input id="profile-location" type="text" maxlength="60" autocomplete="address-level2" placeholder="City or region (optional)"></label>
+          <label>Chess ability
+            <select id="profile-chess-ability">
+              <option value="">Not specified</option>
+              <option value="beginner">Beginner</option>
+              <option value="casual">Casual</option>
+              <option value="intermediate">Intermediate</option>
+              <option value="advanced">Advanced</option>
+              <option value="expert">Expert</option>
+            </select>
+          </label>
+          <label class="profile-email-visibility"><input id="profile-email-public" type="checkbox"> Show my email on my public profile</label>
+        </div>
+        <h3>Choose an avatar</h3>
+        <div id="profile-avatar-options" class="profile-avatar-grid" role="group" aria-label="Choose an avatar"></div>
+        <p id="profile-status" class="profile-status" aria-live="polite"></p>
+        <div style="display:flex;justify-content:flex-end;gap:8px;">
+          <button type="button" onclick="closeProfileSettings()">Cancel</button>
+          <button type="button" onclick="saveProfileSettings()">Save profile</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Public Player Profile Modal -->
+<div id="public-profile-overlay" style="display:none;" onclick="if(event.target===this)closePublicProfile()">
+  <div class="help-modal profile-details-modal">
+    <div class="help-modal-header">
+      <h2>Player Profile</h2>
+      <button class="help-close-btn" onclick="closePublicProfile()">&#x2715;</button>
+    </div>
+    <div class="help-modal-body">
+      <div class="profile-details-summary">
+        <img id="public-profile-avatar" alt="">
+        <div>
+          <strong id="public-profile-name" class="profile-details-name"></strong>
+          <span id="public-profile-username" class="profile-details-username"></span>
+        </div>
+        <span id="public-profile-online" class="profile-details-presence"></span>
+      </div>
+      <div class="profile-details-grid">
+        <div class="profile-detail"><span class="profile-detail-label">Email</span><span id="public-profile-email" class="profile-detail-value"></span></div>
+        <div class="profile-detail"><span class="profile-detail-label">Location</span><span id="public-profile-location" class="profile-detail-value"></span></div>
+        <div class="profile-detail"><span class="profile-detail-label">Chess ability</span><span id="public-profile-ability" class="profile-detail-value"></span></div>
+        <div class="profile-detail"><span class="profile-detail-label">Playing statistics</span><span id="public-profile-stats" class="profile-detail-value"></span></div>
+        <div class="profile-detail"><span class="profile-detail-label">Rewards</span><span id="public-profile-rewards" class="profile-detail-value"></span></div>
+        <div class="profile-detail"><span class="profile-detail-label">Playing status</span><span id="public-profile-playing" class="profile-detail-value"></span></div>
+        <div class="profile-detail"><span class="profile-detail-label">Last game played</span><span id="public-profile-last-game" class="profile-detail-value"></span></div>
+      </div>
+      <p id="public-profile-loading" class="profile-status" aria-live="polite"></p>
     </div>
   </div>
 </div>

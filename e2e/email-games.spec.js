@@ -121,6 +121,16 @@ test.describe('email board input', () => {
           { username: 'offline_friend', activity: 'offline' }
         ] } });
       }
+      if (pathname === '/community/profiles/white_tester') {
+        return route.fulfill({ json: { success: true, profile: {
+          username: 'white_tester', display_name: 'White Player', avatar_id: 'rook',
+          email: null, location: 'Ottawa', chess_ability: 'intermediate',
+          stats: { total: 3, wins: 2, losses: 1, draws: 0 },
+          rewards: { completed_count: 1, total_games: 6, badges: [{ badge: '♟', title: 'Opening Student' }] },
+          presence: { online: true, activity: 'online' },
+          last_game: { opponent: 'Stockfish', result: 'win', played_at: new Date().toISOString() }
+        } } });
+      }
       if (pathname === '/community/messages') {
         if (route.request().method() === 'POST') {
           const request = route.request().postDataJSON();
@@ -158,6 +168,9 @@ test.describe('email board input', () => {
     await communityTab.click();
     await expect(page.locator('#community-tab-panel')).toBeVisible();
     await expect(page.locator('#game-tab-panel')).toBeHidden();
+    await expect(page.locator('#community-refresh')).toHaveCSS('background-color', 'rgb(82, 105, 119)');
+    await expect(page.locator('#offer-draw')).toHaveCSS('background-color', 'rgb(82, 105, 119)');
+    await expect(page.locator('#resign')).toHaveCSS('background-color', 'rgb(165, 61, 56)');
     await expect(page.getByText('online_friend')).toBeVisible();
 
     await page.getByRole('button', { name: 'Invite online_friend to a game' }).click();
@@ -184,6 +197,24 @@ test.describe('email board input', () => {
     await expect(page.getByRole('tab', { name: 'Game' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('#game-tab-panel')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+    await context.close();
+  });
+
+  test('right-clicking a community avatar opens the player profile', async ({ browser }) => {
+    const { context, page } = await openInputGame(browser, { touch: false });
+    await page.getByRole('tab', { name: 'Community' }).click();
+    const avatar = page.locator('.community-player-identity').filter({ hasText: 'white_tester' }).locator('.community-player-avatar');
+    await expect(avatar).toBeVisible();
+    await avatar.click({ button: 'right' });
+
+    const profile = page.getByRole('dialog', { name: 'Player Profile' });
+    await expect(profile).toBeVisible();
+    await expect(profile).toContainText('White Player');
+    await expect(profile).toContainText('Ottawa');
+    await expect(profile).toContainText('2 wins');
+    await expect(profile).toContainText('Stockfish');
+    await page.getByRole('button', { name: 'Close profile' }).click();
+    await expect(profile).toBeHidden();
     await context.close();
   });
 

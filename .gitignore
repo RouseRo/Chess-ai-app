@@ -3,6 +3,8 @@
 *.pyo
 *.pyd
 __pycache__/
+node_modules/
+ui/avatar.js
 venv/Scripts/*.exe
 venv/Lib/site-packages/
 venv/Scripts/*
