@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import sys
 import os
+import hmac
 import chess
 import random
 import subprocess
@@ -95,6 +96,9 @@ def find_stockfish():
 STOCKFISH_PATH = find_stockfish()
 
 AUTH_SERVICE_URL = os.environ.get("AUTH_SERVICE_URL", "http://auth-service:8002")
+CHESS_ENGINE_API_TOKEN = os.environ.get(
+    "CHESS_ENGINE_API_TOKEN"
+) or os.environ.get("JWT_SECRET_KEY", "chess-app-secret-key-change-in-production")
 
 app = FastAPI(
     title="Chess AI Engine",
@@ -325,6 +329,40 @@ async def make_move(request_data: dict, authorization: str = Header(None)):
     except Exception as e:
         print(f"[ERROR] {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error processing move: {str(e)}")
+
+
+@app.post("/stockfish/move")
+async def make_stockfish_move(request_data: dict, authorization: str = Header(None)):
+    token = authorization[7:] if authorization and authorization.startswith("Bearer ") else ""
+    if not token or not hmac.compare_digest(token, CHESS_ENGINE_API_TOKEN):
+        raise HTTPException(status_code=401, detail="Invalid authorization token")
+    fen = request_data.get("fen")
+    if not fen:
+        raise HTTPException(status_code=400, detail="Missing fen")
+    try:
+        board = chess.Board(fen)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid chess position.") from exc
+    if board.is_game_over():
+        raise HTTPException(status_code=409, detail="The game is already over.")
+    if not CHESS_ENGINE_AVAILABLE or not STOCKFISH_PATH:
+        raise HTTPException(status_code=503, detail="Stockfish is not available.")
+    engine = get_stockfish_engine()
+    if not engine:
+        raise HTTPException(status_code=503, detail="Stockfish could not be started.")
+    try:
+        skill_level = int(request_data.get("skill_level", 5))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="Invalid Stockfish skill level.") from exc
+    engine.configure({"Skill Level": min(20, max(1, skill_level))})
+    try:
+        result = engine.play(board, chess.engine.Limit(time=1.0))
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Stockfish failed to find a move.") from exc
+    if not result.move or result.move not in board.legal_moves:
+        raise HTTPException(status_code=503, detail="Stockfish returned no legal move.")
+    san = board.san(result.move)
+    return {"success": True, "uci": result.move.uci(), "san": san}
 
 @app.get("/ai/suggest")
 async def suggest_move(fen: str, authorization: str = Header(None), ai_type: str = "stockfish"):

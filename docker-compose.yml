@@ -8,7 +8,9 @@ services:
       - "${CHESS_ENGINE_HOST_PORT:-8000}:8000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-chess-ai-secret-key-change-in-production}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-chess-app-secret-key-change-in-production}
+      - CHESS_ENGINE_API_TOKEN=${CHESS_ENGINE_API_TOKEN:-}
+      - CHESS_ENGINE_API_TOKEN=${CHESS_ENGINE_API_TOKEN:-}
       - AUTH_SERVICE_URL=http://auth-service:8002
     volumes:
       - ./engine:/app/engine
@@ -45,6 +47,7 @@ services:
       - SMTP_USE_STARTTLS=${SMTP_USE_STARTTLS:-true}
       - SMTP_USE_AUTH=${SMTP_USE_AUTH:-true}
       - APP_BASE_URL=${APP_BASE_URL:-http://localhost:8080}
+      - CHESS_ENGINE_URL=${CHESS_ENGINE_URL:-http://chess-engine:8000}
     volumes:
       - ./data:/app/data
     networks:

@@ -78,11 +78,17 @@
     button.button-danger:hover:not(:disabled) { background: #87302c; border-color: #87302c; }
     button.button-secondary:focus-visible, button.button-danger:focus-visible { outline-color: rgba(40, 107, 161, .55); }
     #login button { margin-top: 16px; }
+    #stockfish-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; align-items: end; max-width: 720px; margin: 14px 0 20px; border-left: 3px solid var(--copper); padding: 12px 16px; background: rgba(255, 254, 250, .75); }
+    #stockfish-form label { margin: 0; }
+    #stockfish-form select, #stockfish-form input { display: block; width: 100%; margin-top: 6px; padding: 10px; font: 1rem/1.4 system-ui, sans-serif; }
     #feedback { min-height: 24px; color: #a12e2e; font: 500 .95rem/1.5 system-ui, sans-serif; }
     #game > #players { margin: 4px 0 4px; font-size: 1.08rem; font-weight: 700; }
     #game > #turn { display: inline-block; margin: 0 0 8px; border-left: 3px solid var(--copper); padding: 3px 10px; color: var(--forest-deep); font: 650 .92rem/1.4 system-ui, sans-serif; }
     #game-result:not([hidden]) { margin: 8px 0; border-left: 3px solid var(--copper); padding: 8px 12px; background: rgba(255, 254, 250, .75); }
     #game-actions:not([hidden]) { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; }
+    #rewind-controls:not([hidden]) { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12px; margin: 12px 0 18px; border-left: 3px solid var(--copper); padding: 10px 12px; background: rgba(255, 254, 250, .75); }
+    #rewind-controls label { margin: 0; }
+    #rewind-target-ply { display: block; min-width: min(280px, 72vw); margin-top: 5px; padding: 10px; color: var(--ink); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 3px; font: 1rem/1.4 system-ui, sans-serif; }
     #draw-status { color: var(--muted); font: .9rem/1.4 system-ui, sans-serif; }
     #game-layout { display: grid; grid-template-columns: minmax(0, 560px) minmax(180px, 1fr); gap: 28px; align-items: start; }
     .page-tabs { display: flex; width: max-content; max-width: 100%; gap: 4px; margin: 20px 0 16px; border: 1px solid var(--line); border-radius: 5px; padding: 4px; background: #e4e9e3; }
@@ -199,6 +205,12 @@
         <button id="decline-draw" class="button-danger" type="button" hidden>Decline draw</button>
         <span id="draw-status" aria-live="polite"></span>
       </div>
+      <div id="rewind-controls" hidden>
+        <label for="rewind-target-ply">Return to an earlier turn
+          <select id="rewind-target-ply"></select>
+        </label>
+        <button id="rewind-game" class="button-secondary" type="button">Rewind and continue</button>
+      </div>
       <div class="page-tabs" role="tablist" aria-label="Game pages">
         <button id="game-tab" class="page-tab" type="button" role="tab" aria-selected="true" aria-controls="game-tab-panel" tabindex="0">Game</button>
         <button id="community-tab" class="page-tab" type="button" role="tab" aria-selected="false" aria-controls="community-tab-panel" tabindex="-1">Community</button>
@@ -275,7 +287,19 @@
         </div>
       </section>
     </section>
-    <section id="games" hidden><h2>Your email games</h2><ul id="game-list"></ul></section>
+    <section id="games" hidden>
+      <h2>Your email games</h2>
+      <form id="stockfish-form">
+        <label for="stockfish-color">Stockfish plays as
+          <select id="stockfish-color"><option value="black">Black</option><option value="white">White</option></select>
+        </label>
+        <label for="stockfish-skill">Skill level (1-20)
+          <input id="stockfish-skill" type="number" min="1" max="20" value="5" required>
+        </label>
+        <button type="submit">Create Stockfish email game</button>
+      </form>
+      <ul id="game-list"></ul>
+    </section>
   </main>
   <div id="player-profile-overlay" style="display:none;" role="presentation">
     <section class="player-profile-dialog" role="dialog" aria-modal="true" aria-labelledby="player-profile-title">
@@ -390,12 +414,29 @@
         const actions = document.getElementById('game-actions');
         actions.hidden = game.status !== 'active';
         const pendingOffer = game.draw_offer_by || '';
-        document.getElementById('offer-draw').hidden = !myTurn || Boolean(pendingOffer);
+        document.getElementById('offer-draw').hidden = !myTurn || Boolean(pendingOffer) || Boolean(game.ai_color);
         document.getElementById('accept-draw').hidden = !pendingOffer || pendingOffer === data.username || game.status !== 'active';
         document.getElementById('decline-draw').hidden = !pendingOffer || pendingOffer === data.username || game.status !== 'active';
-        document.getElementById('draw-status').textContent = pendingOffer
+        document.getElementById('draw-status').textContent = pendingOffer && !game.ai_color
           ? (pendingOffer === data.username ? 'Your draw offer is pending.' : pendingOffer + ' offered a draw.')
           : '';
+        const rewindSelect = document.getElementById('rewind-target-ply');
+        rewindSelect.replaceChildren();
+        const firstHumanTurn = game.ai_color === 'white' ? 1 : 0;
+        for (let targetPly = firstHumanTurn; game.ai_color && targetPly < game.move_history.length; targetPly += 2) {
+          const option = document.createElement('option');
+          option.value = String(targetPly);
+          if (targetPly === 0) {
+            option.textContent = 'Starting position';
+          } else {
+            const previousIndex = targetPly - 1;
+            const side = previousIndex % 2 === 0 ? 'White' : 'Black';
+            const moveNumber = Math.floor(previousIndex / 2) + 1;
+            option.textContent = `After ${side} ${moveNumber}: ${game.move_history[previousIndex].san}`;
+          }
+          rewindSelect.append(option);
+        }
+        document.getElementById('rewind-controls').hidden = !game.ai_color || !rewindSelect.options.length;
         replayPositions = [];
         replayCaptures = [];
         if (game.status === 'completed') {
@@ -429,7 +470,7 @@
         });
         renderCapturedPieces(replayCaptures.length ? replayCaptures[replayIndex] : game.captured_pieces);
         const remind = document.getElementById('remind');
-        const canRemind = game.status === 'active' && !myTurn;
+        const canRemind = game.status === 'active' && !myTurn && !game.ai_color;
         const reminderSentAt = game.last_reminder_at ? Date.parse(game.last_reminder_at) : 0;
         const reminderCoolingDown = reminderSentAt && Date.now() - reminderSentAt < 24 * 60 * 60 * 1000;
         remind.hidden = !canRemind;
@@ -457,8 +498,8 @@
         });
         resizeMoveHistory();
         moves.scrollTop = moves.scrollHeight;
-        document.getElementById('conversation').hidden = false;
-        await loadMessages(true);
+        document.getElementById('conversation').hidden = Boolean(game.ai_color);
+        if (!game.ai_color) await loadMessages(true);
       } catch (error) {
         feedback.textContent = error.message || 'Unable to load game.';
       } finally {
@@ -876,6 +917,30 @@
       }
     }
 
+    async function rewindGame() {
+      const button = document.getElementById('rewind-game');
+      button.disabled = true;
+      feedback.textContent = '';
+      try {
+        const response = await fetch('/community/email-games/' + encodeURIComponent(gameId) + '/rewind', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+          body: JSON.stringify({
+            target_ply: Number(document.getElementById('rewind-target-ply').value),
+            expected_version: currentGame.version
+          })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.detail || data.message || 'Could not rewind the game.');
+        await loadGame();
+        feedback.textContent = 'Rewound. Make a different move to start a new branch.';
+      } catch (error) {
+        feedback.textContent = error.message || 'Could not rewind the game.';
+      } finally {
+        button.disabled = false;
+      }
+    }
+
     async function requestReminder() {
       const button = document.getElementById('remind');
       button.disabled = true;
@@ -1013,6 +1078,7 @@
     });
 
     document.getElementById('refresh').addEventListener('click', loadGame);
+    document.getElementById('rewind-game').addEventListener('click', rewindGame);
     document.getElementById('switch-player').addEventListener('click', () => {
       token = null;
       localStorage.removeItem('authToken');
@@ -1040,6 +1106,28 @@
     document.getElementById('replay-prev').addEventListener('click', () => stepReplay(-1));
     document.getElementById('replay-next').addEventListener('click', () => stepReplay(1));
     document.getElementById('export-pgn').addEventListener('click', downloadPgn);
+    document.getElementById('stockfish-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const button = event.currentTarget.querySelector('button[type="submit"]');
+      button.disabled = true;
+      feedback.textContent = '';
+      try {
+        const response = await fetch('/community/email-games/stockfish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+          body: JSON.stringify({
+            ai_color: document.getElementById('stockfish-color').value,
+            skill_level: Number(document.getElementById('stockfish-skill').value)
+          })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.detail || data.message || 'Could not create Stockfish game.');
+        location.href = 'email-game.html?game_id=' + encodeURIComponent(data.game_id);
+      } catch (error) {
+        feedback.textContent = error.message || 'Could not create Stockfish game.';
+        button.disabled = false;
+      }
+    });
     function resizeMoveHistory() {
       const moves = document.getElementById('moves');
       const followLatest = moves.scrollHeight - moves.scrollTop - moves.clientHeight < 32;

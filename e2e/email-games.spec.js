@@ -68,6 +68,58 @@ async function expectTurnSideAtBottom(page, color) {
     .toBe(color === 'White' ? 'a8' : 'h1');
 }
 
+test('players can create and play a Stockfish email game', async ({ browser, request }) => {
+  const username = `stockfish_${randomUUID().replaceAll('-', '').slice(0, 12)}`;
+  const email = `${username}@example.test`;
+  await registerUser(request, username, email);
+  const token = await loginUser(request, username);
+  const page = await browser.newPage();
+  await page.route('https://code.jquery.com/jquery-3.7.1.min.js', route =>
+    route.fulfill({ path: jqueryPath, contentType: 'application/javascript' })
+  );
+  await page.addInitScript(value => localStorage.setItem('authToken', value), token);
+  await page.goto('/email-game.html');
+  await expect(page.locator('#games')).toBeVisible();
+  await page.getByLabel('Stockfish plays as').selectOption('black');
+  await page.getByLabel('Skill level (1-20)').fill('5');
+  await page.getByRole('button', { name: 'Create Stockfish email game' }).click();
+  await expect(page).toHaveURL(/email-game\.html\?game_id=/);
+  await expect(page.locator('#turn')).toContainText('Your turn (White)');
+  await waitForMessage(request, email, 'Your turn in a Stockfish email chess game');
+
+  await movePiece(page, 'e2', 'e4');
+  await expect(page.locator('#moves li')).toHaveCount(2);
+  await expect(page.locator('#turn')).toContainText('Your turn (White)');
+  await waitForMessage(request, email, 'Your turn in a chess game with Stockfish');
+  await expect(page.locator('#rewind-controls')).toBeVisible();
+  await page.locator('#rewind-target-ply').selectOption('0');
+  await page.getByRole('button', { name: 'Rewind and continue' }).click();
+  await expect(page.locator('#moves li')).toHaveCount(0);
+  await expect(page.locator('#turn')).toContainText('Your turn (White)');
+  await movePiece(page, 'd2', 'd4');
+  await expect(page.locator('#moves li')).toHaveCount(2);
+  await expect(page.locator('#moves')).toContainText('d4');
+
+  await page.goto('/email-game.html');
+  await expect(page.locator('#games')).toBeVisible();
+  await page.getByLabel('Stockfish plays as').selectOption('white');
+  await page.getByRole('button', { name: 'Create Stockfish email game' }).click();
+  await expect(page).toHaveURL(/email-game\.html\?game_id=/);
+  await expect(page.locator('#turn')).toContainText('Your turn (Black)');
+  await expect(page.locator('#moves li')).toHaveCount(1);
+  await movePiece(page, 'e7', 'e5');
+  await expect(page.locator('#moves li')).toHaveCount(3);
+  await expect(page.locator('#turn')).toContainText('Your turn (Black)');
+  await page.locator('#rewind-target-ply').selectOption('1');
+  await page.getByRole('button', { name: 'Rewind and continue' }).click();
+  await expect(page.locator('#moves li')).toHaveCount(1);
+  await expect(page.locator('#turn')).toContainText('Your turn (Black)');
+  await movePiece(page, 'e7', 'e6');
+  await expect(page.locator('#moves li')).toHaveCount(3);
+  await expect(page.locator('#moves')).toContainText('e6');
+  await page.close();
+});
+
 test.describe('email board input', () => {
   async function openInputGame(browser, { touch = true, color = 'white', status = 'active', myTurn = true, fen, moveHistory = [], initialMessages = [] } = {}) {
     const context = await browser.newContext({

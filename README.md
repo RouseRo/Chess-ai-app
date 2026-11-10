@@ -83,6 +83,15 @@ the online player list, see who is online or playing, and send community chat
 messages. Invite an online player directly, or enter a username or email address
 to preview an email invitation before sending it.
 
+From the email-game list, a player can also start a Stockfish email game, choose
+Stockfish's color and skill level, and receive a turn email after the AI replies.
+Stockfish games are single-player correspondence games; draw offers and game
+messages are not available against the engine. To branch a game, use **Return to
+an earlier turn** to select a position where you are to move, then choose
+**Rewind and continue**. Moves after that position are discarded, and the game
+resumes so you can make a different move. Rewind is also available after a game
+is completed; pending emails for the abandoned line are cancelled.
+
 
 The email-game board automatically detects touch-capable devices, including
 phones and tablets. Tap one of your pieces to select it (highlighted in yellow),

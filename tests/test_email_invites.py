@@ -371,6 +371,145 @@ class EmailInviteTests(unittest.TestCase):
             self.assertIn("game_id", outbox_columns)
             self.assertIn("notification_type", outbox_columns)
 
+    def test_stockfish_email_game_can_rewind_and_branch(self):
+        async def exercise_routes():
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=auth.app), base_url="http://testserver") as client:
+                headers = {"Authorization": "Bearer test"}
+                with patch.object(auth, "_request_stockfish_move", side_effect=[
+                    {"uci": "e7e5", "san": "e5"},
+                    {"uci": "d7d5", "san": "d5"},
+                    {"uci": "c7c5", "san": "c5"},
+                ]) as stockfish_move:
+                    created = await client.post(
+                        "/community/email-games/stockfish", headers=headers,
+                        json={"ai_color": "black", "skill_level": 5}
+                    )
+                    game = created.json()["game"]
+                    game_id = game["id"]
+                    for move, version in (("e2e4", 0), ("d2d4", 2)):
+                        response = await client.post(
+                            f"/community/email-games/{game_id}/moves", headers=headers,
+                            json={"move": move, "expected_version": version}
+                        )
+                        self.assertEqual(response.status_code, 200, response.text)
+                    current = response.json()["game"]
+                    self.assertEqual(len(current["move_history"]), 4)
+
+                    ai_turn = await client.post(
+                        f"/community/email-games/{game_id}/rewind", headers=headers,
+                        json={"target_ply": 1, "expected_version": current["version"]}
+                    )
+                    self.assertEqual(ai_turn.status_code, 409)
+
+                    rewound = await client.post(
+                        f"/community/email-games/{game_id}/rewind", headers=headers,
+                        json={"target_ply": 0, "expected_version": current["version"]}
+                    )
+                    self.assertEqual(rewound.status_code, 200, rewound.text)
+                    game = rewound.json()["game"]
+                    self.assertEqual(game["move_history"], [])
+                    self.assertEqual(game["fen"], auth.chess.STARTING_FEN)
+                    self.assertEqual(game["current_player"], "inviter")
+                    self.assertEqual(game["status"], "active")
+                    self.assertEqual(game["version"], current["version"] + 1)
+
+                    branch = await client.post(
+                        f"/community/email-games/{game_id}/moves", headers=headers,
+                        json={"move": "c2c4", "expected_version": game["version"]}
+                    )
+                    self.assertEqual(branch.status_code, 200, branch.text)
+                    self.assertEqual(
+                        [item["uci"] for item in branch.json()["game"]["move_history"]],
+                        ["c2c4", "c7c5"]
+                    )
+                    self.assertEqual(stockfish_move.call_count, 3)
+
+                with self.connect() as conn:
+                    pending = conn.execute(
+                        "SELECT COUNT(*) FROM email_outbox WHERE game_id = ? AND status = 'pending'",
+                        (game_id,)
+                    ).fetchone()[0]
+                    self.assertEqual(pending, 1)
+
+        with patch.object(auth, "verify_jwt_token", return_value={"username": "inviter"}):
+            asyncio.run(exercise_routes())
+
+    def test_stockfish_email_game_plays_ai_turns_and_notifies_human(self):
+        async def exercise_routes():
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=auth.app), base_url="http://testserver") as client:
+                headers = {"Authorization": "Bearer test"}
+                with patch.object(auth, "_request_stockfish_move", side_effect=[
+                    {"uci": "e2e4", "san": "e4"},
+                    {"uci": "g1f3", "san": "Nf3"},
+                    {"uci": "e7e5", "san": "e5"},
+                ]) as stockfish_move:
+                    white_ai = await client.post(
+                        "/community/email-games/stockfish", headers=headers,
+                        json={"ai_color": "white", "skill_level": 5}
+                    )
+                    self.assertEqual(white_ai.status_code, 200, white_ai.text)
+                    white_game = white_ai.json()["game"]
+                    self.assertEqual(white_game["white_player"], "Stockfish")
+                    self.assertEqual(white_game["black_player"], "inviter")
+                    self.assertEqual(white_game["current_player"], "inviter")
+                    self.assertEqual(white_game["version"], 1)
+                    self.assertEqual([move["uci"] for move in white_game["move_history"]], ["e2e4"])
+
+                    white_move = await client.post(
+                        f"/community/email-games/{white_game['id']}/moves", headers=headers,
+                        json={"move": "e7e5", "expected_version": 1}
+                    )
+                    self.assertEqual(white_move.status_code, 200, white_move.text)
+                    self.assertEqual(white_move.json()["game"]["current_player"], "inviter")
+                    self.assertEqual(white_move.json()["game"]["version"], 3)
+                    self.assertEqual(
+                        [move["uci"] for move in white_move.json()["game"]["move_history"]],
+                        ["e2e4", "e7e5", "g1f3"]
+                    )
+
+                    black_ai = await client.post(
+                        "/community/email-games/stockfish", headers=headers,
+                        json={"ai_color": "black", "skill_level": 8}
+                    )
+                    self.assertEqual(black_ai.status_code, 200, black_ai.text)
+                    black_game = black_ai.json()["game"]
+                    self.assertEqual(black_game["current_player"], "inviter")
+                    self.assertEqual(black_game["version"], 0)
+                    black_move = await client.post(
+                        f"/community/email-games/{black_game['id']}/moves", headers=headers,
+                        json={"move": "e2e4", "expected_version": 0}
+                    )
+                    self.assertEqual(black_move.status_code, 200, black_move.text)
+                    self.assertEqual(black_move.json()["game"]["current_player"], "inviter")
+                    self.assertEqual(black_move.json()["game"]["version"], 2)
+                    self.assertEqual(
+                        [move["uci"] for move in black_move.json()["game"]["move_history"]],
+                        ["e2e4", "e7e5"]
+                    )
+                    self.assertEqual(stockfish_move.call_count, 3)
+
+                with self.connect() as conn:
+                    conn.execute(
+                        "INSERT INTO users (username, email, is_verified, last_activity, current_activity, is_admin) "
+                        "VALUES ('Stockfish', 'stockfish@example.com', 1, NULL, 'offline', 0)"
+                    )
+                    notifications = conn.execute(
+                        "SELECT recipient, subject FROM email_outbox WHERE game_id IN (?, ?) ORDER BY id",
+                        (white_game["id"], black_game["id"])
+                    ).fetchall()
+                    self.assertEqual(len(notifications), 4)
+                    self.assertTrue(all(row["recipient"] == "inviter@example.com" for row in notifications))
+                    self.assertTrue(all("Stockfish" in row["subject"] for row in notifications))
+                with patch.object(auth, "verify_jwt_token", return_value={"username": "Stockfish"}):
+                    headers = {"Authorization": "Bearer stockfish-account"}
+                    denied = await client.get(f"/community/email-games/{white_game['id']}", headers=headers)
+                    hidden = await client.get("/community/email-games", headers=headers)
+                self.assertEqual(denied.status_code, 404)
+                self.assertEqual(hidden.json()["games"], [])
+
+        with patch.object(auth, "verify_jwt_token", return_value={"username": "inviter"}):
+            asyncio.run(exercise_routes())
+
     # Verifies HTTP game access, signed-token identity, admin authorization, and pagination validation.
     def test_http_access_with_signed_tokens_and_pagination_validation(self):
         self.invite()
