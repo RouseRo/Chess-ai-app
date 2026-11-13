@@ -329,14 +329,14 @@ CMD ["/bin/sh", "/app/start.sh"]
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
 | `/health` | GET | No | Health check |
-| `/admin/stats` | GET | No | System statistics |
-| `/admin/users` | GET | No | List all users with online status |
-| `/admin/users/{username}` | GET | No | Get detailed user info |
-| `/admin/users/{username}/promote` | POST | No | Promote user to admin |
-| `/admin/users/{username}/demote` | POST | No | Demote admin to user |
-| `/admin/users/{username}/verify` | POST | No | Manually verify user |
-| `/admin/users/{username}` | DELETE | No | Delete user |
-| `/admin/models` | GET | Yes | List configured AI models |
+| `/admin/stats` | GET | Admin | System statistics |
+| `/admin/users` | GET | Admin | List all users with online status |
+| `/admin/users/{username}` | GET | Admin | Get detailed user info |
+| `/admin/users/{username}/promote` | POST | Admin | Promote user to admin |
+| `/admin/users/{username}/demote` | POST | Admin | Demote admin to user |
+| `/admin/users/{username}/verify` | POST | Admin | Manually verify user |
+| `/admin/users/{username}` | DELETE | Admin | Delete user |
+| `/admin/models` | GET | Admin | List configured AI models |
 
 **Stats Response Example:**
 ```json

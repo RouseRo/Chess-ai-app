@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import Depends, FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
@@ -6,6 +6,8 @@ import os
 import sqlite3
 import bcrypt
 import json
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone, timedelta
 
 app = FastAPI(
@@ -25,6 +27,7 @@ app.add_middleware(
 # Database configuration
 DATABASE_PATH = os.environ.get("DATABASE_PATH", "/app/data/users.db")
 SQLITE_VFS = os.environ.get("SQLITE_VFS", "unix-dotfile")
+AUTH_SERVICE_URL = os.environ.get("AUTH_SERVICE_URL", "http://auth-service:8002")
 
 print(f"\n[INIT] ========== ADMIN SERVICE INITIALIZATION ==========")
 print(f"[INIT] DATABASE_PATH: {DATABASE_PATH}")
@@ -320,6 +323,33 @@ def load_ai_models() -> list:
     
     return models
 
+def require_admin(authorization: Optional[str] = Header(None)) -> str:
+    """Allow the request only for a signed-in user who is currently an admin."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Sign-in required.")
+    request = urllib.request.Request(
+        f"{AUTH_SERVICE_URL.rstrip('/')}/auth/verify",
+        headers={"Authorization": authorization},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            result = json.loads(response.read())
+    except urllib.error.HTTPError as exc:
+        if exc.code == 401:
+            raise HTTPException(status_code=401, detail="Sign-in required.") from exc
+        raise HTTPException(status_code=503, detail="Sign-in could not be verified.") from exc
+    except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+        raise HTTPException(status_code=503, detail="Sign-in could not be verified.") from exc
+    username = result.get("username") if result.get("success") else None
+    if not username:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+    # The token's admin claim can be stale, so the users table decides.
+    user = get_user(username)
+    if not user or not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required.")
+    return username
+
 # ========== Health Check ==========
 
 @app.get("/health")
@@ -342,12 +372,12 @@ async def root():
 
 # ========== Admin Endpoints ==========
 
-@app.get("/admin/stats")
+@app.get("/admin/stats", dependencies=[Depends(require_admin)])
 async def admin_stats():
     """Get system statistics."""
     return get_stats()
 
-@app.get("/admin/models", response_model=List[AIModelResponse])
+@app.get("/admin/models", response_model=List[AIModelResponse], dependencies=[Depends(require_admin)])
 async def get_ai_models():
     """Get list of available AI models."""
     models_data = load_ai_models()
@@ -367,7 +397,7 @@ async def get_ai_models():
     
     return models_responses
 
-@app.get("/admin/users", response_model=List[UserResponse])
+@app.get("/admin/users", response_model=List[UserResponse], dependencies=[Depends(require_admin)])
 async def get_all_users():
     """Get list of all users."""
     users = list_all_users()
@@ -428,7 +458,7 @@ async def get_all_users():
         _gs_conn.close()
     return user_responses
 
-@app.get("/admin/users/{username}", response_model=UserDetailResponse)
+@app.get("/admin/users/{username}", response_model=UserDetailResponse, dependencies=[Depends(require_admin)])
 async def get_user_details(username: str):
     """Get detailed user information."""
     user = get_user(username)
@@ -445,7 +475,7 @@ async def get_user_details(username: str):
         games=[]
     )
 
-@app.post("/admin/users/{username}/promote", response_model=AdminActionResponse)
+@app.post("/admin/users/{username}/promote", response_model=AdminActionResponse, dependencies=[Depends(require_admin)])
 async def promote_user_to_admin(username: str):
     """Promote a user to admin."""
     user = get_user(username)
@@ -464,7 +494,7 @@ async def promote_user_to_admin(username: str):
     else:
         raise HTTPException(status_code=500, detail="Failed to promote user")
 
-@app.post("/admin/users/{username}/demote", response_model=AdminActionResponse)
+@app.post("/admin/users/{username}/demote", response_model=AdminActionResponse, dependencies=[Depends(require_admin)])
 async def demote_user_from_admin(username: str):
     """Demote an admin user to regular user."""
     user = get_user(username)
@@ -483,7 +513,7 @@ async def demote_user_from_admin(username: str):
     else:
         raise HTTPException(status_code=500, detail="Failed to demote user")
 
-@app.post("/admin/users/{username}/verify", response_model=AdminActionResponse)
+@app.post("/admin/users/{username}/verify", response_model=AdminActionResponse, dependencies=[Depends(require_admin)])
 async def verify_user_endpoint(username: str):
     """Verify a user's email."""
     user = get_user(username)
@@ -502,7 +532,7 @@ async def verify_user_endpoint(username: str):
     else:
         raise HTTPException(status_code=500, detail="Failed to verify user")
 
-@app.delete("/admin/users/{username}", response_model=AdminActionResponse)
+@app.delete("/admin/users/{username}", response_model=AdminActionResponse, dependencies=[Depends(require_admin)])
 async def delete_user_endpoint(username: str):
     """Delete a user account."""
     user = get_user(username)

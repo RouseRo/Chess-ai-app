@@ -605,16 +605,21 @@ The following accounts have been created and verified on the live deployment:
 ### Adding More Tester Accounts
 
 ```powershell
-# Register and immediately verify a new tester
+# Register and immediately verify a new tester (verification needs an admin sign-in)
 $name = "tester4"
 Invoke-RestMethod `
   -Uri "https://chess-auth.calmdesert-0b7461a5.eastus.azurecontainerapps.io/auth/register" `
   -Method POST -ContentType "application/json" `
   -Body "{`"username`":`"$name`",`"password`":`"Chess2026!`",`"email`":`"$name@chess.local`"}"
 
+$admin = Invoke-RestMethod `
+  -Uri "https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io/admin-auth/login" `
+  -Method POST -ContentType "application/json" `
+  -Body (@{ username = "<admin username>"; password = (Read-Host "Admin password" -MaskInput) } | ConvertTo-Json)
+
 Invoke-RestMethod `
   -Uri "https://chess-ui.calmdesert-0b7461a5.eastus.azurecontainerapps.io/admin/users/$name/verify" `
-  -Method POST
+  -Method POST -Headers @{ Authorization = "Bearer $($admin.token)" }
 ```
 
 Or use the **Admin Dashboard → User Management** panel to verify accounts that testers registered themselves.
@@ -828,6 +833,8 @@ The User Management table displays:
 The **&#8635; Refresh Status** button refreshes the user list and online statuses on demand.
 
 ### Admin API Endpoints
+
+Every `/admin/*` endpoint requires `Authorization: Bearer <token>` from a signed-in admin.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
