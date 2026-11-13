@@ -84,6 +84,9 @@ test('players can create and play a Stockfish email game', async ({ browser, req
   await page.getByLabel('Skill level (1-20)').fill('5');
   await page.getByRole('button', { name: 'Create Stockfish email game' }).click();
   await expect(page).toHaveURL(/email-game\.html\?game_id=/);
+  await page.getByRole('tab', { name: 'Community' }).click();
+  await expect(page.locator('#community-stockfish-form')).toBeVisible();
+  await page.getByRole('tab', { name: 'Game' }).click();
   await expect(page.locator('#turn')).toContainText('Your turn (White)');
   await waitForMessage(request, email, 'Your turn in a Stockfish email chess game');
 

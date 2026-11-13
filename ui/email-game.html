@@ -78,9 +78,9 @@
     button.button-danger:hover:not(:disabled) { background: #87302c; border-color: #87302c; }
     button.button-secondary:focus-visible, button.button-danger:focus-visible { outline-color: rgba(40, 107, 161, .55); }
     #login button { margin-top: 16px; }
-    #stockfish-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; align-items: end; max-width: 720px; margin: 14px 0 20px; border-left: 3px solid var(--copper); padding: 12px 16px; background: rgba(255, 254, 250, .75); }
-    #stockfish-form label { margin: 0; }
-    #stockfish-form select, #stockfish-form input { display: block; width: 100%; margin-top: 6px; padding: 10px; font: 1rem/1.4 system-ui, sans-serif; }
+    .stockfish-form { display: grid; grid-template-columns: 1fr; gap: 8px; align-items: end; margin: 0 0 14px; border-left: 3px solid var(--copper); padding: 10px 12px; background: rgba(255, 254, 250, .75); }
+    .stockfish-form label { margin: 0; }
+    .stockfish-form select, .stockfish-form input { display: block; width: 100%; margin-top: 6px; padding: 10px; font: 1rem/1.4 system-ui, sans-serif; }
     #feedback { min-height: 24px; color: #a12e2e; font: 500 .95rem/1.5 system-ui, sans-serif; }
     #game > #players { margin: 4px 0 4px; font-size: 1.08rem; font-weight: 700; }
     #game > #turn { display: inline-block; margin: 0 0 8px; border-left: 3px solid var(--copper); padding: 3px 10px; color: var(--forest-deep); font: 650 .92rem/1.4 system-ui, sans-serif; }
@@ -257,6 +257,16 @@
         <div id="community-layout">
           <section id="community-players" aria-labelledby="community-players-heading">
             <h3 id="community-players-heading">Players</h3>
+            <h4>Play Stockfish</h4>
+            <form id="community-stockfish-form" class="stockfish-form">
+              <label for="community-stockfish-color">Stockfish color
+                <select id="community-stockfish-color"><option value="black">Black</option><option value="white">White</option></select>
+              </label>
+              <label for="community-stockfish-skill">Stockfish strength (1-20)
+                <input id="community-stockfish-skill" type="number" min="1" max="20" value="5" required>
+              </label>
+              <button type="submit">Create Stockfish email game</button>
+            </form>
             <form id="community-invite-form">
               <label for="community-invite-recipient">Invite by email or username</label>
               <input id="community-invite-recipient" type="text" maxlength="254" autocomplete="email" required>
@@ -289,7 +299,7 @@
     </section>
     <section id="games" hidden>
       <h2>Your email games</h2>
-      <form id="stockfish-form">
+      <form id="stockfish-form" class="stockfish-form">
         <label for="stockfish-color">Stockfish plays as
           <select id="stockfish-color"><option value="black">Black</option><option value="white">White</option></select>
         </label>
@@ -1106,27 +1116,29 @@
     document.getElementById('replay-prev').addEventListener('click', () => stepReplay(-1));
     document.getElementById('replay-next').addEventListener('click', () => stepReplay(1));
     document.getElementById('export-pgn').addEventListener('click', downloadPgn);
-    document.getElementById('stockfish-form').addEventListener('submit', async event => {
-      event.preventDefault();
-      const button = event.currentTarget.querySelector('button[type="submit"]');
-      button.disabled = true;
-      feedback.textContent = '';
-      try {
-        const response = await fetch('/community/email-games/stockfish', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-          body: JSON.stringify({
-            ai_color: document.getElementById('stockfish-color').value,
-            skill_level: Number(document.getElementById('stockfish-skill').value)
-          })
-        });
-        const data = await response.json();
-        if (!response.ok || !data.success) throw new Error(data.detail || data.message || 'Could not create Stockfish game.');
-        location.href = 'email-game.html?game_id=' + encodeURIComponent(data.game_id);
-      } catch (error) {
-        feedback.textContent = error.message || 'Could not create Stockfish game.';
-        button.disabled = false;
-      }
+    document.querySelectorAll('.stockfish-form').forEach(form => {
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        const button = form.querySelector('button[type="submit"]');
+        button.disabled = true;
+        feedback.textContent = '';
+        try {
+          const response = await fetch('/community/email-games/stockfish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+            body: JSON.stringify({
+              ai_color: form.querySelector('select').value,
+              skill_level: Number(form.querySelector('input').value)
+            })
+          });
+          const data = await response.json();
+          if (!response.ok || !data.success) throw new Error(data.detail || data.message || 'Could not create Stockfish game.');
+          location.href = 'email-game.html?game_id=' + encodeURIComponent(data.game_id);
+        } catch (error) {
+          feedback.textContent = error.message || 'Could not create Stockfish game.';
+          button.disabled = false;
+        }
+      });
     });
     function resizeMoveHistory() {
       const moves = document.getElementById('moves');
